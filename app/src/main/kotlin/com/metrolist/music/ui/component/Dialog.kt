@@ -296,6 +296,7 @@ fun TextFieldDialog(
     onDoneMultiple: ((List<String>) -> Unit)? = null,
 
     onDismiss: () -> Unit,
+    autoDismiss: Boolean = true,
     extraContent: (@Composable () -> Unit)? = null,
 ) {
     val legacyFieldState = remember { mutableStateOf(initialTextFieldValue) }
@@ -325,7 +326,7 @@ fun TextFieldDialog(
             TextButton(
                 enabled = isValid,
                 onClick = {
-                    onDismiss()
+                    if (autoDismiss) onDismiss()
                     if (textFields != null && onDoneMultiple != null) {
                         onDoneMultiple(textFields.map { it.second.text })
                     } else {
@@ -353,14 +354,14 @@ fun TextFieldDialog(
                             imeAction = if (singleLine) ImeAction.Done else ImeAction.None,
                             keyboardType = keyboardType
                         ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                if (onDoneMultiple != null) {
-                                    onDoneMultiple(textFields.map { it.second.text })
-                                    onDismiss()
-                                }
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (onDoneMultiple != null) {
+                                onDoneMultiple(textFields.map { it.second.text })
+                                if (autoDismiss) onDismiss()
                             }
-                        ),
+                        }
+                    ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = if (index < textFields.size - 1) 12.dp else 0.dp)
@@ -382,7 +383,7 @@ fun TextFieldDialog(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             onDone(legacyFieldState.value.text)
-                            onDismiss()
+                            if (autoDismiss) onDismiss()
                         }
                     ),
                     modifier = Modifier
