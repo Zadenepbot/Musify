@@ -44,7 +44,7 @@ android {
     
     externalNativeBuild {
         cmake {
-            path("src/main/cpp/vibrafp/lib/CMakeLists.txt")
+            path("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
     }

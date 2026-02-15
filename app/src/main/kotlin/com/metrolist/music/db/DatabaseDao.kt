@@ -1051,6 +1051,12 @@ interface DatabaseDao {
     @Query("UPDATE song SET isDownloaded = :downloaded, dateDownload = :date WHERE id = :songId")
     fun updateDownloadedInfo(songId: String, downloaded: Boolean, date: LocalDateTime?)
 
+    @Query("UPDATE song SET downloadUri = :uri WHERE id = :songId")
+    fun updateDownloadUri(songId: String, uri: String?)
+
+    @Query("SELECT downloadUri FROM song WHERE id = :songId")
+    fun getDownloadUri(songId: String): String?
+
     @Transaction
     @Query("SELECT * FROM song WHERE isUploaded = 1 ORDER BY dateDownload")
     fun uploadedSongsByCreateDateAsc(): Flow<List<Song>>
