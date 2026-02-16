@@ -3249,13 +3249,6 @@ class MusicService :
         private fun startTracking() {
             if (watchTimeJob?.isActive == true) return
             
-            // Check if history is paused (using runBlocking here is safe because we launch a coroutine immediately if check passes, 
-            // but actually we should avoid blocking main thread. Ideally we check inside the coroutine)
-            // However, to prevent launching job unnecessarily, we can do a quick check if possible, 
-            // but for safety let's move it inside scope.launch or use a non-blocking way.
-            // Since dataStore access is suspend, we can't do it synchronously easily without blocking.
-            // Let's rely on the check inside the coroutine.
-
             if (currentMediaId == null || currentCpn == null) return
 
             // If we don't have tracking info yet, try to fetch it
