@@ -260,6 +260,69 @@ object LyricsUtils {
         "Ґ", "ґ", "Є", "є", "І", "і", "Ї", "ї"
     )
 
+    // Hindi/Devanagari definitions
+    private val DEVANAGARI_RANGE = '\u0900'..'\u097F'
+    private val GURMUKHI_RANGE = '\u0A00'..'\u0A7F'
+
+    private val HINDI_VOWELS = mapOf(
+        "अ" to "a", "आ" to "aa", "इ" to "i", "ई" to "ee", "उ" to "u", "ऊ" to "oo",
+        "ऋ" to "ri", "ए" to "e", "ऐ" to "ai", "ओ" to "o", "औ" to "au"
+    )
+
+    private val HINDI_MODIFIERS = mapOf(
+        "ं" to "n", // Anusvara
+        "ँ" to "n", // Chandrabindu
+        "ः" to "h"  // Visarga
+    )
+
+    private val HINDI_CONSONANTS = mapOf(
+        "क" to "k", "ख" to "kh", "ग" to "g", "घ" to "gh", "ङ" to "ng",
+        "च" to "ch", "छ" to "chh", "ज" to "j", "झ" to "jh", "ञ" to "ny",
+        "ट" to "t", "ठ" to "th", "ड" to "d", "ढ" to "dh", "ण" to "n",
+        "त" to "t", "थ" to "th", "द" to "d", "ध" to "dh", "न" to "n",
+        "प" to "p", "फ" to "ph", "ब" to "b", "भ" to "bh", "म" to "m",
+        "य" to "y", "र" to "r", "ल" to "l", "व" to "v",
+        "श" to "sh", "ष" to "sh", "स" to "s", "ह" to "h",
+        "क्ष" to "ksh", "त्र" to "tr", "ज्ञ" to "gy", "श्र" to "shr"
+    )
+
+    private val HINDI_MATRAS = mapOf(
+        "ा" to "aa", "ि" to "i", "ी" to "ee", "ु" to "u", "ू" to "oo",
+        "ृ" to "ri", "े" to "e", "ै" to "ai", "ो" to "o", "ौ" to "au"
+        // Matras can also be followed by nasalization, handled separately
+    )
+
+    // Gurmukhi mappings
+    private val GURMUKHI_VOWELS = mapOf(
+        "ੳ" to "u", "ਅ" to "a", "ੲ" to "e", "ਸ" to "s", "ਹ" to "h",
+        "ਕ" to "k", "ਖ" to "kh", "ਗ" to "g", "ਘ" to "gh", "ਙ" to "ng",
+        "ਚ" to "ch", "ਛ" to "chh", "ਜ" to "j", "ਝ" to "jh", "ਞ" to "ny",
+        "ਟ" to "t", "ਠ" to "th", "ਡ" to "d", "ਢ" to "dh", "ਣ" to "n",
+        "ਤ" to "t", "ਥ" to "th", "ਦ" to "d", "ਧ" to "dh", "ਨ" to "n",
+        "ਪ" to "p", "ਫ" to "ph", "ਬ" to "b", "ਭ" to "bh", "ਮ" to "m",
+        "ਯ" to "y", "ਰ" to "r", "ਲ" to "l", "ਵ" to "v", "ੜ" to "r",
+        "ਸ਼" to "sh", "ਖ਼" to "kh", "ਗ਼" to "gh", "ਜ਼" to "z", "ਫ਼" to "f", "ਲ਼" to "l"
+    )
+
+    private val GURMUKHI_MATRAS = mapOf(
+        "ਾ" to "aa", "ਿ" to "i", "ੀ" to "ee", "ੁ" to "u", "ੂ" to "oo",
+        "ੇ" to "e", "ੈ" to "ai", "ੋ" to "o", "ੌ" to "au",
+        "੍" to "", // Halant/Virama (rare in Gurmukhi but exists)
+        "ੰ" to "n", // Tippi (nasal)
+        "ੱ" to "", // Addak (gemination - doubles next consonant, handled in logic)
+        "ਂ" to "n", // Bindi (nasal)
+        "ਃ" to "h" // Visarga
+    )
+
+    private val GURMUKHI_INDEPENDENT_VOWELS = mapOf(
+        "ਅ" to "a", "ਆ" to "aa", "ਇ" to "i", "ਈ" to "ee", "ਉ" to "u", "ਊ" to "oo",
+        "ਏ" to "e", "ਐ" to "ai", "ਓ" to "o", "ਔ" to "au"
+    )
+
+    private val HALANT = "्"
+    private val NUKTA = "़"
+    private val AVAGRAHA = "ऽ"
+
     private val SERBIAN_SPECIFIC_CYRILLIC_LETTERS = setOf(
         "Ђ", "ђ", "Ј", "ј", "Љ", "љ", "Њ", "њ", "Ћ", "ћ", "Џ", "џ"
     )
@@ -711,6 +774,138 @@ object LyricsUtils {
             .trim()
     }
 
+    suspend fun romanizeHindi(text: String): String = withContext(Dispatchers.Default) {
+        val result = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val char = text[i].toString()
+
+            if (HINDI_VOWELS.containsKey(char)) {
+                result.append(HINDI_VOWELS[char])
+                i++
+                if (i < text.length && HINDI_MODIFIERS.containsKey(text[i].toString())) {
+                    result.append(HINDI_MODIFIERS[text[i].toString()])
+                    i++
+                }
+            } 
+            else if (HINDI_CONSONANTS.containsKey(char)) {
+                var romanConsonant = HINDI_CONSONANTS[char]!!
+                i++
+
+                if (i < text.length && text[i].toString() == NUKTA) {
+                    romanConsonant = when (char) {
+                        "क" -> "q"
+                        "ख" -> "kh"
+                        "ग" -> "gh"
+                        "ज" -> "z"
+                        "ड" -> "r"
+                        "ढ" -> "rh"
+                        "फ" -> "f"
+                        else -> romanConsonant
+                    }
+                    i++
+                }
+
+                result.append(romanConsonant)
+
+                var hasMatra = false
+                var hasHalant = false
+
+                if (i < text.length) {
+                    val nextChar = text[i].toString()
+                    if (HINDI_MATRAS.containsKey(nextChar)) {
+                        result.append(HINDI_MATRAS[nextChar])
+                        hasMatra = true
+                        i++
+                    } else if (nextChar == HALANT) {
+                        hasHalant = true
+                        i++
+                    }
+                }
+
+                if (!hasMatra && !hasHalant) {
+                    var addA = true
+                    if (i >= text.length) {
+                        addA = false
+                    } else {
+                        val nextChar = text[i]
+                        if (!isHindi(nextChar.toString()) && !HINDI_MODIFIERS.containsKey(nextChar.toString()) && !nextChar.isLetterOrDigit()) {
+                            addA = false
+                        }
+                    }
+                    
+                    if (addA) {
+                        result.append("a")
+                    }
+                }
+
+                if (i < text.length && HINDI_MODIFIERS.containsKey(text[i].toString())) {
+                    result.append(HINDI_MODIFIERS[text[i].toString()])
+                    i++
+                }
+            } 
+            else if (HINDI_MODIFIERS.containsKey(char) || char == NUKTA || char == HALANT) {
+                 i++
+            }
+            else {
+                result.append(char)
+                i++
+            }
+        }
+        result.toString()
+    }
+
+    suspend fun romanizeGurmukhi(text: String): String = withContext(Dispatchers.Default) {
+        val result = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val char = text[i].toString()
+
+            if (GURMUKHI_INDEPENDENT_VOWELS.containsKey(char)) {
+                result.append(GURMUKHI_INDEPENDENT_VOWELS[char])
+                i++
+            } else if (GURMUKHI_VOWELS.containsKey(char)) {
+                result.append(GURMUKHI_VOWELS[char])
+                i++
+
+                var hasMatra = false
+                var hasHalant = false
+
+                if (i < text.length) {
+                    val nextChar = text[i].toString()
+                    if (GURMUKHI_MATRAS.containsKey(nextChar)) {
+                        result.append(GURMUKHI_MATRAS[nextChar])
+                        hasMatra = true
+                        i++
+                    }
+                }
+
+                if (!hasMatra && !hasHalant) {
+                    var addA = true
+                    if (i >= text.length) {
+                        addA = false
+                    } else {
+                        val nextChar = text[i]
+                        if (!isGurmukhi(nextChar.toString()) && !nextChar.isLetterOrDigit()) {
+                            addA = false
+                        }
+                    }
+                    
+                    if (addA) {
+                        result.append("a")
+                    }
+                }
+            } else if (GURMUKHI_MATRAS.containsKey(char)) {
+                result.append(GURMUKHI_MATRAS[char])
+                i++
+            } else {
+                result.append(char)
+                i++
+            }
+        }
+        result.toString()
+    }
+
     suspend fun romanizeCyrillic(text: String): String? = withContext(Dispatchers.Default) {
         if (text.isEmpty()) return@withContext null
 
@@ -1087,6 +1282,14 @@ object LyricsUtils {
         val cjkCharCount = text.count { char -> char in '\u4E00'..'\u9FFF' }
         val hiraganaKatakanaCount = text.count { char -> (char in '\u3040'..'\u309F') || (char in '\u30A0'..'\u30FF') }
         return cjkCharCount > 0 && (hiraganaKatakanaCount.toDouble() / text.length.toDouble()) < 0.1
+    }
+
+    fun isHindi(text: String): Boolean {
+        return text.any { it in DEVANAGARI_RANGE }
+    }
+
+    fun isGurmukhi(text: String): Boolean {
+        return text.any { it in GURMUKHI_RANGE }
     }
 
     private fun isCyrillicVowel(char: Char): Boolean {
