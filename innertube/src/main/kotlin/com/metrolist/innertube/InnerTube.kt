@@ -269,6 +269,37 @@ class InnerTube {
         }
     }
 
+    suspend fun updateWatchTime(
+        url: String,
+        cpn: String,
+        videoId: String,
+        startTime: Float,
+        endTime: Float,
+        length: Float,
+        client: YouTubeClient = YouTubeClient.WEB_REMIX,
+        playlistId: String? = null,
+        isAudio: Boolean = true
+    ) = withRetry {
+        httpClient.get(url) {
+            ytClient(client, true)
+            parameter("ns", "yt")
+            parameter("docid", videoId)
+            parameter("cpn", cpn)
+            parameter("st", String.format(Locale.US, "%.3f", startTime))
+            parameter("et", String.format(Locale.US, "%.3f", endTime))
+            parameter("len", String.format(Locale.US, "%.3f", length))
+            parameter("ver", "2")
+            parameter("c", client.clientName)
+            parameter("rt", String.format(Locale.US, "%.3f", System.currentTimeMillis() / 1000f))
+            if (playlistId != null) {
+                parameter("list", playlistId)
+            }
+            if (isAudio) {
+                parameter("lact", String.format(Locale.US, "%.3f", endTime))
+            }
+        }
+    }
+
     suspend fun browse(
         client: YouTubeClient,
         browseId: String? = null,

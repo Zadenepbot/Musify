@@ -202,6 +202,10 @@ import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.seconds
 
+import com.metrolist.innertube.models.response.PlayerResponse
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CancellationException as KotlinCancellationException
+
 private const val INSTANT_SILENCE_SKIP_STEP_MS = 15_000L
 private const val INSTANT_SILENCE_SKIP_SETTLE_MS = 350L
 
@@ -354,6 +358,8 @@ class MusicService :
     private var retryJob: Job? = null
     private var retryCount = 0
     private var silenceSkipJob: Job? = null
+    
+    private val watchTimeTracker = WatchTimeTracker()
 
     // URL cache for stream URLs - class-level so it can be invalidated on errors
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
@@ -1802,6 +1808,8 @@ class MusicService :
         if (player.playWhenReady && player.playbackState == Player.STATE_READY) {
             scrobbleManager?.onSongStart(player.currentMetadata, duration = player.duration)
         }
+        
+        watchTimeTracker.onMediaItemTransition(mediaItem?.mediaId)
 
         // Sync Cast when media changes and Cast is connected
         // Skip if this change was triggered by Cast sync (to prevent loops)
@@ -1935,6 +1943,7 @@ class MusicService :
 
         // Widget and Discord RPC updates
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED)) {
+            watchTimeTracker.onIsPlayingChanged(player.isPlaying)
             updateWidgetUI(player.isPlaying)
             if (player.isPlaying) {
                 startWidgetUpdates()
@@ -2712,6 +2721,7 @@ class MusicService :
                     )
                 }
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId, nonNullPlayback) }
+                watchTimeTracker.setPlaybackTracking(mediaId, nonNullPlayback.playbackTracking)
 
                 // Clear bypass flag now that we've fetched fresh stream
                 if (bypassCacheForQualityChange.remove(mediaId)) {
@@ -2782,20 +2792,6 @@ class MusicService :
                         ),
                     )
                 } catch (_: SQLException) {
-                }
-            }
-        }
-
-        if (playbackStats.totalPlayTimeMs >= historyDurationMs) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val playbackUrl = database.format(mediaItem.mediaId).first()?.playbackUrl
-                    ?: YTPlayerUtils.playerResponseForMetadata(mediaItem.mediaId, null)
-                        .getOrNull()?.playbackTracking?.videostatsPlaybackUrl?.baseUrl
-                playbackUrl?.let {
-                    YouTube.registerPlayback(null, playbackUrl)
-                        .onFailure {
-                            reportException(it)
-                        }
                 }
             }
         }
@@ -3205,6 +3201,148 @@ class MusicService :
         fadingPlayer = null
         isCrossfading = false
         sleepTimer.notifySongTransition()
+    }
+
+    private inner class WatchTimeTracker {
+        private var currentCpn: String? = null
+        private var watchTimeJob: Job? = null
+        private var playbackTracking: PlayerResponse.PlaybackTracking? = null
+        private var currentMediaId: String? = null
+        private var lastReportedTimeMs: Long = 0
+        private var isPlaying = false
+        private var hasRegisteredPlayback = false
+
+        fun onMediaItemTransition(mediaId: String?) {
+            stopTracking()
+            if (mediaId != null) {
+                currentCpn = generateCpn()
+                currentMediaId = mediaId
+                playbackTracking = null
+                lastReportedTimeMs = 0
+                hasRegisteredPlayback = false
+            }
+        }
+
+        fun onIsPlayingChanged(playing: Boolean) {
+            isPlaying = playing
+            if (playing) {
+                startTracking()
+            } else {
+                watchTimeJob?.cancel()
+                watchTimeJob = null
+            }
+        }
+
+        fun setPlaybackTracking(mediaId: String, tracking: PlayerResponse.PlaybackTracking?) {
+            if (mediaId == currentMediaId) {
+                playbackTracking = tracking
+                if (isPlaying) {
+                    startTracking()
+                }
+            }
+        }
+
+        private fun startTracking() {
+            if (watchTimeJob?.isActive == true) return
+            
+            // If we don't have tracking info yet, try to fetch it (fallback for cache)
+            if (currentMediaId != null && playbackTracking == null) {
+                 scope.launch(Dispatchers.IO) {
+                     try {
+                         val response = YTPlayerUtils.playerResponseForMetadata(currentMediaId!!)
+                         val tracking = response.getOrNull()?.playbackTracking
+                         withContext(Dispatchers.Main) {
+                             if (currentMediaId == response.getOrNull()?.videoDetails?.videoId) {
+                                setPlaybackTracking(currentMediaId!!, tracking)
+                             }
+                         }
+                     } catch (e: Exception) {
+                         Timber.tag(TAG).e(e, "Failed to fetch playback tracking for watchtime")
+                     }
+                 }
+                 return
+            }
+
+            if (currentMediaId == null || playbackTracking == null || currentCpn == null) return
+
+            watchTimeJob = scope.launch(Dispatchers.IO) {
+                val cpn = currentCpn ?: return@launch
+                val mediaId = currentMediaId ?: return@launch
+                val tracking = playbackTracking ?: return@launch
+                
+                // Register playback if not already done
+                val playbackUrl = tracking.videostatsPlaybackUrl?.baseUrl
+                if (playbackUrl != null && !hasRegisteredPlayback) {
+                     YouTube.registerPlayback(null, playbackUrl, cpn)
+                         .onSuccess { hasRegisteredPlayback = true }
+                         .onFailure { Timber.tag(TAG).e(it, "Failed to register playback") }
+                }
+
+                val watchTimeUrl = tracking.videostatsWatchtimeUrl?.baseUrl ?: return@launch
+                
+                while (isActive) {
+                    try {
+                        val currentPosMs = withContext(Dispatchers.Main) { 
+                            if (playerInitialized.value) player.currentPosition else 0L 
+                        }
+                        val durationMs = withContext(Dispatchers.Main) { 
+                            if (playerInitialized.value) player.duration else 0L 
+                        }
+                        
+                        if (durationMs <= 0) {
+                            delay(5000)
+                            continue
+                        }
+
+                        if (currentPosMs < lastReportedTimeMs) {
+                            // Seeked backwards or restarted
+                            lastReportedTimeMs = currentPosMs
+                        }
+                        
+                        val startTimeSec = lastReportedTimeMs / 1000f
+                        val endTimeSec = currentPosMs / 1000f
+                        val lengthSec = durationMs / 1000f
+                        
+                        // Only send if we have advanced at least 1 second
+                        if (endTimeSec > startTimeSec + 1.0f) {
+                             val trackingUrl = watchTimeUrl // Create local copy for smart cast safety
+                             YouTube.updateWatchTime(
+                                 watchTimeUrl = trackingUrl,
+                                 cpn = cpn,
+                                 videoId = mediaId,
+                                 startTime = startTimeSec,
+                                 endTime = endTimeSec,
+                                 length = lengthSec,
+                                 playlistId = null
+                             ).onFailure { Timber.tag(TAG).e(it, "Failed to update watchtime") }
+                             
+                             lastReportedTimeMs = currentPosMs
+                        }
+                        
+                        delay(20000) // Update every 20 seconds
+                    } catch (e: Exception) {
+                        if (e is KotlinCancellationException) throw e
+                        Timber.tag(TAG).e(e, "Error in watchtime loop")
+                        delay(20000)
+                    }
+                }
+            }
+        }
+
+        private fun stopTracking() {
+            watchTimeJob?.cancel()
+            watchTimeJob = null
+            currentCpn = null
+            currentMediaId = null
+            playbackTracking = null
+            lastReportedTimeMs = 0
+            hasRegisteredPlayback = false
+        }
+
+        private fun generateCpn(): String {
+            val chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+            return (1..16).map { chars[kotlin.random.Random.nextInt(chars.length)] }.joinToString("")
+        }
     }
 
     companion object {
