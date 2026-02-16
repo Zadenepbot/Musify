@@ -3220,6 +3220,10 @@ class MusicService :
                 playbackTracking = null
                 lastReportedTimeMs = 0
                 hasRegisteredPlayback = false
+                
+                if (isPlaying) {
+                    startTracking()
+                }
             }
         }
 
@@ -3245,19 +3249,22 @@ class MusicService :
         private fun startTracking() {
             if (watchTimeJob?.isActive == true) return
             
-            // Check if history is paused
-            runBlocking {
-                 if (dataStore.get(PauseListenHistoryKey, false)) {
-                     Timber.tag(TAG).d("Playback tracking disabled due to paused history setting")
-                     return@runBlocking
-                 }
-            }
-            if (runBlocking { dataStore.get(PauseListenHistoryKey, false) }) return
+            // Check if history is paused (using runBlocking here is safe because we launch a coroutine immediately if check passes, 
+            // but actually we should avoid blocking main thread. Ideally we check inside the coroutine)
+            // However, to prevent launching job unnecessarily, we can do a quick check if possible, 
+            // but for safety let's move it inside scope.launch or use a non-blocking way.
+            // Since dataStore access is suspend, we can't do it synchronously easily without blocking.
+            // Let's rely on the check inside the coroutine.
 
-            // If we don't have tracking info yet, try to fetch it (fallback for cache)
-            if (currentMediaId != null && playbackTracking == null) {
+            if (currentMediaId == null || currentCpn == null) return
+
+            // If we don't have tracking info yet, try to fetch it
+            if (playbackTracking == null) {
                  scope.launch(Dispatchers.IO) {
                      try {
+                         // Check privacy before network call
+                         if (dataStore.get(PauseListenHistoryKey, false)) return@launch
+
                          val response = YTPlayerUtils.playerResponseForMetadata(currentMediaId!!)
                          val tracking = response.getOrNull()?.playbackTracking
                          withContext(Dispatchers.Main) {
@@ -3272,17 +3279,15 @@ class MusicService :
                  return
             }
 
-            if (currentMediaId == null || playbackTracking == null || currentCpn == null) return
-
             watchTimeJob = scope.launch(Dispatchers.IO) {
-                // Double check inside the coroutine
+                // Initial privacy check
                 if (dataStore.get(PauseListenHistoryKey, false)) return@launch
 
                 val cpn = currentCpn ?: return@launch
                 val mediaId = currentMediaId ?: return@launch
                 val tracking = playbackTracking ?: return@launch
                 
-                // Register playback if not already done
+                // Initial register attempt
                 val playbackUrl = tracking.videostatsPlaybackUrl?.baseUrl
                 if (playbackUrl != null && !hasRegisteredPlayback) {
                      YouTube.registerPlayback(null, playbackUrl, cpn)
@@ -3298,6 +3303,13 @@ class MusicService :
                         if (dataStore.get(PauseListenHistoryKey, false)) {
                             Timber.tag(TAG).d("Stopping watchtime tracking: History paused")
                             break
+                        }
+
+                        // Retry register if needed
+                        if (!hasRegisteredPlayback && playbackUrl != null) {
+                             YouTube.registerPlayback(null, playbackUrl, cpn)
+                                 .onSuccess { hasRegisteredPlayback = true }
+                                 .onFailure { Timber.tag(TAG).e(it, "Failed to retry register playback") }
                         }
 
                         val currentPosMs = withContext(Dispatchers.Main) { 
