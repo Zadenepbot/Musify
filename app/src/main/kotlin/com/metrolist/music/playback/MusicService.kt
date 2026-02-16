@@ -3245,6 +3245,15 @@ class MusicService :
         private fun startTracking() {
             if (watchTimeJob?.isActive == true) return
             
+            // Check if history is paused
+            runBlocking {
+                 if (dataStore.get(PauseListenHistoryKey, false)) {
+                     Timber.tag(TAG).d("Playback tracking disabled due to paused history setting")
+                     return@runBlocking
+                 }
+            }
+            if (runBlocking { dataStore.get(PauseListenHistoryKey, false) }) return
+
             // If we don't have tracking info yet, try to fetch it (fallback for cache)
             if (currentMediaId != null && playbackTracking == null) {
                  scope.launch(Dispatchers.IO) {
@@ -3266,6 +3275,9 @@ class MusicService :
             if (currentMediaId == null || playbackTracking == null || currentCpn == null) return
 
             watchTimeJob = scope.launch(Dispatchers.IO) {
+                // Double check inside the coroutine
+                if (dataStore.get(PauseListenHistoryKey, false)) return@launch
+
                 val cpn = currentCpn ?: return@launch
                 val mediaId = currentMediaId ?: return@launch
                 val tracking = playbackTracking ?: return@launch
@@ -3282,6 +3294,12 @@ class MusicService :
                 
                 while (isActive) {
                     try {
+                        // Check privacy setting periodically
+                        if (dataStore.get(PauseListenHistoryKey, false)) {
+                            Timber.tag(TAG).d("Stopping watchtime tracking: History paused")
+                            break
+                        }
+
                         val currentPosMs = withContext(Dispatchers.Main) { 
                             if (playerInitialized.value) player.currentPosition else 0L 
                         }
