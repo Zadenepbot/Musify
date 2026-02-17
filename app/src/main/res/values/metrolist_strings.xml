@@ -718,4 +718,17 @@
     <string name="discord_activity_name_description">Custom name for the activity (leave empty for default)</string>
     <string name="discord_advanced_mode">Advanced mode</string>
     <string name="discord_advanced_mode_description">Show additional customization options for Rich Presence</string>
+
+    <!-- Video Player -->
+    <string name="video_quality">Quality</string>
+    <string name="video_speed">Speed</string>
+    <string name="video_fullscreen">Fullscreen</string>
+    <string name="video_pip">Picture in picture</string>
+    <string name="video_previous">Previous</string>
+    <string name="video_next">Next</string>
+    <string name="video_play">Play</string>
+    <string name="video_pause">Pause</string>
+    <string name="video_loading">Loading video</string>
+    <string name="video_error">Failed to load video</string>
+    <string name="video_copied_link">Video link copied</string>
 </resources>

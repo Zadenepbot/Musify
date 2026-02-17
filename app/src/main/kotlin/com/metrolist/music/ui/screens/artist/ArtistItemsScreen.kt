@@ -60,6 +60,7 @@ import com.metrolist.music.ui.menu.YouTubeAlbumMenu
 import com.metrolist.music.ui.menu.YouTubeArtistMenu
 import com.metrolist.music.ui.menu.YouTubePlaylistMenu
 import com.metrolist.music.ui.menu.YouTubeSongMenu
+import com.metrolist.music.ui.screens.videoRoute
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.viewmodels.ArtistItemsViewModel
@@ -84,6 +85,10 @@ fun ArtistItemsScreen(
 
     val title by viewModel.title.collectAsState()
     val itemsPage by viewModel.itemsPage.collectAsState()
+
+    // Detect if this is a video section
+    val isVideoSection = title.contains("video", ignoreCase = true) ||
+        title.contains("short", ignoreCase = true)
 
     LaunchedEffect(lazyListState) {
         snapshotFlow {
@@ -177,7 +182,10 @@ fun ArtistItemsScreen(
                         .clickable {
                             when (item) {
                                 is SongItem -> {
-                                    if (item.id == mediaMetadata?.id) {
+                                    if (isVideoSection) {
+                                        val artistDisplay = item.artists.joinToString(" • ") { it.name }
+                                        navController.navigate(videoRoute(item.id, item.title, artistDisplay))
+                                    } else if (item.id == mediaMetadata?.id) {
                                         playerConnection.togglePlayPause()
                                     } else {
                                         playerConnection.playQueue(
@@ -231,12 +239,19 @@ fun ArtistItemsScreen(
                         .combinedClickable(
                             onClick = {
                                 when (item) {
-                                    is SongItem -> playerConnection.playQueue(
-                                        YouTubeQueue(
-                                            item.endpoint ?: WatchEndpoint(videoId = item.id),
-                                            item.toMediaMetadata()
-                                        )
-                                    )
+                                    is SongItem -> {
+                                        if (isVideoSection) {
+                                            val artistDisplay = item.artists.joinToString(" • ") { it.name }
+                                            navController.navigate(videoRoute(item.id, item.title, artistDisplay))
+                                        } else {
+                                            playerConnection.playQueue(
+                                                YouTubeQueue(
+                                                    item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                                    item.toMediaMetadata()
+                                                )
+                                            )
+                                        }
+                                    }
 
                                     is AlbumItem -> navController.navigate("album/${item.id}")
                                     is ArtistItem -> navController.navigate("artist/${item.id}")
