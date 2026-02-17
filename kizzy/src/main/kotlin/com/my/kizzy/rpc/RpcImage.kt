@@ -18,10 +18,25 @@ import com.my.kizzy.repository.KizzyRepository
  * Modified by Zion Huang
  */
 sealed class RpcImage {
+    abstract suspend fun resolveImage(repository: KizzyRepository): String?
 
     class DiscordImage(val image: String) : RpcImage() {
+        override suspend fun resolveImage(repository: KizzyRepository): String {
+            return if (image.startsWith("http")) image else "mp:${image}"
+        }
     }
 
-    class ExternalImage(val image: String) : RpcImage() {
+    class ExternalImage(
+        val image: String,
+        private val fallbackDiscordAsset: String? = null,
+    ) : RpcImage() {
+        override suspend fun resolveImage(repository: KizzyRepository): String? {
+            val asset = ArtworkCache.getOrFetch(image) { repository.getImage(image) }
+            return when {
+                asset != null -> "mp:$asset"
+                image.startsWith("http") -> image // Raw URL
+                else -> fallbackDiscordAsset?.let { if (it.startsWith("http")) it else "mp:${it}" }
+            }
+        }
     }
 }
