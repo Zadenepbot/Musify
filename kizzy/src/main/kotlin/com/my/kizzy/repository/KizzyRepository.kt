@@ -28,4 +28,11 @@ class KizzyRepository(
     suspend fun getImages(urls: List<String>): ImageProxyResponse? {
         return api.getImage(urls).getOrNull()?.body()
     }
+
+    suspend fun getImage(url: String): String? {
+        return getImages(listOf(url))
+            ?.results
+            ?.firstOrNull { it.originalUrl == url }
+            ?.id
+    }
 }
