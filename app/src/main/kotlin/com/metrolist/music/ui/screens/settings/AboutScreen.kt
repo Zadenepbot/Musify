@@ -254,6 +254,17 @@ fun AboutScreen(
             }
         )
 
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Avrumi Sternheim",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.clickable {
+                uriHandler.openUri("https://github.com/alltechdev")
+            }
+        )
+
         Spacer(Modifier.height(32.dp))
     }
 
