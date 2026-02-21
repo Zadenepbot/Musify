@@ -7,15 +7,22 @@ package com.metrolist.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,11 +39,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import timber.log.Timber
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -48,6 +61,7 @@ import com.metrolist.music.constants.CONTENT_TYPE_SONG
 import com.metrolist.music.constants.SongSortDescendingKey
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.SongSortTypeKey
+import com.metrolist.innertube.models.SongItem
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.ui.component.HideOnScrollFAB
@@ -79,6 +93,11 @@ fun LibraryPodcastsScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val podcasts by viewModel.allPodcasts.collectAsState()
+    val subscribedChannels by viewModel.subscribedChannels.collectAsState()
+    val newEpisodes by viewModel.newEpisodes.collectAsState()
+    val isLoadingNewEpisodes by viewModel.isLoadingNewEpisodes.collectAsState()
+
+    Timber.d("[PODCAST_LIB] Subscribed channels: ${subscribedChannels.size}, episodes: ${podcasts.size}, new episodes: ${newEpisodes.size}")
 
     val lazyListState = rememberLazyListState()
 
@@ -100,6 +119,174 @@ fun LibraryPodcastsScreen(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
+            // Subscribed Channels Section
+            if (subscribedChannels.isNotEmpty()) {
+                item(
+                    key = "subscribed_channels_header",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.subscribed_channels),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { viewModel.syncPodcastSubscriptions() }) {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = stringResource(R.string.action_sync),
+                            )
+                        }
+                    }
+                }
+
+                item(
+                    key = "subscribed_channels_row",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(
+                            items = subscribedChannels,
+                            key = { it.id }
+                        ) { podcast ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .width(100.dp)
+                                    .clickable {
+                                        Timber.d("[PODCAST_LIB] Navigating to podcast: ${podcast.id}")
+                                        navController.navigate("online_podcast/${podcast.id}")
+                                    }
+                                    .padding(4.dp)
+                            ) {
+                                AsyncImage(
+                                    model = podcast.thumbnailUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = podcast.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(
+                    key = "subscribed_channels_divider",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
+            // New Episodes Section (from official API)
+            if (newEpisodes.isNotEmpty() || isLoadingNewEpisodes) {
+                item(
+                    key = "new_episodes_header",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.new_episodes),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { viewModel.fetchNewEpisodes() }) {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = stringResource(R.string.action_sync),
+                            )
+                        }
+                    }
+                }
+
+                item(
+                    key = "new_episodes_row",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(
+                            items = newEpisodes,
+                            key = { it.id }
+                        ) { episode ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .width(140.dp)
+                                    .clickable {
+                                        playerConnection.playQueue(
+                                            ListQueue(
+                                                title = episode.title,
+                                                items = listOf(episode.toMediaItem()),
+                                            ),
+                                        )
+                                    }
+                                    .padding(4.dp)
+                            ) {
+                                AsyncImage(
+                                    model = episode.thumbnail,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = episode.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Text(
+                                    text = episode.artists.joinToString { it.name },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item(
+                    key = "new_episodes_divider",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
             item(
                 key = "filter",
                 contentType = CONTENT_TYPE_HEADER,
@@ -119,6 +306,32 @@ fun LibraryPodcastsScreen(
                             )
                         },
                     )
+                }
+            }
+
+            // Episodes for Later header
+            item(
+                key = "episodes_header",
+                contentType = CONTENT_TYPE_HEADER,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.episodes_for_later),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { viewModel.syncEpisodesForLater() }) {
+                        Icon(
+                            painter = painterResource(R.drawable.sync),
+                            contentDescription = stringResource(R.string.action_sync),
+                        )
+                    }
                 }
             }
 

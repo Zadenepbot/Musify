@@ -585,6 +585,10 @@ fun HomeScreen(
     val speedDialItems by viewModel.speedDialItems.collectAsState()
     val selectedChip by viewModel.selectedChip.collectAsState()
 
+    // Official podcast API data
+    val savedPodcastShows by viewModel.savedPodcastShows.collectAsState()
+    val episodesForLater by viewModel.episodesForLater.collectAsState()
+
     val isLoading: Boolean by viewModel.isLoading.collectAsState()
     val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -608,30 +612,42 @@ fun HomeScreen(
     }
     val url = if (isLoggedIn) accountImageUrl else null
 
-    // Extract unique podcasts from episodes for "Podcast Channels" row (shuffled on refresh)
-    // Depends on both homePage and selectedChip so it updates when switching chips or refreshing
+    // Extract unique podcasts from episodes for "Podcast Channels" row
+    // Cache the podcasts to prevent them from disappearing during refresh
+    var cachedPodcasts by remember { mutableStateOf<List<PodcastItem>>(emptyList()) }
+
     val featuredPodcasts = remember(homePage, selectedChip) {
-        if (selectedChip == null) emptyList()
-        else homePage?.sections
-            ?.flatMap { it.items }
-            ?.filterIsInstance<EpisodeItem>()
-            ?.mapNotNull { episode ->
-                episode.podcast?.let { podcast ->
-                    PodcastItem(
-                        id = podcast.id,
-                        title = podcast.name,
-                        author = episode.author,
-                        episodeCountText = null,
-                        thumbnail = episode.thumbnail,
-                        playEndpoint = null,
-                        shuffleEndpoint = null,
-                    )
+        if (selectedChip == null) {
+            cachedPodcasts = emptyList()
+            emptyList()
+        } else {
+            val newPodcasts = homePage?.sections
+                ?.flatMap { it.items }
+                ?.filterIsInstance<EpisodeItem>()
+                ?.mapNotNull { episode ->
+                    episode.podcast?.let { podcast ->
+                        PodcastItem(
+                            id = podcast.id,
+                            title = podcast.name,
+                            author = episode.author,
+                            episodeCountText = null,
+                            thumbnail = episode.thumbnail,
+                            playEndpoint = null,
+                            shuffleEndpoint = null,
+                        )
+                    }
                 }
+                ?.distinctBy { it.id }
+                ?.shuffled()
+                ?.take(10)
+                ?: emptyList()
+
+            // Only update cache if we got valid data; keep old data during refresh
+            if (newPodcasts.isNotEmpty()) {
+                cachedPodcasts = newPodcasts
             }
-            ?.distinctBy { it.id }
-            ?.shuffled()
-            ?.take(10)
-            ?: emptyList()
+            cachedPodcasts
+        }
     }
 
     val scope = rememberCoroutineScope()
@@ -1900,6 +1916,54 @@ fun HomeScreen(
                         }
                     }
                 } else {
+                    // Show "Your Shows" section from official API
+                    if (savedPodcastShows.isNotEmpty()) {
+                        item(key = "00_your_shows_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.your_shows),
+                                onClick = {
+                                    navController.navigate("youtube_browse/FEmusic_library_non_music_audio_list")
+                                }
+                            )
+                        }
+
+                        item(key = "00_your_shows_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(savedPodcastShows) { podcast ->
+                                    ytGridItem(podcast)
+                                }
+                            }
+                        }
+                    }
+
+                    // Show "Episodes for Later" section from official API
+                    if (episodesForLater.isNotEmpty()) {
+                        item(key = "00_episodes_for_later_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.episodes_for_later),
+                                onClick = {
+                                    navController.navigate("online_playlist/SE")
+                                }
+                            )
+                        }
+
+                        item(key = "00_episodes_for_later_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(episodesForLater) { episode ->
+                                    ytGridItem(episode)
+                                }
+                            }
+                        }
+                    }
+
                     // Show Podcast Channels row if we have any (extracted from episodes)
                     // Use key prefix "0_" to ensure channels sort before episode sections "1_"
                     if (featuredPodcasts.isNotEmpty()) {

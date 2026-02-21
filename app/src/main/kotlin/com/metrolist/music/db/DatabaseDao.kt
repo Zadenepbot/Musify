@@ -41,6 +41,7 @@ import com.metrolist.music.db.entities.Playlist
 import com.metrolist.music.db.entities.PlaylistEntity
 import com.metrolist.music.db.entities.PlaylistSong
 import com.metrolist.music.db.entities.PlaylistSongMap
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.db.entities.RecognitionHistory
 import com.metrolist.music.db.entities.RelatedSongMap
 import com.metrolist.music.db.entities.SearchHistory
@@ -1648,4 +1649,24 @@ interface DatabaseDao {
     fun checkpoint() {
         raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
     }
+
+    // Podcast methods
+
+    @Query("SELECT * FROM podcast WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt DESC")
+    fun subscribedPodcasts(): Flow<List<PodcastEntity>>
+
+    @Query("SELECT * FROM podcast WHERE id = :id")
+    fun podcast(id: String): Flow<PodcastEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insert(podcast: PodcastEntity): Long
+
+    @Update
+    fun update(podcast: PodcastEntity)
+
+    @Upsert
+    fun upsert(podcast: PodcastEntity)
+
+    @Delete
+    fun delete(podcast: PodcastEntity)
 }

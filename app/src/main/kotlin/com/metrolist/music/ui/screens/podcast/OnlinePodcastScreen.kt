@@ -20,7 +20,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,7 +56,9 @@ import coil3.request.ImageRequest
 import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.PodcastItem
 import timber.log.Timber
+import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalPlayerAwareWindowInsets
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.models.toMediaMetadata
@@ -75,6 +81,7 @@ fun OnlinePodcastScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
+    val database = LocalDatabase.current
 
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -83,6 +90,7 @@ fun OnlinePodcastScreen(
     val episodes by viewModel.episodes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val libraryPodcast by viewModel.libraryPodcast.collectAsState()
 
     val lazyListState = rememberLazyListState()
 
@@ -126,7 +134,9 @@ fun OnlinePodcastScreen(
                     item(key = "podcast_header") {
                         PodcastHeader(
                             podcast = podcastItem,
-                            episodeCount = episodes.size
+                            episodeCount = episodes.size,
+                            inLibrary = libraryPodcast?.inLibrary == true,
+                            onLibraryClick = { viewModel.toggleLibrary() }
                         )
                     }
 
@@ -205,7 +215,9 @@ fun OnlinePodcastScreen(
 @Composable
 private fun PodcastHeader(
     podcast: PodcastItem,
-    episodeCount: Int
+    episodeCount: Int,
+    inLibrary: Boolean,
+    onLibraryClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -253,6 +265,30 @@ private fun PodcastHeader(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = onLibraryClick,
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (inLibrary)
+                    MaterialTheme.colorScheme.secondaryContainer
+                else
+                    Color.Transparent
+            ),
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.height(40.dp)
+        ) {
+            Icon(
+                painter = painterResource(if (inLibrary) R.drawable.library_add_check else R.drawable.library_add),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = stringResource(if (inLibrary) R.string.remove_from_library else R.string.add_to_library)
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
     }

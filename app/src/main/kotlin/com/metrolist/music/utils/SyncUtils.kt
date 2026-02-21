@@ -12,6 +12,7 @@ import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.ArtistItem
 import com.metrolist.innertube.models.PlaylistItem
+import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.utils.completed
 import com.metrolist.innertube.utils.parseCookieString
@@ -24,6 +25,7 @@ import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.ArtistEntity
 import com.metrolist.music.db.entities.PlaylistEntity
 import com.metrolist.music.db.entities.PlaylistSongMap
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.extensions.collectLatest
 import com.metrolist.music.extensions.isInternetConnected
@@ -61,6 +63,8 @@ sealed class SyncOperation {
     data object LikedAlbums : SyncOperation()
     data object UploadedAlbums : SyncOperation()
     data object ArtistsSubscriptions : SyncOperation()
+    data object PodcastSubscriptions : SyncOperation()
+    data object EpisodesForLater : SyncOperation()
     data object SavedPlaylists : SyncOperation()
     data object AutoSyncPlaylists : SyncOperation()
     data class SinglePlaylist(val browseId: String, val playlistId: String) : SyncOperation()
@@ -150,6 +154,8 @@ class SyncUtils @Inject constructor(
             is SyncOperation.LikedAlbums -> executeSyncLikedAlbums()
             is SyncOperation.UploadedAlbums -> executeSyncUploadedAlbums()
             is SyncOperation.ArtistsSubscriptions -> executeSyncArtistsSubscriptions()
+            is SyncOperation.PodcastSubscriptions -> executeSyncPodcastSubscriptions()
+            is SyncOperation.EpisodesForLater -> executeSyncEpisodesForLater()
             is SyncOperation.SavedPlaylists -> executeSyncSavedPlaylists()
             is SyncOperation.AutoSyncPlaylists -> executeSyncAutoSyncPlaylists()
             is SyncOperation.SinglePlaylist -> executeSyncPlaylist(operation.browseId, operation.playlistId)
@@ -310,6 +316,18 @@ class SyncUtils @Inject constructor(
         }
     }
 
+    fun syncPodcastSubscriptions() {
+        syncScope.launch {
+            syncChannel.send(SyncOperation.PodcastSubscriptions)
+        }
+    }
+
+    fun syncEpisodesForLater() {
+        syncScope.launch {
+            syncChannel.send(SyncOperation.EpisodesForLater)
+        }
+    }
+
     fun cleanupDuplicatePlaylists() {
         syncScope.launch {
             syncChannel.send(SyncOperation.CleanupDuplicates)
@@ -330,6 +348,8 @@ class SyncUtils @Inject constructor(
     suspend fun syncLikedAlbumsSuspend() = executeSyncLikedAlbums()
     suspend fun syncUploadedAlbumsSuspend() = executeSyncUploadedAlbums()
     suspend fun syncArtistsSubscriptionsSuspend() = executeSyncArtistsSubscriptions()
+    suspend fun syncPodcastSubscriptionsSuspend() = executeSyncPodcastSubscriptions()
+    suspend fun syncEpisodesForLaterSuspend() = executeSyncEpisodesForLater()
     suspend fun syncSavedPlaylistsSuspend() = executeSyncSavedPlaylists()
     suspend fun syncAutoSyncPlaylistsSuspend() = executeSyncAutoSyncPlaylists()
     suspend fun cleanupDuplicatePlaylistsSuspend() = executeCleanupDuplicatePlaylists()
@@ -466,6 +486,12 @@ class SyncUtils @Inject constructor(
             delay(DB_OPERATION_DELAY_MS)
 
             executeSyncArtistsSubscriptions()
+            delay(DB_OPERATION_DELAY_MS)
+
+            executeSyncPodcastSubscriptions()
+            delay(DB_OPERATION_DELAY_MS)
+
+            executeSyncEpisodesForLater()
             delay(DB_OPERATION_DELAY_MS)
 
             executeSyncSavedPlaylists()
@@ -919,6 +945,185 @@ class SyncUtils @Inject constructor(
         }.onFailure { e ->
             Timber.e(e, "Failed to sync artist subscriptions after retries")
             updateState { copy(artists = SyncStatus.Error(e.message ?: "Unknown error")) }
+        }
+    }
+
+    private suspend fun executeSyncPodcastSubscriptions() = withContext(Dispatchers.IO) {
+        Timber.d("[PODCAST_SYNC] executeSyncPodcastSubscriptions() started")
+        if (!isLoggedIn()) {
+            Timber.w("[PODCAST_SYNC] Skipping syncPodcastSubscriptions - user not logged in")
+            return@withContext
+        }
+        Timber.d("[PODCAST_SYNC] User is logged in, proceeding with sync")
+
+        updateState { copy(currentOperation = "Syncing podcast subscriptions") }
+
+        withRetry {
+            Timber.d("[PODCAST_SYNC] Calling YouTube.libraryPodcastChannels()")
+            YouTube.libraryPodcastChannels()
+        }.onSuccess { result ->
+            Timber.d("[PODCAST_SYNC] withRetry succeeded, result isSuccess=${result.isSuccess}")
+            result.onSuccess { page ->
+                try {
+                    Timber.d("[PODCAST_SYNC] Page received, total items: ${page.items.size}")
+                    page.items.forEachIndexed { index, item ->
+                        Timber.d("[PODCAST_SYNC] Page item $index: type=${item::class.simpleName}, id=${(item as? PodcastItem)?.id ?: "N/A"}")
+                    }
+                    val remotePodcasts = page.items.filterIsInstance<PodcastItem>()
+                    Timber.d("[PODCAST_SYNC] Filtered to ${remotePodcasts.size} PodcastItems")
+
+                    remotePodcasts.forEachIndexed { index, podcast ->
+                        Timber.d("[PODCAST_SYNC] Remote podcast $index: id=${podcast.id}, title=${podcast.title}, author=${podcast.author?.name}")
+                    }
+
+                    val remoteIds = remotePodcasts.map { it.id }.toSet()
+                    val localPodcasts = database.subscribedPodcasts().first()
+                    Timber.d("[PODCAST_SYNC] Local subscribed podcasts count: ${localPodcasts.size}")
+
+                    // Push local-only podcasts to YTM using the savePodcast API
+                    val localOnlyPodcasts = localPodcasts.filterNot { it.id in remoteIds }
+                    Timber.d("[PODCAST_SYNC] Local-only podcasts to push to YTM: ${localOnlyPodcasts.size}")
+                    localOnlyPodcasts.forEach { podcast ->
+                        try {
+                            Timber.d("[PODCAST_SYNC] Pushing local podcast to YTM: ${podcast.id}")
+                            YouTube.savePodcast(podcast.id, true)
+                            delay(DB_OPERATION_DELAY_MS)
+                        } catch (e: Exception) {
+                            Timber.e(e, "[PODCAST_SYNC] Failed to push podcast to YTM: ${podcast.id}")
+                        }
+                    }
+
+                    // Add/update podcasts from remote
+                    remotePodcasts.forEach { podcast ->
+                        try {
+                            val dbPodcast = database.podcast(podcast.id).firstOrNull()
+                            Timber.d("[PODCAST_SYNC] Processing remote podcast ${podcast.id}: exists in db=${dbPodcast != null}, isSubscribed=${dbPodcast?.bookmarkedAt != null}")
+
+                            database.transaction {
+                                if (dbPodcast == null) {
+                                    Timber.d("[PODCAST_SYNC] Inserting new podcast: ${podcast.id}")
+                                    insert(
+                                        PodcastEntity(
+                                            id = podcast.id,
+                                            title = podcast.title,
+                                            author = podcast.author?.name,
+                                            thumbnailUrl = podcast.thumbnail,
+                                            bookmarkedAt = LocalDateTime.now(),
+                                        )
+                                    )
+                                } else if (dbPodcast.bookmarkedAt == null) {
+                                    Timber.d("[PODCAST_SYNC] Updating existing podcast to saved: ${podcast.id}")
+                                    update(
+                                        dbPodcast.copy(
+                                            title = podcast.title,
+                                            author = podcast.author?.name,
+                                            thumbnailUrl = podcast.thumbnail,
+                                            bookmarkedAt = LocalDateTime.now(),
+                                            lastUpdateTime = LocalDateTime.now(),
+                                        )
+                                    )
+                                } else {
+                                    Timber.d("[PODCAST_SYNC] Podcast already saved: ${podcast.id}")
+                                }
+                            }
+                            delay(DB_OPERATION_DELAY_MS)
+                        } catch (e: Exception) {
+                            Timber.e(e, "[PODCAST_SYNC] Failed to process podcast: ${podcast.id}")
+                        }
+                    }
+
+                    Timber.d("[PODCAST_SYNC] Synced ${remotePodcasts.size} podcast subscriptions successfully")
+                } catch (e: Exception) {
+                    Timber.e(e, "[PODCAST_SYNC] Error processing podcast subscriptions")
+                }
+            }.onFailure { e ->
+                Timber.e(e, "[PODCAST_SYNC] Failed to fetch podcast subscriptions from YouTube")
+            }
+        }.onFailure { e ->
+            Timber.e(e, "[PODCAST_SYNC] Failed to sync podcast subscriptions after retries")
+        }
+    }
+
+    private suspend fun executeSyncEpisodesForLater() = withContext(Dispatchers.IO) {
+        Timber.d("[EPISODES_SYNC] executeSyncEpisodesForLater() started")
+        if (!isLoggedIn()) {
+            Timber.w("[EPISODES_SYNC] Skipping syncEpisodesForLater - user not logged in")
+            return@withContext
+        }
+        Timber.d("[EPISODES_SYNC] User is logged in, proceeding with sync")
+
+        updateState { copy(currentOperation = "Syncing episodes for later") }
+
+        withRetry {
+            Timber.d("[EPISODES_SYNC] Calling YouTube.episodesForLater() (VLSE playlist)")
+            YouTube.episodesForLater()
+        }.onSuccess { result ->
+            result.onSuccess { remoteEpisodes ->
+                try {
+                    Timber.d("[EPISODES_SYNC] Fetched ${remoteEpisodes.size} episodes from VLSE playlist")
+
+                    remoteEpisodes.forEach { episode ->
+                        try {
+                            val dbSong = database.song(episode.id).firstOrNull()
+                            Timber.d("[EPISODES_SYNC] Processing remote episode ${episode.id}: exists in db=${dbSong != null}")
+
+                            database.transaction {
+                                if (dbSong == null) {
+                                    Timber.d("[EPISODES_SYNC] Inserting new episode: ${episode.id}")
+                                    val mediaMetadata = episode.toMediaMetadata()
+                                    insert(mediaMetadata.toSongEntity().copy(
+                                        inLibrary = LocalDateTime.now(),
+                                        isEpisode = true
+                                    ))
+                                    // Insert artists
+                                    mediaMetadata.artists.forEach { artist ->
+                                        artist.id?.let { artistId ->
+                                            insert(
+                                                ArtistEntity(
+                                                    id = artistId,
+                                                    name = artist.name,
+                                                )
+                                            )
+                                        }
+                                    }
+                                } else if (!dbSong.song.isEpisode || dbSong.song.inLibrary == null) {
+                                    Timber.d("[EPISODES_SYNC] Updating existing song to episode in library: ${episode.id}")
+                                    update(
+                                        dbSong.song.copy(
+                                            isEpisode = true,
+                                            inLibrary = dbSong.song.inLibrary ?: LocalDateTime.now(),
+                                            libraryAddToken = episode.libraryAddToken ?: dbSong.song.libraryAddToken,
+                                            libraryRemoveToken = episode.libraryRemoveToken ?: dbSong.song.libraryRemoveToken,
+                                        )
+                                    )
+                                } else {
+                                    // Update tokens if we got new ones
+                                    if (episode.libraryAddToken != null || episode.libraryRemoveToken != null) {
+                                        update(
+                                            dbSong.song.copy(
+                                                libraryAddToken = episode.libraryAddToken ?: dbSong.song.libraryAddToken,
+                                                libraryRemoveToken = episode.libraryRemoveToken ?: dbSong.song.libraryRemoveToken,
+                                            )
+                                        )
+                                    }
+                                    Timber.d("[EPISODES_SYNC] Episode already in library: ${episode.id}")
+                                }
+                            }
+                            delay(DB_OPERATION_DELAY_MS)
+                        } catch (e: Exception) {
+                            Timber.e(e, "[EPISODES_SYNC] Failed to process episode: ${episode.id}")
+                        }
+                    }
+
+                    Timber.d("[EPISODES_SYNC] Synced ${remoteEpisodes.size} episodes successfully")
+                } catch (e: Exception) {
+                    Timber.e(e, "[EPISODES_SYNC] Error processing episodes")
+                }
+            }.onFailure { e ->
+                Timber.e(e, "[EPISODES_SYNC] Failed to fetch episodes from YouTube")
+            }
+        }.onFailure { e ->
+            Timber.e(e, "[EPISODES_SYNC] Failed to sync episodes after retries")
         }
     }
 

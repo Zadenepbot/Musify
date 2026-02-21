@@ -20,6 +20,7 @@ data class PodcastPage(
             podcast: PodcastItem? = null
         ): EpisodeItem? {
             val subtitleRuns = renderer.subtitle?.runs?.splitBySeparator()
+            val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
             return EpisodeItem(
                 id = renderer.onTap?.watchEndpoint?.videoId ?: return null,
@@ -33,6 +34,8 @@ data class PodcastPage(
                 thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                 explicit = false,
                 endpoint = renderer.onTap?.watchEndpoint,
+                libraryAddToken = libraryTokens.addToken,
+                libraryRemoveToken = libraryTokens.removeToken,
             )
         }
 
@@ -46,6 +49,7 @@ data class PodcastPage(
                 ?.text
                 ?.runs
                 ?.splitBySeparator()
+            val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
             return EpisodeItem(
                 id = renderer.playlistItemData?.videoId ?: return null,
@@ -68,6 +72,8 @@ data class PodcastPage(
                     it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                 } != null,
                 endpoint = renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint,
+                libraryAddToken = libraryTokens.addToken,
+                libraryRemoveToken = libraryTokens.removeToken,
             )
         }
     }

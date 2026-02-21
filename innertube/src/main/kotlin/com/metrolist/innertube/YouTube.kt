@@ -20,6 +20,8 @@ import com.metrolist.innertube.models.SearchSuggestions
 import com.metrolist.innertube.models.Run
 import com.metrolist.innertube.models.Runs
 import com.metrolist.innertube.models.SongItem
+import com.metrolist.innertube.models.TasteArtist
+import com.metrolist.innertube.models.TasteProfile
 import com.metrolist.innertube.models.WatchEndpoint
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_ATV
 import com.metrolist.innertube.models.YouTubeClient
@@ -56,6 +58,7 @@ import com.metrolist.innertube.pages.MoodAndGenres
 import com.metrolist.innertube.pages.NewReleaseAlbumPage
 import com.metrolist.innertube.pages.NextPage
 import com.metrolist.innertube.pages.NextResult
+import com.metrolist.innertube.pages.PageHelper
 import com.metrolist.innertube.pages.PlaylistContinuationPage
 import com.metrolist.innertube.pages.PlaylistPage
 import com.metrolist.innertube.pages.PodcastPage
@@ -562,6 +565,59 @@ object YouTube {
 
         Timber.d("Header title: ${header?.title?.runs?.firstOrNull()?.text}")
 
+        // Debug: Log button structure
+        header?.buttons?.forEachIndexed { i, button ->
+            Timber.d("[PODCAST] Button[$i]: menuRenderer=${button.menuRenderer != null}, toggleButtonRenderer=${button.toggleButtonRenderer != null}, playButtonRenderer=${button.musicPlayButtonRenderer != null}")
+            button.menuRenderer?.items?.forEachIndexed { j, item ->
+                Timber.d("[PODCAST] Button[$i].menuItems[$j]: toggle=${item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType}, nav=${item.menuNavigationItemRenderer?.icon?.iconType}")
+                // Check for SUBSCRIBE button (like artists have)
+                if (item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE") {
+                    val channelIds = item.toggleMenuServiceItemRenderer?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds
+                    Timber.d("[PODCAST] Found SUBSCRIBE button! channelIds=$channelIds")
+                }
+            }
+            button.toggleButtonRenderer?.let { toggle ->
+                Timber.d("[PODCAST] Button[$i].toggleButtonRenderer: defaultIcon=${toggle.defaultIcon.iconType}, defaultToken=${toggle.defaultServiceEndpoint.feedbackEndpoint?.feedbackToken?.take(30)}, subscribeChannelIds=${toggle.defaultServiceEndpoint.subscribeEndpoint?.channelIds}")
+            }
+        }
+
+        // Extract channelId for subscription (like artists)
+        val channelId = header?.buttons?.flatMap { button ->
+            button.menuRenderer?.items ?: emptyList()
+        }?.find {
+            it.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE"
+        }?.toggleMenuServiceItemRenderer?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds?.firstOrNull()
+        Timber.d("[PODCAST] Extracted channelId for subscription: $channelId")
+
+        // Extract library tokens from the header's menu buttons OR toggle buttons
+        var libraryTokens = header?.buttons?.flatMap { button ->
+            button.menuRenderer?.items ?: emptyList()
+        }?.let { menuItems ->
+            PageHelper.extractLibraryTokensFromMenuItems(menuItems)
+        }
+
+        // Also check for standalone toggle buttons (used by some podcasts)
+        if (libraryTokens?.addToken == null && libraryTokens?.removeToken == null) {
+            header?.buttons?.forEach { button ->
+                button.toggleButtonRenderer?.let { toggle ->
+                    val iconType = toggle.defaultIcon.iconType
+                    if (PageHelper.isLibraryIcon(iconType)) {
+                        val defaultToken = toggle.defaultServiceEndpoint.feedbackEndpoint?.feedbackToken
+                        val toggledToken = toggle.toggledServiceEndpoint?.feedbackEndpoint?.feedbackToken
+                        libraryTokens = if (PageHelper.isAddLibraryIcon(iconType)) {
+                            // BOOKMARK_BORDER: default=add, toggled=remove
+                            PageHelper.LibraryFeedbackTokens(defaultToken, toggledToken)
+                        } else {
+                            // BOOKMARK: default=remove, toggled=add
+                            PageHelper.LibraryFeedbackTokens(toggledToken, defaultToken)
+                        }
+                        Timber.d("[PODCAST] Found toggle button with library tokens - add: ${libraryTokens?.addToken != null}, remove: ${libraryTokens?.removeToken != null}")
+                    }
+                }
+            }
+        }
+        Timber.d("[PODCAST] Library tokens - add: ${libraryTokens?.addToken != null}, remove: ${libraryTokens?.removeToken != null}")
+
         val podcastItem = PodcastItem(
             id = podcastId,
             title = header?.title?.runs?.firstOrNull()?.text ?: "",
@@ -580,6 +636,9 @@ object YouTube {
                 it.menuRenderer?.items?.any { item -> item.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" } == true
             }?.menuRenderer?.items?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" }
                 ?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
+            libraryAddToken = libraryTokens?.addToken,
+            libraryRemoveToken = libraryTokens?.removeToken,
+            channelId = channelId,
         )
 
         // Try twoColumn for episodes
@@ -717,7 +776,9 @@ object YouTube {
     }
 
     suspend fun browse(browseId: String, params: String?): Result<BrowseResult> = runCatching {
-        val response = innerTube.browse(WEB_REMIX, browseId = browseId, params = params).body<BrowseResponse>()
+        // Use authentication for library endpoints
+        val needsLogin = browseId.startsWith("FEmusic_library") || browseId == "VLSE" || browseId == "VLRDPN"
+        val response = innerTube.browse(WEB_REMIX, browseId = browseId, params = params, setLogin = needsLogin).body<BrowseResponse>()
         BrowseResult(
             title = response.header?.musicHeaderRenderer?.title?.runs?.firstOrNull()?.text,
             items = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.mapNotNull { content ->
@@ -1105,6 +1166,31 @@ object YouTube {
         )
     }
 
+    /**
+     * Fetch podcast discovery/recommendations page.
+     * Returns sections like "Popular shows", "Popular episodes", category sections.
+     */
+    suspend fun podcastDiscover(): Result<HomePage> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "FEmusic_non_music_audio",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        val sectionListRenderer = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer
+        val carousels = sectionListRenderer?.contents?.mapNotNull { it.musicCarouselShelfRenderer } ?: emptyList()
+        val sections = carousels.mapNotNull {
+            HomePage.Section.fromMusicCarouselShelfRenderer(it)
+        }
+        val chips = sectionListRenderer?.header?.chipCloudRenderer?.chips?.mapNotNull {
+            HomePage.Chip.fromChipCloudChipRenderer(it)
+        }
+        val continuation = sectionListRenderer?.continuations?.getContinuation()
+
+        HomePage(chips, sections, continuation)
+    }
+
     suspend fun likeVideo(videoId: String, like: Boolean) = runCatching {
         if (like)
             innerTube.likeVideo(WEB_REMIX, videoId)
@@ -1124,6 +1210,190 @@ object YouTube {
             innerTube.subscribeChannel(WEB_REMIX, channelId)
         else
             innerTube.unsubscribeChannel(WEB_REMIX, channelId)
+    }
+
+    /**
+     * Save a podcast show to library.
+     * Uses likePlaylist API. Podcast IDs are "MPSP<playlistId>".
+     */
+    suspend fun savePodcast(podcastId: String, save: Boolean) = runCatching {
+        val playlistId = podcastId.removePrefix("MPSP")
+        if (save)
+            innerTube.likePlaylist(WEB_REMIX, playlistId)
+        else
+            innerTube.unlikePlaylist(WEB_REMIX, playlistId)
+    }
+
+    /**
+     * Add episode to "Episodes for Later" playlist (SE).
+     */
+    suspend fun addEpisodeToSavedEpisodes(videoId: String) = runCatching {
+        innerTube.addToPlaylist(WEB_REMIX, "SE", videoId)
+    }
+
+    /**
+     * Remove episode from "Episodes for Later" playlist (SE).
+     * Note: setVideoId is required for removal and must be obtained from the playlist response.
+     */
+    suspend fun removeEpisodeFromSavedEpisodes(videoId: String, setVideoId: String) = runCatching {
+        innerTube.removeFromPlaylist(WEB_REMIX, "SE", videoId, setVideoId)
+    }
+
+    suspend fun libraryPodcastChannels(): Result<LibraryPage> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "FEmusic_library_non_music_audio_channels_list",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+
+        val items = when {
+            contents?.gridRenderer != null -> {
+                contents.gridRenderer.items
+                    .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
+                    .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+            }
+            contents?.musicShelfRenderer != null -> {
+                contents.musicShelfRenderer.contents
+                    ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                    ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
+                    ?: emptyList()
+            }
+            else -> emptyList()
+        }
+
+        LibraryPage(
+            items = items,
+            continuation = null
+        )
+    }
+
+    suspend fun libraryPodcastEpisodes(): Result<LibraryPage> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "FEmusic_library_non_music_audio_list",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+
+        val items = when {
+            contents?.gridRenderer != null -> {
+                contents.gridRenderer.items
+                    .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
+                    .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+            }
+            contents?.musicShelfRenderer != null -> {
+                contents.musicShelfRenderer.contents
+                    ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                    ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
+                    ?: emptyList()
+            }
+            else -> emptyList()
+        }
+
+        LibraryPage(
+            items = items,
+            continuation = null
+        )
+    }
+
+    /**
+     * Fetch saved podcast shows from library.
+     * Uses FEmusic_library_non_music_audio_list and filters to only PodcastItem.
+     */
+    suspend fun savedPodcastShows(): Result<List<PodcastItem>> = runCatching {
+        val libraryPage = libraryPodcastEpisodes().getOrThrow()
+        libraryPage.items.filterIsInstance<PodcastItem>()
+    }
+
+    /**
+     * Fetch "New Episodes" auto-playlist (VLRDPN).
+     * Returns new episodes from saved/subscribed podcasts.
+     */
+    suspend fun newEpisodes(): Result<List<SongItem>> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "VLRDPN",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+            ?.mapNotNull { it.musicMultiRowListItemRenderer }
+            ?.map { renderer ->
+                SongItem(
+                    id = renderer.onTap?.watchEndpoint?.videoId ?: "",
+                    title = renderer.title?.runs?.firstOrNull()?.text ?: "",
+                    artists = renderer.subtitle?.runs?.mapNotNull { run ->
+                        run.navigationEndpoint?.browseEndpoint?.let { endpoint ->
+                            Artist(name = run.text, id = endpoint.browseId)
+                        }
+                    } ?: emptyList(),
+                    album = null,
+                    duration = null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                    isEpisode = true,
+                )
+            } ?: emptyList()
+    }
+
+    /**
+     * Fetch "Episodes for Later" playlist (VLSE).
+     * Returns manually saved episodes.
+     */
+    suspend fun episodesForLater(): Result<List<SongItem>> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "VLSE",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        val shelfContents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+
+        // Try parsing musicMultiRowListItemRenderer first (podcast episodes format)
+        val multiRowItems = shelfContents?.mapNotNull { it.musicMultiRowListItemRenderer }
+            ?.map { renderer ->
+                SongItem(
+                    id = renderer.onTap?.watchEndpoint?.videoId ?: "",
+                    title = renderer.title?.runs?.firstOrNull()?.text ?: "",
+                    artists = renderer.subtitle?.runs?.firstOrNull()?.let { run ->
+                        listOf(Artist(name = run.text, id = run.navigationEndpoint?.browseEndpoint?.browseId))
+                    } ?: emptyList(),
+                    album = null,
+                    duration = null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                    isEpisode = true,
+                )
+            }
+
+        // If no multiRow items, try musicResponsiveListItemRenderer
+        if (!multiRowItems.isNullOrEmpty()) {
+            multiRowItems
+        } else {
+            shelfContents?.mapNotNull { it.musicResponsiveListItemRenderer }
+                ?.mapNotNull { renderer ->
+                    val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
+                    val title = renderer.flexColumns.firstOrNull()
+                        ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
+                        ?: return@mapNotNull null
+                    val artistRun = renderer.flexColumns.getOrNull(1)
+                        ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
+                    SongItem(
+                        id = videoId,
+                        title = title,
+                        artists = artistRun?.let { listOf(Artist(name = it.text, id = it.navigationEndpoint?.browseEndpoint?.browseId)) } ?: emptyList(),
+                        album = null,
+                        duration = null,
+                        thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                        isEpisode = true,
+                    )
+                } ?: emptyList()
+        }
     }
 
     suspend fun getChannelId(browseId: String): String {
@@ -1375,6 +1645,32 @@ object YouTube {
 
     suspend fun getMediaInfo(videoId: String): Result<MediaInfo> = runCatching {
         return innerTube.getMediaInfo(videoId)
+    }
+
+    suspend fun getTasteProfile(): Result<TasteProfile> = runCatching {
+        // Browse the taste builder page
+        // Note: Full parsing requires additional model support for musicTastebuilderShelfRenderer
+        // This returns an empty profile for now - can be enhanced when models are added
+        innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "FEmusic_tastebuilder",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        TasteProfile(artists = emptyMap())
+    }
+
+    suspend fun setTasteProfile(selectedArtists: List<String>, allArtists: Map<String, TasteArtist>): Result<Unit> = runCatching {
+        val selectedValues = selectedArtists.mapNotNull { allArtists[it]?.selectionValue }
+        val impressionValues = allArtists.values.map { it.impressionValue }
+
+        if (selectedValues.isNotEmpty()) {
+            feedback(selectedValues + impressionValues).getOrThrow()
+        }
+    }
+
+    suspend fun removeHistoryItems(feedbackTokens: List<String>): Result<Boolean> = runCatching {
+        feedback(feedbackTokens).getOrThrow()
     }
 
     @JvmInline

@@ -35,7 +35,8 @@ data class SongItem(
     val setVideoId: String? = null,
     val libraryAddToken: String? = null,
     val libraryRemoveToken: String? = null,
-    val historyRemoveToken: String? = null
+    val historyRemoveToken: String? = null,
+    val isEpisode: Boolean = false
 ) : YTItem() {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
@@ -98,6 +99,9 @@ data class PodcastItem(
     override val thumbnail: String?,
     val playEndpoint: WatchEndpoint?,
     val shuffleEndpoint: WatchEndpoint?,
+    val libraryAddToken: String? = null,
+    val libraryRemoveToken: String? = null,
+    val channelId: String? = null,
 ) : YTItem() {
     override val explicit: Boolean
         get() = false
@@ -127,6 +131,8 @@ data class EpisodeItem(
     override val thumbnail: String,
     override val explicit: Boolean = false,
     val endpoint: WatchEndpoint? = null,
+    val libraryAddToken: String? = null,
+    val libraryRemoveToken: String? = null,
 ) : YTItem() {
     override val shareLink: String
         get() = "https://music.youtube.com/watch?v=$id"
@@ -139,7 +145,10 @@ data class EpisodeItem(
         duration = duration,
         thumbnail = thumbnail,
         explicit = explicit,
-        endpoint = endpoint
+        endpoint = endpoint,
+        isEpisode = true,
+        libraryAddToken = libraryAddToken,
+        libraryRemoveToken = libraryRemoveToken,
     )
 }
 

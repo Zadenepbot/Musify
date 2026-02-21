@@ -88,6 +88,7 @@ import com.metrolist.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.LocalDateTime
 
 @SuppressLint("MutableCollectionMutableState")
@@ -388,6 +389,34 @@ fun YouTubeSongMenu(
         item {
             Material3MenuGroup(
                 items = buildList {
+                    // Save for Later option for podcast episodes
+                    if (song.isEpisode) {
+                        add(
+                            Material3MenuItemData(
+                                title = { Text(text = stringResource(R.string.save_episode_for_later)) },
+                                description = { Text(text = stringResource(R.string.save_episode_for_later_desc)) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.playlist_add),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        Timber.d("[EPISODE_SAVE] Saving episode ${song.id} to Episodes for Later")
+                                        YouTube.addEpisodeToSavedEpisodes(song.id)
+                                            .onSuccess {
+                                                Timber.d("[EPISODE_SAVE] Successfully saved to Episodes for Later")
+                                            }
+                                            .onFailure { e ->
+                                                Timber.e(e, "[EPISODE_SAVE] Failed to save to Episodes for Later")
+                                            }
+                                    }
+                                    onDismiss()
+                                }
+                            )
+                        )
+                    }
                     if (song.historyRemoveToken != null) {
                         add(
                             Material3MenuItemData(
@@ -400,7 +429,14 @@ fun YouTubeSongMenu(
                                 },
                                 onClick = {
                                     coroutineScope.launch {
+                                        Timber.d("[HISTORY_REMOVE] Removing song ${song.id} from YTM history")
                                         YouTube.feedback(listOf(song.historyRemoveToken!!))
+                                            .onSuccess {
+                                                Timber.d("[HISTORY_REMOVE] Successfully removed from YTM history")
+                                            }
+                                            .onFailure { e ->
+                                                Timber.e(e, "[HISTORY_REMOVE] Failed to remove from YTM history")
+                                            }
                                         delay(500)
                                         onHistoryRemoved()
                                         onDismiss()

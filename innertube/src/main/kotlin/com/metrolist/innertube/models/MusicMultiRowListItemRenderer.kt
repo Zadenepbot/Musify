@@ -10,6 +10,7 @@ data class MusicMultiRowListItemRenderer(
     val onTap: NavigationEndpoint?,
     val playbackProgress: PlaybackProgress?,
     val displayStyle: String?,
+    val menu: Menu?,
 ) {
     @Serializable
     data class PlaybackProgress(

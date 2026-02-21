@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 34,
-    "identityHash": "e2ec11f55f018d3cae37b5f53c9036f7",
+    "version": 35,
+    "identityHash": "142018dd588d8c108effdb199dfb4459",
     "entities": [
       {
         "tableName": "song",
@@ -1241,7 +1241,7 @@
       },
       {
         "tableName": "podcast",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `thumbnailUrl` TEXT, `bookmarkedAt` INTEGER, `lastUpdateTime` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `thumbnailUrl` TEXT, `bookmarkedAt` INTEGER, `lastUpdateTime` INTEGER NOT NULL, `libraryAddToken` TEXT, `libraryRemoveToken` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -1275,6 +1275,16 @@
             "columnName": "lastUpdateTime",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "libraryAddToken",
+            "columnName": "libraryAddToken",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "libraryRemoveToken",
+            "columnName": "libraryRemoveToken",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -1301,7 +1311,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e2ec11f55f018d3cae37b5f53c9036f7')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '142018dd588d8c108effdb199dfb4459')"
     ]
   }
 }

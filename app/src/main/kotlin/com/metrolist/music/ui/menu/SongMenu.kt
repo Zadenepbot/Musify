@@ -76,9 +76,11 @@ import com.metrolist.music.constants.ListItemHeight
 import com.metrolist.music.constants.ListThumbnailSize
 import com.metrolist.music.db.entities.ArtistEntity
 import com.metrolist.music.db.entities.Event
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.db.entities.SpeedDialItem
 import com.metrolist.music.db.entities.PlaylistSong
 import com.metrolist.music.db.entities.Song
+import timber.log.Timber
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.playback.ExoDownloadService
@@ -129,6 +131,15 @@ fun SongMenu(
     )
 
     val isPinned by database.speedDialDao.isPinned(song.id).collectAsState(initial = false)
+
+    // Podcast subscription state for episodes
+    val podcastEntity by produceState<PodcastEntity?>(initialValue = null, song) {
+        val podcastId = song.song.albumId
+        if (song.song.isEpisode && podcastId != null) {
+            database.podcast(podcastId).collect { value = it }
+        }
+    }
+    val isPodcastSubscribed = podcastEntity?.bookmarkedAt != null
 
     val orderedArtists by produceState(initialValue = emptyList<ArtistEntity>(), song) {
         withContext(Dispatchers.IO) {
@@ -507,44 +518,71 @@ fun SongMenu(
                             }
                         )
                     )
-                    add(
-                        Material3MenuItemData(
-                            title = {
-                                Text(
-                                    text = stringResource(
-                                        if (song.song.inLibrary == null) R.string.add_to_library
-                                        else R.string.remove_from_library
+                    // For episodes, use "Save for later" (Episodes for Later playlist)
+                    // For regular songs, use "Add to library"
+                    if (song.song.isEpisode) {
+                        add(
+                            Material3MenuItemData(
+                                title = { Text(text = stringResource(R.string.save_episode_for_later)) },
+                                description = { Text(text = stringResource(R.string.episodes_for_later)) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.library_add),
+                                        contentDescription = null,
                                     )
-                                )
-                            },
-                            description = { Text(text = stringResource(R.string.add_to_library_desc)) },
-                            icon = {
-                                Icon(
-                                    painter = painterResource(
-                                        if (song.song.inLibrary == null) R.drawable.library_add
-                                        else R.drawable.library_add_check
-                                    ),
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = {
-                                val currentSong = song.song
-                                val isInLibrary = currentSong.inLibrary != null
-                                val token =
-                                    if (isInLibrary) currentSong.libraryRemoveToken else currentSong.libraryAddToken
+                                },
+                                onClick = {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
+                                            Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
+                                        }.onFailure { e ->
+                                            Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                        }
+                                    }
+                                    onDismiss()
+                                }
+                            )
+                        )
+                    } else {
+                        add(
+                            Material3MenuItemData(
+                                title = {
+                                    Text(
+                                        text = stringResource(
+                                            if (song.song.inLibrary == null) R.string.add_to_library
+                                            else R.string.remove_from_library
+                                        )
+                                    )
+                                },
+                                description = { Text(text = stringResource(R.string.add_to_library_desc)) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(
+                                            if (song.song.inLibrary == null) R.drawable.library_add
+                                            else R.drawable.library_add_check
+                                        ),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    val currentSong = song.song
+                                    val isInLibrary = currentSong.inLibrary != null
+                                    val token =
+                                        if (isInLibrary) currentSong.libraryRemoveToken else currentSong.libraryAddToken
 
-                                token?.let {
-                                    coroutineScope.launch {
-                                        YouTube.feedback(listOf(it))
+                                    token?.let {
+                                        coroutineScope.launch {
+                                            YouTube.feedback(listOf(it))
+                                        }
+                                    }
+
+                                    database.query {
+                                        update(song.song.toggleLibrary())
                                     }
                                 }
-
-                                database.query {
-                                    update(song.song.toggleLibrary())
-                                }
-                            }
+                            )
                         )
-                    )
+                    }
                     if (event != null) {
                         add(
                             Material3MenuItemData(
@@ -751,6 +789,70 @@ fun SongMenu(
                                     } else {
                                         navController.navigate("album/${song.song.albumId}")
                                     }
+                                }
+                            )
+                        )
+                    }
+                    // Subscribe to podcast option for episodes
+                    song.song.albumId?.takeIf { song.song.isEpisode }?.let { podcastId ->
+                        add(
+                            Material3MenuItemData(
+                                title = {
+                                    Text(
+                                        text = stringResource(
+                                            if (isPodcastSubscribed) R.string.subscribed
+                                            else R.string.subscribe_to_podcast
+                                        )
+                                    )
+                                },
+                                description = {
+                                    song.song.albumName?.let {
+                                        Text(text = it)
+                                    }
+                                },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(
+                                            if (isPodcastSubscribed) R.drawable.library_add_check
+                                            else R.drawable.library_add
+                                        ),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    Timber.d("[PODCAST_LIB] Toggling podcast save for: $podcastId")
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        val existingPodcast = podcastEntity
+                                        val isCurrentlySaved = existingPodcast?.bookmarkedAt != null
+
+                                        // Call the API to save/unsave on YTM
+                                        YouTube.savePodcast(podcastId, !isCurrentlySaved).onSuccess {
+                                            Timber.d("[PODCAST_LIB] savePodcast API success!")
+                                        }.onFailure { e ->
+                                            Timber.e(e, "[PODCAST_LIB] savePodcast API failed")
+                                        }
+
+                                        // Update local database
+                                        if (existingPodcast != null) {
+                                            Timber.d("[PODCAST_LIB] Updating existing podcast")
+                                            database.query {
+                                                update(existingPodcast.toggleBookmark())
+                                            }
+                                        } else {
+                                            Timber.d("[PODCAST_LIB] Creating new podcast entry")
+                                            database.query {
+                                                insert(
+                                                    PodcastEntity(
+                                                        id = podcastId,
+                                                        title = song.song.albumName ?: "Unknown Podcast",
+                                                        author = song.artists.firstOrNull()?.name,
+                                                        thumbnailUrl = song.song.thumbnailUrl,
+                                                    ).toggleBookmark()
+                                                )
+                                            }
+                                        }
+                                    }
+                                    onDismiss()
                                 }
                             )
                         )

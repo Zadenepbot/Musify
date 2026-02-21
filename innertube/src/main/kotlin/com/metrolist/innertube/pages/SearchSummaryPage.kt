@@ -299,7 +299,8 @@ data class SearchSummaryPage(
                                 it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                             } != null,
                         libraryAddToken = libraryTokens.addToken,
-                        libraryRemoveToken = libraryTokens.removeToken
+                        libraryRemoveToken = libraryTokens.removeToken,
+                        isEpisode = renderer.isEpisode
                     )
                 }
 
@@ -479,6 +480,7 @@ data class SearchSummaryPage(
                 }
 
                 renderer.isEpisode -> {
+                    val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
                     EpisodeItem(
                         id = renderer.playlistItemData?.videoId ?: return null,
                         title =
@@ -527,6 +529,8 @@ data class SearchSummaryPage(
                             ?.musicPlayButtonRenderer
                             ?.playNavigationEndpoint
                             ?.watchEndpoint,
+                        libraryAddToken = libraryTokens.addToken,
+                        libraryRemoveToken = libraryTokens.removeToken,
                     )
                 }
 

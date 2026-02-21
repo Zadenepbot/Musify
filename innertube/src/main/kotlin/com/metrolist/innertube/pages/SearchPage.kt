@@ -71,7 +71,8 @@ object SearchPage {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                         } != null,
                     libraryAddToken = libraryTokens.addToken,
-                    libraryRemoveToken = libraryTokens.removeToken
+                    libraryRemoveToken = libraryTokens.removeToken,
+                    isEpisode = renderer.isEpisode
                 )
             }
             renderer.isArtist -> {
@@ -246,6 +247,7 @@ object SearchPage {
                 )
             }
             renderer.isEpisode -> {
+                val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
                 EpisodeItem(
                     id = renderer.playlistItemData?.videoId ?: return null,
                     title =
@@ -294,6 +296,8 @@ object SearchPage {
                         ?.musicPlayButtonRenderer
                         ?.playNavigationEndpoint
                         ?.watchEndpoint,
+                    libraryAddToken = libraryTokens.addToken,
+                    libraryRemoveToken = libraryTokens.removeToken,
                 )
             }
             else -> null

@@ -123,7 +123,8 @@ fun SongItem.toMediaMetadata() =
         musicVideoType = musicVideoType,
         libraryAddToken = libraryAddToken,
         libraryRemoveToken = libraryRemoveToken,
-        suggestedBy = null
+        suggestedBy = null,
+        isEpisode = isEpisode
     )
 
 fun EpisodeItem.toMediaMetadata() =
@@ -146,5 +147,7 @@ fun EpisodeItem.toMediaMetadata() =
         },
         explicit = explicit,
         suggestedBy = null,
-        isEpisode = true
+        isEpisode = true,
+        libraryAddToken = libraryAddToken,
+        libraryRemoveToken = libraryRemoveToken,
     )

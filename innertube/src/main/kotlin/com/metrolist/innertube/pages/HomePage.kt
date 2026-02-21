@@ -103,6 +103,7 @@ data class HomePage(
 
             private fun fromMusicMultiRowListItemRenderer(renderer: MusicMultiRowListItemRenderer): EpisodeItem? {
                 val subtitleRuns = renderer.subtitle?.runs?.splitBySeparator()
+                val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
                 return EpisodeItem(
                     id = renderer.onTap?.watchEndpoint?.videoId ?: return null,
@@ -114,6 +115,8 @@ data class HomePage(
                     thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                     explicit = false,
                     endpoint = renderer.onTap?.watchEndpoint,
+                    libraryAddToken = libraryTokens.addToken,
+                    libraryRemoveToken = libraryTokens.removeToken,
                 )
             }
 
@@ -157,6 +160,7 @@ data class HomePage(
                     explicit = renderer.badges?.find {
                         it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                     } != null,
+                    isEpisode = renderer.isEpisode
                 )
             }
 
@@ -313,6 +317,7 @@ data class HomePage(
                         }
 
                         val subtitleRuns = renderer.subtitle?.runs?.splitBySeparator()
+                        val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
                         // Find podcast link in subtitle (has isPodcastEndpoint)
                         val podcastRun = renderer.subtitle?.runs?.find {
@@ -346,6 +351,8 @@ data class HomePage(
                                 ?.musicItemThumbnailOverlayRenderer?.content
                                 ?.musicPlayButtonRenderer?.playNavigationEndpoint
                                 ?.watchEndpoint,
+                            libraryAddToken = libraryTokens.addToken,
+                            libraryRemoveToken = libraryTokens.removeToken,
                         )
                     }
 
