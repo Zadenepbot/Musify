@@ -704,30 +704,35 @@ fun SongMenu(
         item {
             Material3MenuGroup(
                 items = buildList {
-                    add(
-                        Material3MenuItemData(
-                            title = { Text(text = stringResource(R.string.view_artist)) },
-                            description = { Text(text = song.artists.joinToString { it.name }) },
-                            icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.artist),
-                                    contentDescription = null,
-                                )
-                            },
-                            onClick = {
-                                if (song.artists.size == 1) {
-                                    navController.navigate("artist/${song.artists[0].id}")
-                                    onDismiss()
-                                } else {
-                                    showSelectArtistDialog = true
-                                }
-                            }
-                        )
-                    )
-                    if (song.song.albumId != null) {
+                    // Don't show "View Artist" for podcast episodes
+                    if (!song.song.isEpisode) {
                         add(
                             Material3MenuItemData(
-                                title = { Text(text = stringResource(R.string.view_album)) },
+                                title = { Text(text = stringResource(R.string.view_artist)) },
+                                description = { Text(text = song.artists.joinToString { it.name }) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.artist),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    if (song.artists.size == 1) {
+                                        navController.navigate("artist/${song.artists[0].id}")
+                                        onDismiss()
+                                    } else {
+                                        showSelectArtistDialog = true
+                                    }
+                                }
+                            )
+                        )
+                    }
+                    if (song.song.albumId != null) {
+                        // Show "View Podcast" for episodes, "View Album" for songs
+                        val isPodcast = song.song.isEpisode
+                        add(
+                            Material3MenuItemData(
+                                title = { Text(text = stringResource(if (isPodcast) R.string.view_podcast else R.string.view_album)) },
                                 description = {
                                     song.song.albumName?.let {
                                         Text(text = it)
@@ -735,13 +740,17 @@ fun SongMenu(
                                 },
                                 icon = {
                                     Icon(
-                                        painter = painterResource(R.drawable.album),
+                                        painter = painterResource(if (isPodcast) R.drawable.mic else R.drawable.album),
                                         contentDescription = null,
                                     )
                                 },
                                 onClick = {
                                     onDismiss()
-                                    navController.navigate("album/${song.song.albumId}")
+                                    if (isPodcast) {
+                                        navController.navigate("online_podcast/${song.song.albumId}")
+                                    } else {
+                                        navController.navigate("album/${song.song.albumId}")
+                                    }
                                 }
                             )
                         )

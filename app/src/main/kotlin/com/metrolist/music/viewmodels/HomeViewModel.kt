@@ -631,9 +631,26 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         if (isRefreshing.value) return
+        isRefreshing.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            isRefreshing.value = true
-            load()
+            // If a chip is selected, reload the chip's content instead of the default home
+            val currentChip = selectedChip.value
+            if (currentChip != null) {
+                val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+                val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+                val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
+                val nextSections = YouTube.home(params = currentChip.endpoint?.params).getOrNull()
+                if (nextSections != null) {
+                    homePage.value = nextSections.copy(
+                        chips = homePage.value?.chips,
+                        sections = nextSections.sections.map { section ->
+                            section.copy(items = section.items.filterExplicit(hideExplicit).filterVideoSongs(hideVideoSongs).filterYoutubeShorts(hideYoutubeShorts))
+                        }
+                    )
+                }
+            } else {
+                load()
+            }
             isRefreshing.value = false
         }
         // Run sync when user manually refreshes

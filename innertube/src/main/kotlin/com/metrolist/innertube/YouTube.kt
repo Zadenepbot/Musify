@@ -14,6 +14,8 @@ import com.metrolist.innertube.models.MusicCarouselShelfRenderer
 import com.metrolist.innertube.models.MusicShelfRenderer
 import com.metrolist.innertube.models.SectionListRenderer
 import com.metrolist.innertube.models.PlaylistItem
+import com.metrolist.innertube.models.PodcastItem
+import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.SearchSuggestions
 import com.metrolist.innertube.models.Run
 import com.metrolist.innertube.models.Runs
@@ -56,6 +58,7 @@ import com.metrolist.innertube.pages.NextPage
 import com.metrolist.innertube.pages.NextResult
 import com.metrolist.innertube.pages.PlaylistContinuationPage
 import com.metrolist.innertube.pages.PlaylistPage
+import com.metrolist.innertube.pages.PodcastPage
 import com.metrolist.innertube.pages.RelatedPage
 import com.metrolist.innertube.pages.SearchPage
 import com.metrolist.innertube.pages.SearchResult
@@ -73,6 +76,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.Proxy
 import kotlin.random.Random
+import timber.log.Timber
 
 /**
  * Parse useful data with [InnerTube] sending requests.
@@ -530,22 +534,139 @@ object YouTube {
         )
     }
 
+    suspend fun podcast(podcastId: String): Result<PodcastPage> = podcastWithDebug(podcastId) { }
+
+    suspend fun podcastWithDebug(podcastId: String, log: (String) -> Unit): Result<PodcastPage> = runCatching {
+        Timber.d("Fetching podcast with ID: $podcastId")
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = podcastId,
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        Timber.d("Response received, twoColumnBrowseResultsRenderer: ${response.contents?.twoColumnBrowseResultsRenderer != null}")
+        Timber.d("singleColumnBrowseResultsRenderer: ${response.contents?.singleColumnBrowseResultsRenderer != null}")
+
+        // Try twoColumn first (standard layout)
+        var header = response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+            ?.musicResponsiveHeaderRenderer
+
+        // Fallback to singleColumn layout
+        if (header == null) {
+            header = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+                ?.musicResponsiveHeaderRenderer
+            Timber.d("Using singleColumn layout, header found: ${header != null}")
+        }
+
+        Timber.d("Header title: ${header?.title?.runs?.firstOrNull()?.text}")
+
+        val podcastItem = PodcastItem(
+            id = podcastId,
+            title = header?.title?.runs?.firstOrNull()?.text ?: "",
+            author = header?.straplineTextOne?.runs?.firstOrNull()?.let {
+                Artist(
+                    name = it.text,
+                    id = it.navigationEndpoint?.browseEndpoint?.browseId
+                )
+            },
+            episodeCountText = header?.secondSubtitle?.runs?.firstOrNull()?.text,
+            thumbnail = header?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.lastOrNull()?.url,
+            playEndpoint = header?.buttons?.find {
+                it.menuRenderer?.items?.firstOrNull()?.menuNavigationItemRenderer?.icon?.iconType == "PLAY_ARROW"
+            }?.menuRenderer?.items?.firstOrNull()?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
+            shuffleEndpoint = header?.buttons?.find {
+                it.menuRenderer?.items?.any { item -> item.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" } == true
+            }?.menuRenderer?.items?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" }
+                ?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
+        )
+
+        // Try twoColumn for episodes
+        val secondaryContents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents
+        Timber.d("secondaryContents null: ${secondaryContents == null}")
+        Timber.d("secondaryContents.sectionListRenderer null: ${secondaryContents?.sectionListRenderer == null}")
+        Timber.d("sectionListRenderer.contents size: ${secondaryContents?.sectionListRenderer?.contents?.size ?: 0}")
+
+        secondaryContents?.sectionListRenderer?.contents?.forEachIndexed { index, content ->
+            Timber.d("Content[$index]: musicShelfRenderer=${content.musicShelfRenderer != null}, musicPlaylistShelfRenderer=${content.musicPlaylistShelfRenderer != null}, gridRenderer=${content.gridRenderer != null}")
+            content.musicShelfRenderer?.let { shelf ->
+                Timber.d("musicShelfRenderer.contents size: ${shelf.contents?.size ?: 0}")
+            }
+            content.musicPlaylistShelfRenderer?.let { shelf ->
+                Timber.d("musicPlaylistShelfRenderer.contents size: ${shelf.contents.size}")
+            }
+        }
+
+        var episodeContents = secondaryContents?.sectionListRenderer
+            ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+
+        // Try musicPlaylistShelfRenderer
+        if (episodeContents == null) {
+            episodeContents = secondaryContents?.sectionListRenderer
+                ?.contents?.firstOrNull()?.musicPlaylistShelfRenderer?.contents
+            Timber.d("Trying musicPlaylistShelfRenderer: ${episodeContents?.size ?: 0}")
+        }
+
+        // Fallback to singleColumn
+        if (episodeContents == null) {
+            episodeContents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents
+                ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.contents
+            Timber.d("Using singleColumn for episodes, found: ${episodeContents?.size ?: 0}")
+        }
+
+        Timber.d("Episode contents count: ${episodeContents?.size ?: 0}")
+
+        // Get episodes from musicMultiRowListItemRenderer (used for podcasts)
+        val multiRowItems = episodeContents?.mapNotNull { it.musicMultiRowListItemRenderer } ?: emptyList()
+        Timber.d("multiRowItems count: ${multiRowItems.size}")
+
+        multiRowItems.take(2).forEachIndexed { idx, renderer ->
+            Timber.d("Episode[$idx] title: ${renderer.title?.runs?.firstOrNull()?.text}")
+            Timber.d("Episode[$idx] subtitle: ${renderer.subtitle?.runs?.map { it.text }}")
+            Timber.d("Episode[$idx] videoId: ${renderer.onTap?.watchEndpoint?.videoId}")
+            Timber.d("Episode[$idx] thumbnail: ${renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()}")
+        }
+
+        val episodes = multiRowItems.mapNotNull { renderer ->
+            PodcastPage.fromMusicMultiRowListItemRenderer(renderer, podcastItem)
+        }
+
+        Timber.d("Parsed episodes: ${episodes.size}")
+
+        PodcastPage(
+            podcast = podcastItem,
+            episodes = episodes,
+            continuation = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+                ?.contents?.firstOrNull()?.musicShelfRenderer?.continuations?.getContinuation()
+                ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                    ?.tabRenderer?.content?.sectionListRenderer?.contents
+                    ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.continuations?.getContinuation()
+        )
+    }
+
     suspend fun home(continuation: String? = null, params: String? = null): Result<HomePage> = runCatching {
+        Timber.d("home() called with continuation=$continuation, params=$params")
         if (continuation != null) {
             return@runCatching homeContinuation(continuation).getOrThrow()
         }
 
         val response = innerTube.browse(WEB_REMIX, browseId = "FEmusic_home", params = params).body<BrowseResponse>()
+        Timber.d("home() response received")
         val continuation = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.continuations?.getContinuation()
         val sectionListRender = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer
-        val sections = sectionListRender?.contents!!
-            .mapNotNull { it.musicCarouselShelfRenderer }
-            .mapNotNull {
-                HomePage.Section.fromMusicCarouselShelfRenderer(it)
-            }.toMutableList()
-        val chips = sectionListRender.header?.chipCloudRenderer?.chips?.mapNotNull { HomePage.Chip.fromChipCloudChipRenderer(it) }
+        Timber.d("home() sectionListRender contents size: ${sectionListRender?.contents?.size ?: 0}")
+        val carousels = sectionListRender?.contents?.mapNotNull { it.musicCarouselShelfRenderer } ?: emptyList()
+        Timber.d("home() carousels count: ${carousels.size}")
+        val sections = carousels.mapNotNull {
+            HomePage.Section.fromMusicCarouselShelfRenderer(it)
+        }.toMutableList()
+        Timber.d("home() sections parsed: ${sections.size}")
+        val chips = sectionListRender?.header?.chipCloudRenderer?.chips?.mapNotNull { HomePage.Chip.fromChipCloudChipRenderer(it) }
+        Timber.d("home() chips: ${chips?.size ?: 0}")
         HomePage(chips, sections, continuation)
     }
 
@@ -1155,6 +1276,7 @@ object YouTube {
                     is AlbumItem -> albums.add(item)
                     is ArtistItem -> artists.add(item)
                     is PlaylistItem -> playlists.add(item)
+                    is PodcastItem, is EpisodeItem -> {}
                     null -> {}
                 }
             }
@@ -1264,6 +1386,8 @@ object YouTube {
             val FILTER_ARTIST = SearchFilter("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D")
             val FILTER_FEATURED_PLAYLIST = SearchFilter("EgeKAQQoADgBagwQDhAKEAMQBRAJEAQ%3D")
             val FILTER_COMMUNITY_PLAYLIST = SearchFilter("EgeKAQQoAEABagoQAxAEEAoQCRAF")
+            val FILTER_PODCAST = SearchFilter("EgWKAQJQAWoKEAkQChAFEAMQBA%3D%3D")
+            val FILTER_EPISODE = SearchFilter("EgWKAQJYAWoKEAkQChAFEAMQBA%3D%3D")
         }
     }
 

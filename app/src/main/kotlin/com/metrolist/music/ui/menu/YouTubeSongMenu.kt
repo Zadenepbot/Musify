@@ -560,9 +560,13 @@ fun YouTubeSongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
+            // Check if this is a podcast episode (album ID doesn't start with MPREb_)
+            val isPodcast = song.album?.let { !it.id.startsWith("MPREb_") } ?: false
+
             Material3MenuGroup(
                 items = buildList {
-                    if (artists.isNotEmpty()) {
+                    // Don't show "View Artist" for podcasts - only show "View Podcast"
+                    if (artists.isNotEmpty() && !isPodcast) {
                         add(
                             Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
@@ -587,16 +591,20 @@ fun YouTubeSongMenu(
                     song.album?.let { album ->
                         add(
                             Material3MenuItemData(
-                                title = { Text(text = stringResource(R.string.view_album)) },
+                                title = { Text(text = stringResource(if (isPodcast) R.string.view_podcast else R.string.view_album)) },
                                 description = { Text(text = album.name) },
                                 icon = {
                                     Icon(
-                                        painter = painterResource(R.drawable.album),
+                                        painter = painterResource(if (isPodcast) R.drawable.mic else R.drawable.album),
                                         contentDescription = null,
                                     )
                                 },
                                 onClick = {
-                                    navController.navigate("album/${album.id}")
+                                    if (isPodcast) {
+                                        navController.navigate("online_podcast/${album.id}")
+                                    } else {
+                                        navController.navigate("album/${album.id}")
+                                    }
                                     onDismiss()
                                 }
                             )

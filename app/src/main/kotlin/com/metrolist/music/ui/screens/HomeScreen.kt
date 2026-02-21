@@ -104,7 +104,9 @@ import coil3.request.SuccessResult
 import coil3.toBitmap
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.ArtistItem
+import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.PlaylistItem
+import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
 import com.metrolist.innertube.models.YTItem
@@ -606,6 +608,32 @@ fun HomeScreen(
     }
     val url = if (isLoggedIn) accountImageUrl else null
 
+    // Extract unique podcasts from episodes for "Podcast Channels" row (shuffled on refresh)
+    // Depends on both homePage and selectedChip so it updates when switching chips or refreshing
+    val featuredPodcasts = remember(homePage, selectedChip) {
+        if (selectedChip == null) emptyList()
+        else homePage?.sections
+            ?.flatMap { it.items }
+            ?.filterIsInstance<EpisodeItem>()
+            ?.mapNotNull { episode ->
+                episode.podcast?.let { podcast ->
+                    PodcastItem(
+                        id = podcast.id,
+                        title = podcast.name,
+                        author = episode.author,
+                        episodeCountText = null,
+                        thumbnail = episode.thumbnail,
+                        playEndpoint = null,
+                        shuffleEndpoint = null,
+                    )
+                }
+            }
+            ?.distinctBy { it.id }
+            ?.shuffled()
+            ?.take(10)
+            ?: emptyList()
+    }
+
     val scope = rememberCoroutineScope()
     // Track randomization job
     var randomizeJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
@@ -769,6 +797,13 @@ fun HomeScreen(
                             is AlbumItem -> navController.navigate("album/${item.id}")
                             is ArtistItem -> navController.navigate("artist/${item.id}")
                             is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            is PodcastItem -> navController.navigate("online_podcast/${item.id}")
+                            is EpisodeItem -> playerConnection.playQueue(
+                                ListQueue(
+                                    title = item.title,
+                                    items = listOf(item.toMediaMetadata().toMediaItem())
+                                )
+                            )
                         }
                     },
                     onLongClick = {
@@ -795,6 +830,18 @@ fun HomeScreen(
                                 is PlaylistItem -> YouTubePlaylistMenu(
                                     playlist = item,
                                     coroutineScope = scope,
+                                    onDismiss = menuState::dismiss
+                                )
+
+                                is PodcastItem -> YouTubePlaylistMenu(
+                                    playlist = item.asPlaylistItem(),
+                                    coroutineScope = scope,
+                                    onDismiss = menuState::dismiss
+                                )
+
+                                is EpisodeItem -> YouTubeSongMenu(
+                                    song = item.asSongItem(),
+                                    navController = navController,
                                     onDismiss = menuState::dismiss
                                 )
                             }
@@ -1110,6 +1157,13 @@ fun HomeScreen(
                                                                                             is AlbumItem -> navController.navigate("album/${randomItem.id}")
                                                                                             is ArtistItem -> navController.navigate("artist/${randomItem.id}")
                                                                                             is PlaylistItem -> navController.navigate("online_playlist/${randomItem.id}")
+                                                                                            is PodcastItem -> navController.navigate("online_podcast/${randomItem.id}")
+                                                                                            is EpisodeItem -> playerConnection.playQueue(
+                                                                                                ListQueue(
+                                                                                                    title = randomItem.title,
+                                                                                                    items = listOf(randomItem.toMediaMetadata().toMediaItem())
+                                                                                                )
+                                                                                            )
                                                                                         }
                                                                                     }
                                                                                 }
@@ -1169,6 +1223,16 @@ fun HomeScreen(
                                                                                             is PlaylistItem -> YouTubePlaylistMenu(
                                                                                                 playlist = item,
                                                                                                 coroutineScope = scope,
+                                                                                                onDismiss = menuState::dismiss
+                                                                                            )
+                                                                                            is PodcastItem -> YouTubePlaylistMenu(
+                                                                                                playlist = item.asPlaylistItem(),
+                                                                                                coroutineScope = scope,
+                                                                                                onDismiss = menuState::dismiss
+                                                                                            )
+                                                                                            is EpisodeItem -> YouTubeSongMenu(
+                                                                                                song = item.asSongItem(),
+                                                                                                navController = navController,
                                                                                                 onDismiss = menuState::dismiss
                                                                                             )
                                                                                         }
@@ -1835,6 +1899,89 @@ fun HomeScreen(
                             }
                         }
                     }
+                } else {
+                    // Show Podcast Channels row if we have any (extracted from episodes)
+                    // Use key prefix "0_" to ensure channels sort before episode sections "1_"
+                    if (featuredPodcasts.isNotEmpty()) {
+                        item(key = "0_podcast_channels_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.podcast_channels),
+                            )
+                        }
+
+                        item(key = "0_podcast_channels_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(featuredPodcasts) { podcast ->
+                                    ytGridItem(podcast)
+                                }
+                            }
+                        }
+
+                        // Add "Latest Episodes" header before episode sections
+                        item(key = "0_latest_episodes_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.latest_episodes),
+                            )
+                        }
+                    }
+
+                    // Render the regular sections from the chip (episodes grouped by category)
+                    // Use key prefix "1_" to ensure episodes sort after channels "0_"
+                    homeSections.filterIsInstance<HomeSection.HomePageSection>().forEach { section ->
+                        val sectionData = homePage?.sections?.getOrNull(section.index)
+                        sectionData?.let {
+                            item(key = "1_chip_section_title_${section.index}") {
+                                NavigationTitle(
+                                    title = sectionData.title,
+                                    label = sectionData.label,
+                                    thumbnail = sectionData.thumbnail?.let { thumbnailUrl ->
+                                        {
+                                            val shape =
+                                                if (sectionData.endpoint?.isArtistEndpoint == true) CircleShape else RoundedCornerShape(
+                                                    ThumbnailCornerRadius
+                                                )
+                                            AsyncImage(
+                                                model = thumbnailUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(ListThumbnailSize)
+                                                    .clip(shape)
+                                            )
+                                        }
+                                    },
+                                    onClick = sectionData.endpoint?.let { endpoint ->
+                                        {
+                                            when {
+                                                endpoint.browseId == "FEmusic_moods_and_genres" ->
+                                                    navController.navigate("mood_and_genres")
+                                                endpoint.params != null ->
+                                                    navController.navigate("youtube_browse/${endpoint.browseId}?params=${endpoint.params}")
+                                                else ->
+                                                    navController.navigate("browse/${endpoint.browseId}")
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
+
+                            item(key = "1_chip_section_list_${section.index}") {
+                                LazyRow(
+                                    contentPadding = WindowInsets.systemBars
+                                        .only(WindowInsetsSides.Horizontal)
+                                        .asPaddingValues(),
+                                ) {
+                                    items(sectionData.items) { item ->
+                                        ytGridItem(item)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 }
             }
@@ -1874,6 +2021,15 @@ fun HomeScreen(
                                 is PlaylistItem -> luckyItem.playEndpoint?.let {
                                     playerConnection.playQueue(YouTubeQueue(it))
                                 }
+                                is PodcastItem -> luckyItem.playEndpoint?.let {
+                                    playerConnection.playQueue(YouTubeQueue(it))
+                                }
+                                is EpisodeItem -> playerConnection.playQueue(
+                                    ListQueue(
+                                        title = luckyItem.title,
+                                        items = listOf(luckyItem.toMediaMetadata().toMediaItem())
+                                    )
+                                )
                             }
                         }
                     }

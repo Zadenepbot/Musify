@@ -90,6 +90,59 @@ data class ArtistItem(
         get() = "https://music.youtube.com/channel/$id"
 }
 
+data class PodcastItem(
+    override val id: String,
+    override val title: String,
+    val author: Artist?,
+    val episodeCountText: String?,
+    override val thumbnail: String?,
+    val playEndpoint: WatchEndpoint?,
+    val shuffleEndpoint: WatchEndpoint?,
+) : YTItem() {
+    override val explicit: Boolean
+        get() = false
+    override val shareLink: String
+        get() = "https://music.youtube.com/playlist?list=$id"
+
+    fun asPlaylistItem() = PlaylistItem(
+        id = id,
+        title = title,
+        author = author,
+        songCountText = episodeCountText,
+        thumbnail = thumbnail,
+        playEndpoint = playEndpoint,
+        shuffleEndpoint = shuffleEndpoint,
+        radioEndpoint = null,
+        isEditable = false
+    )
+}
+
+data class EpisodeItem(
+    override val id: String,
+    override val title: String,
+    val author: Artist?,
+    val podcast: Album? = null,
+    val duration: Int? = null,
+    val publishDateText: String? = null,
+    override val thumbnail: String,
+    override val explicit: Boolean = false,
+    val endpoint: WatchEndpoint? = null,
+) : YTItem() {
+    override val shareLink: String
+        get() = "https://music.youtube.com/watch?v=$id"
+
+    fun asSongItem() = SongItem(
+        id = id,
+        title = title,
+        artists = listOfNotNull(author),
+        album = podcast,
+        duration = duration,
+        thumbnail = thumbnail,
+        explicit = explicit,
+        endpoint = endpoint
+    )
+}
+
 fun <T : YTItem> List<T>.filterExplicit(enabled: Boolean = true) =
     if (enabled) {
         filter { !it.explicit }
