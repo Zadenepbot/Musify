@@ -1044,8 +1044,9 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
 
-                    homeSections.forEach { section ->
+                homeSections.forEach { section ->
                         when (section) {
                             HomeSection.SpeedDial -> {
                                 speedDialItems.takeIf { it.isNotEmpty() }?.let { items ->
@@ -1826,7 +1827,6 @@ fun HomeScreen(
                             }
                         }
                     }
-                }
 
                 if (isLoading || homePage?.continuation != null && homePage?.sections?.isNotEmpty() == true) {
                     item(key = "loading_shimmer") {
