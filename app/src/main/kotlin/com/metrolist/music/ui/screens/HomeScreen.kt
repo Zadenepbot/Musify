@@ -969,19 +969,21 @@ fun HomeScreen(
 
                 if (isLoading && homePage?.chips.isNullOrEmpty()) {
                     item(key = "chips_shimmer") {
-                        LazyRow(
-                            contentPadding = WindowInsets.systemBars
-                                .only(WindowInsetsSides.Horizontal)
-                                .asPaddingValues(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            items(5) {
-                                TextPlaceholder(
-                                    height = 30.dp,
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.width(72.dp)
-                                )
+                        ShimmerHost {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                items(5) {
+                                    TextPlaceholder(
+                                        height = 30.dp,
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.width(72.dp)
+                                    )
+                                }
                             }
                         }
                     }
