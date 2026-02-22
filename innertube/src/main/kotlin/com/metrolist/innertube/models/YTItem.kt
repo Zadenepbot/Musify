@@ -133,6 +133,8 @@ data class EpisodeItem(
     val endpoint: WatchEndpoint? = null,
     val libraryAddToken: String? = null,
     val libraryRemoveToken: String? = null,
+    val markAsPlayedToken: String? = null,
+    val markAsUnplayedToken: String? = null,
 ) : YTItem() {
     override val shareLink: String
         get() = "https://music.youtube.com/watch?v=$id"

@@ -7,6 +7,7 @@ package com.metrolist.music.ui.menu
 
 import android.content.Intent
 import android.content.res.Configuration
+import java.time.LocalDateTime
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -518,25 +519,61 @@ fun SongMenu(
                             }
                         )
                     )
-                    // For episodes, use "Save for later" (Episodes for Later playlist)
+                    // For episodes, use "Save for later" / "Remove from saved" (Episodes for Later playlist)
                     // For regular songs, use "Add to library"
                     if (song.song.isEpisode) {
+                        val isEpisodeSaved = song.song.inLibrary != null
                         add(
                             Material3MenuItemData(
-                                title = { Text(text = stringResource(R.string.save_episode_for_later)) },
+                                title = {
+                                    Text(text = stringResource(
+                                        if (isEpisodeSaved) R.string.remove_episode_from_saved
+                                        else R.string.save_episode_for_later
+                                    ))
+                                },
                                 description = { Text(text = stringResource(R.string.episodes_for_later)) },
                                 icon = {
                                     Icon(
-                                        painter = painterResource(R.drawable.library_add),
+                                        painter = painterResource(
+                                            if (isEpisodeSaved) R.drawable.library_add_check
+                                            else R.drawable.library_add
+                                        ),
                                         contentDescription = null,
                                     )
                                 },
                                 onClick = {
                                     coroutineScope.launch(Dispatchers.IO) {
-                                        YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
-                                            Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
-                                        }.onFailure { e ->
-                                            Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                        if (isEpisodeSaved) {
+                                            // Remove from Episodes for Later
+                                            val setVideoIdEntity = database.getSetVideoId(song.id)
+                                            val setVideoId = setVideoIdEntity?.setVideoId
+                                            if (setVideoId != null) {
+                                                YouTube.removeEpisodeFromSavedEpisodes(song.id, setVideoId).onSuccess {
+                                                    Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${song.id}")
+                                                    // Update local database
+                                                    database.query {
+                                                        update(song.song.copy(inLibrary = null))
+                                                    }
+                                                }.onFailure { e ->
+                                                    Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${song.id}")
+                                                }
+                                            } else {
+                                                Timber.w("[EPISODE_SAVE] No setVideoId found for ${song.id}, removing from local DB only")
+                                                database.query {
+                                                    update(song.song.copy(inLibrary = null))
+                                                }
+                                            }
+                                        } else {
+                                            // Add to Episodes for Later
+                                            YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
+                                                Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
+                                                // Update local database to mark as saved
+                                                database.query {
+                                                    update(song.song.copy(inLibrary = LocalDateTime.now()))
+                                                }
+                                            }.onFailure { e ->
+                                                Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                            }
                                         }
                                     }
                                     onDismiss()

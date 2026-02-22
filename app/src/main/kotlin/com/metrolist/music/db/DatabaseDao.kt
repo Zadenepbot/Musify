@@ -1370,6 +1370,9 @@ interface DatabaseDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(playCountEntity: PlayCountEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(setVideoIdEntity: SetVideoIdEntity)
+
     @Transaction
     fun insert(
         mediaMetadata: MediaMetadata,

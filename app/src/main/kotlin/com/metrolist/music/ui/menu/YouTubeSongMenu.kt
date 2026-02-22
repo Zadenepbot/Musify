@@ -389,33 +389,62 @@ fun YouTubeSongMenu(
         item {
             Material3MenuGroup(
                 items = buildList {
-                    // Save for Later option for podcast episodes
+                    // Save/Remove for Later option for podcast episodes
                     if (song.isEpisode) {
-                        add(
-                            Material3MenuItemData(
-                                title = { Text(text = stringResource(R.string.save_episode_for_later)) },
-                                description = { Text(text = stringResource(R.string.save_episode_for_later_desc)) },
-                                icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.playlist_add),
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    coroutineScope.launch(Dispatchers.IO) {
-                                        Timber.d("[EPISODE_SAVE] Saving episode ${song.id} to Episodes for Later")
-                                        YouTube.addEpisodeToSavedEpisodes(song.id)
-                                            .onSuccess {
-                                                Timber.d("[EPISODE_SAVE] Successfully saved to Episodes for Later")
-                                            }
-                                            .onFailure { e ->
-                                                Timber.e(e, "[EPISODE_SAVE] Failed to save to Episodes for Later")
-                                            }
+                        if (song.setVideoId != null) {
+                            // Episode is saved - show remove option
+                            add(
+                                Material3MenuItemData(
+                                    title = { Text(text = stringResource(R.string.remove_episode_from_saved)) },
+                                    icon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.remove),
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            Timber.d("[EPISODE_SAVE] Removing episode ${song.id} from Episodes for Later")
+                                            YouTube.removeEpisodeFromSavedEpisodes(song.id, song.setVideoId!!)
+                                                .onSuccess {
+                                                    Timber.d("[EPISODE_SAVE] Successfully removed from Episodes for Later")
+                                                }
+                                                .onFailure { e ->
+                                                    Timber.e(e, "[EPISODE_SAVE] Failed to remove from Episodes for Later")
+                                                }
+                                        }
+                                        onDismiss()
                                     }
-                                    onDismiss()
-                                }
+                                )
                             )
-                        )
+                        } else {
+                            // Episode not saved - show save option
+                            add(
+                                Material3MenuItemData(
+                                    title = { Text(text = stringResource(R.string.save_episode_for_later)) },
+                                    description = { Text(text = stringResource(R.string.save_episode_for_later_desc)) },
+                                    icon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.playlist_add),
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            Timber.d("[EPISODE_SAVE] Saving episode ${song.id} to Episodes for Later")
+                                            YouTube.addEpisodeToSavedEpisodes(song.id)
+                                                .onSuccess {
+                                                    Timber.d("[EPISODE_SAVE] Successfully saved to Episodes for Later")
+                                                }
+                                                .onFailure { e ->
+                                                    Timber.e(e, "[EPISODE_SAVE] Failed to save to Episodes for Later")
+                                                }
+                                        }
+                                        onDismiss()
+                                    }
+                                )
+                            )
+                        }
                     }
                     if (song.historyRemoveToken != null) {
                         add(

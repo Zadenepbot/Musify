@@ -78,7 +78,7 @@ data class LibraryPage(
                 renderer.isPodcast -> {
                     val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
                     PodcastItem(
-                        id = renderer.navigationEndpoint.browseEndpoint?.browseId?.removePrefix("MPSP") ?: return null,
+                        id = renderer.navigationEndpoint.browseEndpoint?.browseId ?: return null,
                         title = renderer.title.runs?.firstOrNull()?.text ?: return null,
                         author = renderer.subtitle?.runs?.firstOrNull()?.let {
                             Artist(
@@ -229,6 +229,29 @@ data class LibraryPage(
                         ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
                         ?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint
                 )
+
+                renderer.isPodcast -> {
+                    val podcastLibraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
+                    PodcastItem(
+                        id = renderer.navigationEndpoint?.browseEndpoint?.browseId ?: return null,
+                        title = renderer.flexColumns.firstOrNull()?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
+                            ?: return null,
+                        author = renderer.flexColumns.getOrNull(1)?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.let {
+                            Artist(
+                                name = it.text,
+                                id = it.navigationEndpoint?.browseEndpoint?.browseId
+                            )
+                        },
+                        episodeCountText = renderer.flexColumns.getOrNull(1)?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.lastOrNull()?.text,
+                        thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
+                        playEndpoint = renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchPlaylistEndpoint,
+                        shuffleEndpoint = renderer.menu?.menuRenderer?.items
+                            ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE" }
+                            ?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
+                        libraryAddToken = podcastLibraryTokens.addToken,
+                        libraryRemoveToken = podcastLibraryTokens.removeToken,
+                    )
+                }
 
                 else -> {
                     println("[UPLOAD_DEBUG] LibraryPage.parse: Not a song or artist, isSong=${renderer.isSong}, isArtist=${renderer.isArtist}")

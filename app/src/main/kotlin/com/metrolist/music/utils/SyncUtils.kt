@@ -26,6 +26,7 @@ import com.metrolist.music.db.entities.ArtistEntity
 import com.metrolist.music.db.entities.PlaylistEntity
 import com.metrolist.music.db.entities.PlaylistSongMap
 import com.metrolist.music.db.entities.PodcastEntity
+import com.metrolist.music.db.entities.SetVideoIdEntity
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.extensions.collectLatest
 import com.metrolist.music.extensions.isInternetConnected
@@ -71,6 +72,7 @@ sealed class SyncOperation {
     data class LikeSong(val song: SongEntity) : SyncOperation()
     data object CleanupDuplicates : SyncOperation()
     data object ClearAllSynced : SyncOperation()
+    data object ClearPodcastData : SyncOperation()
 }
 
 sealed class SyncStatus {
@@ -162,6 +164,7 @@ class SyncUtils @Inject constructor(
             is SyncOperation.LikeSong -> executeLikeSong(operation.song)
             is SyncOperation.CleanupDuplicates -> executeCleanupDuplicatePlaylists()
             is SyncOperation.ClearAllSynced -> executeClearAllSyncedContent()
+            is SyncOperation.ClearPodcastData -> executeClearPodcastData()
         }
     }
 
@@ -337,6 +340,12 @@ class SyncUtils @Inject constructor(
     fun clearAllSyncedContent() {
         syncScope.launch {
             syncChannel.send(SyncOperation.ClearAllSynced)
+        }
+    }
+
+    fun clearPodcastData() {
+        syncScope.launch {
+            syncChannel.send(SyncOperation.ClearPodcastData)
         }
     }
 
@@ -958,41 +967,21 @@ class SyncUtils @Inject constructor(
 
         updateState { copy(currentOperation = "Syncing podcast subscriptions") }
 
+        // Sync saved podcast shows (most common - saved via likePlaylist)
         withRetry {
-            Timber.d("[PODCAST_SYNC] Calling YouTube.libraryPodcastChannels()")
-            YouTube.libraryPodcastChannels()
+            Timber.d("[PODCAST_SYNC] Calling YouTube.savedPodcastShows()")
+            YouTube.savedPodcastShows()
         }.onSuccess { result ->
-            Timber.d("[PODCAST_SYNC] withRetry succeeded, result isSuccess=${result.isSuccess}")
-            result.onSuccess { page ->
+            Timber.d("[PODCAST_SYNC] savedPodcastShows succeeded, result isSuccess=${result.isSuccess}")
+            result.onSuccess { remotePodcasts ->
                 try {
-                    Timber.d("[PODCAST_SYNC] Page received, total items: ${page.items.size}")
-                    page.items.forEachIndexed { index, item ->
-                        Timber.d("[PODCAST_SYNC] Page item $index: type=${item::class.simpleName}, id=${(item as? PodcastItem)?.id ?: "N/A"}")
-                    }
-                    val remotePodcasts = page.items.filterIsInstance<PodcastItem>()
-                    Timber.d("[PODCAST_SYNC] Filtered to ${remotePodcasts.size} PodcastItems")
+                    Timber.d("[PODCAST_SYNC] Fetched ${remotePodcasts.size} saved podcast shows")
 
                     remotePodcasts.forEachIndexed { index, podcast ->
                         Timber.d("[PODCAST_SYNC] Remote podcast $index: id=${podcast.id}, title=${podcast.title}, author=${podcast.author?.name}")
                     }
 
-                    val remoteIds = remotePodcasts.map { it.id }.toSet()
-                    val localPodcasts = database.subscribedPodcasts().first()
-                    Timber.d("[PODCAST_SYNC] Local subscribed podcasts count: ${localPodcasts.size}")
-
-                    // Push local-only podcasts to YTM using the savePodcast API
-                    val localOnlyPodcasts = localPodcasts.filterNot { it.id in remoteIds }
-                    Timber.d("[PODCAST_SYNC] Local-only podcasts to push to YTM: ${localOnlyPodcasts.size}")
-                    localOnlyPodcasts.forEach { podcast ->
-                        try {
-                            Timber.d("[PODCAST_SYNC] Pushing local podcast to YTM: ${podcast.id}")
-                            YouTube.savePodcast(podcast.id, true)
-                            delay(DB_OPERATION_DELAY_MS)
-                        } catch (e: Exception) {
-                            Timber.e(e, "[PODCAST_SYNC] Failed to push podcast to YTM: ${podcast.id}")
-                        }
-                    }
-
+                    // Server-first: YouTube Music is the source of truth
                     // Add/update podcasts from remote
                     remotePodcasts.forEach { podcast ->
                         try {
@@ -1032,15 +1021,107 @@ class SyncUtils @Inject constructor(
                         }
                     }
 
-                    Timber.d("[PODCAST_SYNC] Synced ${remotePodcasts.size} podcast subscriptions successfully")
+                    Timber.d("[PODCAST_SYNC] Synced ${remotePodcasts.size} saved podcast shows successfully")
                 } catch (e: Exception) {
-                    Timber.e(e, "[PODCAST_SYNC] Error processing podcast subscriptions")
+                    Timber.e(e, "[PODCAST_SYNC] Error processing saved podcast shows")
                 }
             }.onFailure { e ->
-                Timber.e(e, "[PODCAST_SYNC] Failed to fetch podcast subscriptions from YouTube")
+                Timber.e(e, "[PODCAST_SYNC] Failed to fetch saved podcast shows from YouTube")
             }
         }.onFailure { e ->
-            Timber.e(e, "[PODCAST_SYNC] Failed to sync podcast subscriptions after retries")
+            Timber.e(e, "[PODCAST_SYNC] Failed to sync saved podcast shows after retries")
+        }
+
+        // Also sync subscribed podcast channels (subscribed via subscribeChannel API)
+        withRetry {
+            Timber.d("[PODCAST_SYNC] Calling YouTube.libraryPodcastChannels()")
+            YouTube.libraryPodcastChannels()
+        }.onSuccess { result ->
+            Timber.d("[PODCAST_SYNC] libraryPodcastChannels succeeded, result isSuccess=${result.isSuccess}")
+            result.onSuccess { page ->
+                try {
+                    val remotePodcasts = page.items.filterIsInstance<PodcastItem>()
+                    Timber.d("[PODCAST_SYNC] Fetched ${remotePodcasts.size} subscribed podcast channels")
+
+                    // Add/update podcasts from remote channels
+                    remotePodcasts.forEach { podcast ->
+                        try {
+                            val dbPodcast = database.podcast(podcast.id).firstOrNull()
+                            Timber.d("[PODCAST_SYNC] Processing subscribed channel ${podcast.id}: exists in db=${dbPodcast != null}")
+
+                            database.transaction {
+                                if (dbPodcast == null) {
+                                    Timber.d("[PODCAST_SYNC] Inserting new subscribed channel: ${podcast.id}")
+                                    insert(
+                                        PodcastEntity(
+                                            id = podcast.id,
+                                            title = podcast.title,
+                                            author = podcast.author?.name,
+                                            thumbnailUrl = podcast.thumbnail,
+                                            bookmarkedAt = LocalDateTime.now(),
+                                        )
+                                    )
+                                } else if (dbPodcast.bookmarkedAt == null) {
+                                    Timber.d("[PODCAST_SYNC] Updating existing channel to subscribed: ${podcast.id}")
+                                    update(
+                                        dbPodcast.copy(
+                                            title = podcast.title,
+                                            author = podcast.author?.name,
+                                            thumbnailUrl = podcast.thumbnail,
+                                            bookmarkedAt = LocalDateTime.now(),
+                                            lastUpdateTime = LocalDateTime.now(),
+                                        )
+                                    )
+                                }
+                            }
+                            delay(DB_OPERATION_DELAY_MS)
+                        } catch (e: Exception) {
+                            Timber.e(e, "[PODCAST_SYNC] Failed to process subscribed channel: ${podcast.id}")
+                        }
+                    }
+
+                    Timber.d("[PODCAST_SYNC] Synced ${remotePodcasts.size} subscribed podcast channels successfully")
+                } catch (e: Exception) {
+                    Timber.e(e, "[PODCAST_SYNC] Error processing subscribed podcast channels")
+                }
+            }.onFailure { e ->
+                Timber.e(e, "[PODCAST_SYNC] Failed to fetch subscribed podcast channels from YouTube")
+            }
+        }.onFailure { e ->
+            Timber.e(e, "[PODCAST_SYNC] Failed to sync subscribed podcast channels after retries")
+        }
+
+        // Cleanup: Remove local podcasts that are no longer subscribed on YouTube Music
+        try {
+            val allRemoteIds = mutableSetOf<String>()
+
+            // Collect all remote podcast IDs
+            YouTube.savedPodcastShows().onSuccess { podcasts ->
+                allRemoteIds.addAll(podcasts.map { it.id })
+            }
+            YouTube.libraryPodcastChannels().onSuccess { page ->
+                allRemoteIds.addAll(page.items.filterIsInstance<PodcastItem>().map { it.id })
+            }
+
+            if (allRemoteIds.isNotEmpty()) {
+                val localPodcasts = database.subscribedPodcasts().first()
+                val localOnlyPodcasts = localPodcasts.filterNot { it.id in allRemoteIds }
+                Timber.d("[PODCAST_SYNC] Cleanup: removing ${localOnlyPodcasts.size} podcasts not on YTM")
+
+                localOnlyPodcasts.forEach { podcast ->
+                    try {
+                        // Remove subscription (set bookmarkedAt to null)
+                        database.transaction {
+                            update(podcast.copy(bookmarkedAt = null))
+                        }
+                        Timber.d("[PODCAST_SYNC] Unsubscribed from local podcast: ${podcast.id}")
+                    } catch (e: Exception) {
+                        Timber.e(e, "[PODCAST_SYNC] Failed to cleanup podcast: ${podcast.id}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "[PODCAST_SYNC] Error during cleanup")
         }
     }
 
@@ -1061,7 +1142,15 @@ class SyncUtils @Inject constructor(
             result.onSuccess { remoteEpisodes ->
                 try {
                     Timber.d("[EPISODES_SYNC] Fetched ${remoteEpisodes.size} episodes from VLSE playlist")
+                    val remoteIds = remoteEpisodes.map { it.id }.toSet()
 
+                    // Get local episodes that are saved (for cleanup later)
+                    val localSavedEpisodes = database.podcastEpisodesByCreateDateAsc().first()
+                        .filter { it.song.inLibrary != null }
+                    Timber.d("[EPISODES_SYNC] Local saved episodes: ${localSavedEpisodes.size}")
+
+                    // Server-first: YouTube Music is the source of truth
+                    // Sync remote episodes to local database
                     remoteEpisodes.forEach { episode ->
                         try {
                             val dbSong = database.song(episode.id).firstOrNull()
@@ -1108,10 +1197,29 @@ class SyncUtils @Inject constructor(
                                     }
                                     Timber.d("[EPISODES_SYNC] Episode already in library: ${episode.id}")
                                 }
+                                // Store setVideoId for removal capability
+                                episode.setVideoId?.let { svid ->
+                                    Timber.d("[EPISODES_SYNC] Storing setVideoId for ${episode.id}: $svid")
+                                    insert(SetVideoIdEntity(videoId = episode.id, setVideoId = svid))
+                                }
                             }
                             delay(DB_OPERATION_DELAY_MS)
                         } catch (e: Exception) {
                             Timber.e(e, "[EPISODES_SYNC] Failed to process episode: ${episode.id}")
+                        }
+                    }
+
+                    // Cleanup: Remove local episodes that are no longer in Episodes for Later
+                    val localToRemove = localSavedEpisodes.filterNot { it.id in remoteIds }
+                    Timber.d("[EPISODES_SYNC] Cleanup: removing ${localToRemove.size} episodes not in VLSE")
+                    localToRemove.forEach { song ->
+                        try {
+                            database.transaction {
+                                update(song.song.copy(inLibrary = null))
+                            }
+                            Timber.d("[EPISODES_SYNC] Removed episode from library: ${song.id}")
+                        } catch (e: Exception) {
+                            Timber.e(e, "[EPISODES_SYNC] Failed to cleanup episode: ${song.id}")
                         }
                     }
 
@@ -1379,6 +1487,37 @@ class SyncUtils @Inject constructor(
             Timber.d("clearAllSyncedContent: Cleanup completed successfully")
         } catch (e: Exception) {
             Timber.e(e, "clearAllSyncedContent: Error during cleanup")
+            updateState { copy(overallStatus = SyncStatus.Error(e.message ?: "Unknown error"), currentOperation = "") }
+        }
+    }
+
+    private suspend fun executeClearPodcastData() = withContext(Dispatchers.IO) {
+        Timber.d("[PODCAST_CLEAR] Starting podcast data cleanup")
+
+        updateState { copy(overallStatus = SyncStatus.Syncing, currentOperation = "Clearing podcast data") }
+
+        try {
+            database.withTransaction {
+                // Clear subscribed podcasts
+                val subscribedPodcasts = database.subscribedPodcasts().first()
+                Timber.d("[PODCAST_CLEAR] Clearing ${subscribedPodcasts.size} subscribed podcasts")
+                subscribedPodcasts.forEach { podcast ->
+                    database.update(podcast.copy(bookmarkedAt = null))
+                }
+
+                // Clear episode library status (inLibrary) for episodes
+                val savedEpisodes = database.podcastEpisodesByCreateDateAsc().first()
+                    .filter { it.song.inLibrary != null }
+                Timber.d("[PODCAST_CLEAR] Clearing ${savedEpisodes.size} saved episodes")
+                savedEpisodes.forEach { song ->
+                    database.update(song.song.copy(inLibrary = null))
+                }
+            }
+
+            updateState { copy(overallStatus = SyncStatus.Completed, currentOperation = "") }
+            Timber.d("[PODCAST_CLEAR] Podcast data cleared successfully")
+        } catch (e: Exception) {
+            Timber.e(e, "[PODCAST_CLEAR] Error during cleanup")
             updateState { copy(overallStatus = SyncStatus.Error(e.message ?: "Unknown error"), currentOperation = "") }
         }
     }

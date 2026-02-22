@@ -24,8 +24,8 @@ data class MusicResponsiveHeaderRenderer(
 
         @Serializable
         data class ToggleButtonRenderer(
-            val defaultIcon: Icon,
-            val defaultServiceEndpoint: DefaultServiceEndpoint,
+            val defaultIcon: Icon?,
+            val defaultServiceEndpoint: DefaultServiceEndpoint?,
             val toggledServiceEndpoint: ToggledServiceEndpoint?,
         )
     }

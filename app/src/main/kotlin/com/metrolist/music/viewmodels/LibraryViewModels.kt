@@ -397,7 +397,7 @@ constructor(
     private val _isLoadingNewEpisodes = MutableStateFlow(false)
     val isLoadingNewEpisodes: StateFlow<Boolean> = _isLoadingNewEpisodes.asStateFlow()
 
-    // Episodes for Later
+    // Episodes for Later - only show episodes that are saved (inLibrary != null)
     val allPodcasts =
         context.dataStore.data
             .map {
@@ -408,7 +408,9 @@ constructor(
             }.distinctUntilChanged()
             .flatMapLatest { (sortDesc, hideExplicit) ->
                 val (sortType, descending) = sortDesc
-                database.podcastEpisodes(sortType, descending).map { it.filterExplicit(hideExplicit) }
+                database.podcastEpisodes(sortType, descending).map { episodes ->
+                    episodes.filter { it.song.inLibrary != null }.filterExplicit(hideExplicit)
+                }
             }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
@@ -444,6 +446,19 @@ constructor(
         viewModelScope.launch(Dispatchers.IO) {
             syncUtils.syncEpisodesForLater()
         }
+    }
+
+    fun clearPodcastData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            syncUtils.clearPodcastData()
+        }
+    }
+
+    suspend fun refreshAll() {
+        // Sync subscriptions first, then episodes, then fetch new episodes
+        syncUtils.syncPodcastSubscriptionsSuspend()
+        syncUtils.syncEpisodesForLaterSuspend()
+        fetchNewEpisodes()
     }
 }
 

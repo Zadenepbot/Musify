@@ -806,6 +806,7 @@
     <string name="save_episode_for_later">Save for later</string>
     <string name="save_episode_for_later_desc">Add to your Episodes for Later playlist</string>
     <string name="saved_episode">Saved to Episodes for Later</string>
+    <string name="remove_episode_from_saved">Remove from saved</string>
     <string name="subscribe_to_podcast">Save podcast to library</string>
     <string name="save_to_library">Save to Library</string>
     <string name="saved_to_library">Saved</string>

@@ -577,7 +577,7 @@ object YouTube {
                 }
             }
             button.toggleButtonRenderer?.let { toggle ->
-                Timber.d("[PODCAST] Button[$i].toggleButtonRenderer: defaultIcon=${toggle.defaultIcon.iconType}, defaultToken=${toggle.defaultServiceEndpoint.feedbackEndpoint?.feedbackToken?.take(30)}, subscribeChannelIds=${toggle.defaultServiceEndpoint.subscribeEndpoint?.channelIds}")
+                Timber.d("[PODCAST] Button[$i].toggleButtonRenderer: defaultIcon=${toggle.defaultIcon?.iconType}, defaultToken=${toggle.defaultServiceEndpoint?.feedbackEndpoint?.feedbackToken?.take(30)}, subscribeChannelIds=${toggle.defaultServiceEndpoint?.subscribeEndpoint?.channelIds}")
             }
         }
 
@@ -600,9 +600,9 @@ object YouTube {
         if (libraryTokens?.addToken == null && libraryTokens?.removeToken == null) {
             header?.buttons?.forEach { button ->
                 button.toggleButtonRenderer?.let { toggle ->
-                    val iconType = toggle.defaultIcon.iconType
-                    if (PageHelper.isLibraryIcon(iconType)) {
-                        val defaultToken = toggle.defaultServiceEndpoint.feedbackEndpoint?.feedbackToken
+                    val iconType = toggle.defaultIcon?.iconType
+                    if (iconType != null && PageHelper.isLibraryIcon(iconType)) {
+                        val defaultToken = toggle.defaultServiceEndpoint?.feedbackEndpoint?.feedbackToken
                         val toggledToken = toggle.toggledServiceEndpoint?.feedbackEndpoint?.feedbackToken
                         libraryTokens = if (PageHelper.isAddLibraryIcon(iconType)) {
                             // BOOKMARK_BORDER: default=add, toggled=remove
@@ -1218,6 +1218,7 @@ object YouTube {
      */
     suspend fun savePodcast(podcastId: String, save: Boolean) = runCatching {
         val playlistId = podcastId.removePrefix("MPSP")
+        Timber.d("[PODCAST_API] savePodcast: podcastId=$podcastId, playlistId=$playlistId, save=$save")
         if (save)
             innerTube.likePlaylist(WEB_REMIX, playlistId)
         else
@@ -1239,66 +1240,78 @@ object YouTube {
         innerTube.removeFromPlaylist(WEB_REMIX, "SE", videoId, setVideoId)
     }
 
-    suspend fun libraryPodcastChannels(): Result<LibraryPage> = runCatching {
-        val response = innerTube.browse(
-            client = WEB_REMIX,
-            browseId = "FEmusic_library_non_music_audio_channels_list",
-            setLogin = true
-        ).body<BrowseResponse>()
+    suspend fun libraryPodcastChannels(): Result<LibraryPage> {
+        Timber.d("[PODCAST_API] libraryPodcastChannels: calling browse with FEmusic_library_non_music_audio_channels_list")
+        return runCatching {
+            val response = innerTube.browse(
+                client = WEB_REMIX,
+                browseId = "FEmusic_library_non_music_audio_channels_list",
+                setLogin = true
+            ).body<BrowseResponse>()
 
-        val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-            ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+            val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
 
-        val items = when {
-            contents?.gridRenderer != null -> {
-                contents.gridRenderer.items
-                    .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
-                    .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+            val items = when {
+                contents?.gridRenderer != null -> {
+                    contents.gridRenderer.items
+                        .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
+                        .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+                }
+                contents?.musicShelfRenderer != null -> {
+                    contents.musicShelfRenderer.contents
+                        ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                        ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
+                        ?: emptyList()
+                }
+                else -> emptyList()
             }
-            contents?.musicShelfRenderer != null -> {
-                contents.musicShelfRenderer.contents
-                    ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
-                    ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
-                    ?: emptyList()
-            }
-            else -> emptyList()
+
+            LibraryPage(
+                items = items,
+                continuation = null
+            )
+        }.also { result ->
+            result.onFailure { e -> Timber.e(e, "[PODCAST_API] libraryPodcastChannels FAILED") }
+            result.onSuccess { Timber.d("[PODCAST_API] libraryPodcastChannels SUCCESS: ${it.items.size} items") }
         }
-
-        LibraryPage(
-            items = items,
-            continuation = null
-        )
     }
 
-    suspend fun libraryPodcastEpisodes(): Result<LibraryPage> = runCatching {
-        val response = innerTube.browse(
-            client = WEB_REMIX,
-            browseId = "FEmusic_library_non_music_audio_list",
-            setLogin = true
-        ).body<BrowseResponse>()
+    suspend fun libraryPodcastEpisodes(): Result<LibraryPage> {
+        Timber.d("[PODCAST_API] libraryPodcastEpisodes: calling browse with FEmusic_library_non_music_audio_list")
+        return runCatching {
+            val response = innerTube.browse(
+                client = WEB_REMIX,
+                browseId = "FEmusic_library_non_music_audio_list",
+                setLogin = true
+            ).body<BrowseResponse>()
 
-        val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-            ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+            val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
 
-        val items = when {
-            contents?.gridRenderer != null -> {
-                contents.gridRenderer.items
-                    .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
-                    .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+            val items = when {
+                contents?.gridRenderer != null -> {
+                    contents.gridRenderer.items
+                        .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
+                        .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+                }
+                contents?.musicShelfRenderer != null -> {
+                    contents.musicShelfRenderer.contents
+                        ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                        ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
+                        ?: emptyList()
+                }
+                else -> emptyList()
             }
-            contents?.musicShelfRenderer != null -> {
-                contents.musicShelfRenderer.contents
-                    ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
-                    ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
-                    ?: emptyList()
-            }
-            else -> emptyList()
+
+            LibraryPage(
+                items = items,
+                continuation = null
+            )
+        }.also { result ->
+            result.onFailure { e -> Timber.e(e, "[PODCAST_API] libraryPodcastEpisodes FAILED") }
+            result.onSuccess { Timber.d("[PODCAST_API] libraryPodcastEpisodes SUCCESS: ${it.items.size} items") }
         }
-
-        LibraryPage(
-            items = items,
-            continuation = null
-        )
     }
 
     /**
@@ -1314,31 +1327,37 @@ object YouTube {
      * Fetch "New Episodes" auto-playlist (VLRDPN).
      * Returns new episodes from saved/subscribed podcasts.
      */
-    suspend fun newEpisodes(): Result<List<SongItem>> = runCatching {
-        val response = innerTube.browse(
-            client = WEB_REMIX,
-            browseId = "VLRDPN",
-            setLogin = true
-        ).body<BrowseResponse>()
+    suspend fun newEpisodes(): Result<List<SongItem>> {
+        Timber.d("[PODCAST_API] newEpisodes: calling browse with VLRDPN")
+        return runCatching {
+            val response = innerTube.browse(
+                client = WEB_REMIX,
+                browseId = "VLRDPN",
+                setLogin = true
+            ).body<BrowseResponse>()
 
-        response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
-            ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
-            ?.mapNotNull { it.musicMultiRowListItemRenderer }
-            ?.map { renderer ->
-                SongItem(
-                    id = renderer.onTap?.watchEndpoint?.videoId ?: "",
-                    title = renderer.title?.runs?.firstOrNull()?.text ?: "",
-                    artists = renderer.subtitle?.runs?.mapNotNull { run ->
-                        run.navigationEndpoint?.browseEndpoint?.let { endpoint ->
-                            Artist(name = run.text, id = endpoint.browseId)
-                        }
-                    } ?: emptyList(),
-                    album = null,
-                    duration = null,
-                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
-                    isEpisode = true,
-                )
-            } ?: emptyList()
+            response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+                ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+                ?.mapNotNull { it.musicMultiRowListItemRenderer }
+                ?.map { renderer ->
+                    SongItem(
+                        id = renderer.onTap?.watchEndpoint?.videoId ?: "",
+                        title = renderer.title?.runs?.firstOrNull()?.text ?: "",
+                        artists = renderer.subtitle?.runs?.mapNotNull { run ->
+                            run.navigationEndpoint?.browseEndpoint?.let { endpoint ->
+                                Artist(name = run.text, id = endpoint.browseId)
+                            }
+                        } ?: emptyList(),
+                        album = null,
+                        duration = null,
+                        thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                        isEpisode = true,
+                    )
+                } ?: emptyList()
+        }.also { result ->
+            result.onFailure { e -> Timber.e(e, "[PODCAST_API] newEpisodes FAILED") }
+            result.onSuccess { Timber.d("[PODCAST_API] newEpisodes SUCCESS: ${it.size} items") }
+        }
     }
 
     /**
@@ -1346,54 +1365,77 @@ object YouTube {
      * Returns manually saved episodes.
      */
     suspend fun episodesForLater(): Result<List<SongItem>> = runCatching {
+        Timber.d("[PODCAST_API] episodesForLater: calling browse with VLSE")
         val response = innerTube.browse(
             client = WEB_REMIX,
             browseId = "VLSE",
             setLogin = true
         ).body<BrowseResponse>()
 
-        val shelfContents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
-            ?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+        // VLSE uses musicPlaylistShelfRenderer, not musicShelfRenderer
+        val contents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?.contents?.firstOrNull()
 
-        // Try parsing musicMultiRowListItemRenderer first (podcast episodes format)
-        val multiRowItems = shelfContents?.mapNotNull { it.musicMultiRowListItemRenderer }
-            ?.map { renderer ->
+        val shelfContents = contents?.musicPlaylistShelfRenderer?.contents
+            ?: contents?.musicShelfRenderer?.contents
+
+        // Parse musicResponsiveListItemRenderer (standard playlist format)
+        shelfContents?.mapNotNull { it.musicResponsiveListItemRenderer }
+            ?.mapNotNull { renderer ->
+                val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
+                val setVideoId = renderer.playlistItemData?.playlistSetVideoId
+                val title = renderer.flexColumns.firstOrNull()
+                    ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
+                    ?: return@mapNotNull null
+                val artistRun = renderer.flexColumns.getOrNull(1)
+                    ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
                 SongItem(
-                    id = renderer.onTap?.watchEndpoint?.videoId ?: "",
-                    title = renderer.title?.runs?.firstOrNull()?.text ?: "",
-                    artists = renderer.subtitle?.runs?.firstOrNull()?.let { run ->
-                        listOf(Artist(name = run.text, id = run.navigationEndpoint?.browseEndpoint?.browseId))
-                    } ?: emptyList(),
+                    id = videoId,
+                    title = title,
+                    artists = artistRun?.let { listOf(Artist(name = it.text, id = it.navigationEndpoint?.browseEndpoint?.browseId)) } ?: emptyList(),
                     album = null,
                     duration = null,
                     thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                    setVideoId = setVideoId,
                     isEpisode = true,
                 )
-            }
+            } ?: emptyList()
+    }
 
-        // If no multiRow items, try musicResponsiveListItemRenderer
-        if (!multiRowItems.isNullOrEmpty()) {
-            multiRowItems
-        } else {
-            shelfContents?.mapNotNull { it.musicResponsiveListItemRenderer }
-                ?.mapNotNull { renderer ->
-                    val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
-                    val title = renderer.flexColumns.firstOrNull()
-                        ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
-                        ?: return@mapNotNull null
-                    val artistRun = renderer.flexColumns.getOrNull(1)
-                        ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
-                    SongItem(
-                        id = videoId,
-                        title = title,
-                        artists = artistRun?.let { listOf(Artist(name = it.text, id = it.navigationEndpoint?.browseEndpoint?.browseId)) } ?: emptyList(),
-                        album = null,
-                        duration = null,
-                        thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
-                        isEpisode = true,
-                    )
+    /**
+     * Fetch "Continue Listening" / Resume Playback.
+     * Returns partially played episodes for resumption.
+     */
+    suspend fun continueListening(): Result<List<SongItem>> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "FEmusic_listening_review",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents
+            ?.flatMap { section ->
+                section.musicShelfRenderer?.contents?.mapNotNull { content ->
+                    content.musicResponsiveListItemRenderer?.let { renderer ->
+                        val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
+                        val title = renderer.flexColumns.firstOrNull()
+                            ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
+                            ?: return@mapNotNull null
+                        val artistRun = renderer.flexColumns.getOrNull(1)
+                            ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
+                        SongItem(
+                            id = videoId,
+                            title = title,
+                            artists = artistRun?.let { listOf(Artist(name = it.text, id = it.navigationEndpoint?.browseEndpoint?.browseId)) } ?: emptyList(),
+                            album = null,
+                            duration = null,
+                            thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                            isEpisode = true,
+                        )
+                    }
                 } ?: emptyList()
-        }
+            } ?: emptyList()
     }
 
     suspend fun getChannelId(browseId: String): String {
