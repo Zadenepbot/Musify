@@ -141,33 +141,97 @@ object YouTube {
 
     suspend fun searchSummary(query: String): Result<SearchSummaryPage> = runCatching {
         val response = innerTube.search(WEB_REMIX, query).body<SearchResponse>()
-        SearchSummaryPage(
-            summaries = response.contents?.tabbedSearchResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.mapNotNull { it ->
-                if (it.musicCardShelfRenderer != null)
-                    SearchSummary(
-                        title = it.musicCardShelfRenderer.header?.musicCardShelfHeaderBasicRenderer?.title?.runs?.firstOrNull()?.text ?: YouTubeConstants.DEFAULT_TOP_RESULT,
-                        items = listOfNotNull(SearchSummaryPage.fromMusicCardShelfRenderer(it.musicCardShelfRenderer))
-                            .plus(
-                                it.musicCardShelfRenderer.contents
-                                    ?.mapNotNull { it.musicResponsiveListItemRenderer }
-                                    ?.mapNotNull(SearchSummaryPage.Companion::fromMusicResponsiveListItemRenderer)
-                                    .orEmpty()
-                            )
-                            .distinctBy { it.id }
-                            .ifEmpty { null } ?: return@mapNotNull null
-                    )
-                else
-                    SearchSummary(
-                        title = it.musicShelfRenderer?.title?.runs?.firstOrNull()?.text ?: YouTubeConstants.DEFAULT_OTHER_RESULTS,
-                        items = it.musicShelfRenderer?.contents?.getItems()
-                            ?.mapNotNull {
-                                SearchSummaryPage.fromMusicResponsiveListItemRenderer(it)
+        val allSummaries = mutableListOf<SearchSummary>()
+
+        response.contents?.tabbedSearchResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { section ->
+                if (section.musicCardShelfRenderer != null) {
+                    // Top result card - keep as single section
+                    val items = listOfNotNull(SearchSummaryPage.fromMusicCardShelfRenderer(section.musicCardShelfRenderer))
+                        .plus(
+                            section.musicCardShelfRenderer.contents
+                                ?.mapNotNull { it.musicResponsiveListItemRenderer }
+                                ?.mapNotNull(SearchSummaryPage.Companion::fromMusicResponsiveListItemRenderer)
+                                .orEmpty()
+                        )
+                        .distinctBy { it.id }
+
+                    if (items.isNotEmpty()) {
+                        allSummaries.add(SearchSummary(
+                            title = section.musicCardShelfRenderer.header?.musicCardShelfHeaderBasicRenderer?.title?.runs?.firstOrNull()?.text
+                                ?: YouTubeConstants.DEFAULT_TOP_RESULT,
+                            items = items
+                        ))
+                    }
+                } else if (section.musicShelfRenderer != null) {
+                    val items = section.musicShelfRenderer.contents?.getItems()
+                        ?.mapNotNull { SearchSummaryPage.fromMusicResponsiveListItemRenderer(it) }
+                        ?.distinctBy { it.id }
+                        ?: emptyList()
+
+                    if (items.isEmpty()) return@forEach
+
+                    val apiTitle = section.musicShelfRenderer.title?.runs?.firstOrNull()?.text
+
+                    if (apiTitle != null) {
+                        // API provided a title, use single section
+                        allSummaries.add(SearchSummary(title = apiTitle, items = items))
+                    } else {
+                        // No title - group items by type into separate sections
+                        val grouped = items.groupBy { item ->
+                            when (item) {
+                                is EpisodeItem -> "Episodes"
+                                is PodcastItem -> "Podcasts"
+                                is AlbumItem -> "Albums"
+                                is ArtistItem -> "Artists"
+                                is PlaylistItem -> "Playlists"
+                                is SongItem -> when {
+                                    item.isEpisode -> "Episodes"
+                                    item.isVideoSong -> "Videos"
+                                    else -> "Songs"
+                                }
+                                else -> YouTubeConstants.DEFAULT_OTHER_RESULTS
                             }
-                            ?.distinctBy { it.id }
-                            ?.ifEmpty { null } ?: return@mapNotNull null
-                    )
-            }!!
-        )
+                        }
+
+                        // Add each group as a separate section in a logical order
+                        val sectionOrder = listOf("Songs", "Videos", "Albums", "Artists", "Playlists", "Podcasts", "Episodes", YouTubeConstants.DEFAULT_OTHER_RESULTS)
+                        sectionOrder.forEach { sectionName ->
+                            grouped[sectionName]?.let { groupItems ->
+                                if (groupItems.isNotEmpty()) {
+                                    allSummaries.add(SearchSummary(title = sectionName, items = groupItems))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        // Merge sections with the same title
+        val mergedSummaries = allSummaries
+            .groupBy { it.title }
+            .map { (title, sections) ->
+                SearchSummary(
+                    title = title,
+                    items = sections.flatMap { it.items }.distinctBy { it.id }
+                )
+            }
+            // Reorder to maintain logical order
+            .sortedBy { summary ->
+                when (summary.title) {
+                    YouTubeConstants.DEFAULT_TOP_RESULT -> 0
+                    "Songs" -> 1
+                    "Videos" -> 2
+                    "Albums" -> 3
+                    "Artists" -> 4
+                    "Playlists" -> 5
+                    "Podcasts" -> 6
+                    "Episodes" -> 7
+                    else -> 8
+                }
+            }
+
+        SearchSummaryPage(summaries = mergedSummaries)
     }
 
     suspend fun search(query: String, filter: SearchFilter): Result<SearchResult> = runCatching {

@@ -42,7 +42,29 @@ data class MusicResponsiveListItemRenderer(
     val isPodcast: Boolean
         get() = navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE
     val isEpisode: Boolean
-        get() = navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE
+        get() {
+            // Method 1: Check browse endpoint (for episode detail pages)
+            if (navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE) {
+                return true
+            }
+            // Method 2: Check if first subtitle text is "Episode" (for search results)
+            val firstSubtitleText = flexColumns.getOrNull(1)
+                ?.musicResponsiveListItemFlexColumnRenderer
+                ?.text?.runs?.firstOrNull()?.text
+            if (firstSubtitleText == "Episode") {
+                return true
+            }
+            // Method 3: Check for podcast link in subtitle (backup detection)
+            val hasPodcastLink = flexColumns.getOrNull(1)
+                ?.musicResponsiveListItemFlexColumnRenderer
+                ?.text?.runs?.any { run ->
+                    run.navigationEndpoint?.browseEndpoint
+                        ?.browseEndpointContextSupportedConfigs
+                        ?.browseEndpointContextMusicConfig
+                        ?.pageType == MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE
+                } == true
+            return hasPodcastLink && playlistItemData?.videoId != null && navigationEndpoint == null
+        }
 
     val musicVideoType: String?
         get() =

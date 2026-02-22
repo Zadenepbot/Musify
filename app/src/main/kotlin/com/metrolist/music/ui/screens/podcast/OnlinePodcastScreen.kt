@@ -145,7 +145,7 @@ fun OnlinePodcastScreen(
                         key = { it.id }
                     ) { episode ->
                         YouTubeListItem(
-                            item = episode.asSongItem(),
+                            item = episode,
                             isActive = mediaMetadata?.id == episode.id,
                             isPlaying = isPlaying,
                             modifier = Modifier
