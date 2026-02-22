@@ -1686,8 +1686,16 @@ class MusicService :
     fun toggleLike() {
         scope.launch {
             val songToToggle = currentSong.first()
-            songToToggle?.let {
-                val song = it.song.toggleLike()
+            songToToggle?.let { librarySong ->
+                val songEntity = librarySong.song
+
+                // For podcast episodes, toggle save for later instead of like
+                if (songEntity.isEpisode) {
+                    toggleEpisodeSaveForLater(songEntity)
+                    return@let
+                }
+
+                val song = songEntity.toggleLike()
                 database.query {
                     update(song)
                     syncUtils.likeSong(song)
@@ -1711,6 +1719,47 @@ class MusicService :
                 }
                 currentMediaMetadata.value = player.currentMetadata
             }
+        }
+    }
+
+    private suspend fun toggleEpisodeSaveForLater(songEntity: com.metrolist.music.db.entities.SongEntity) {
+        val isCurrentlySaved = songEntity.inLibrary != null
+        if (isCurrentlySaved) {
+            // Remove from Episodes for Later
+            val setVideoIdEntity = database.getSetVideoId(songEntity.id)
+            val setVideoId = setVideoIdEntity?.setVideoId
+            if (setVideoId != null) {
+                YouTube.removeEpisodeFromSavedEpisodes(songEntity.id, setVideoId)
+                    .onSuccess {
+                        Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${songEntity.id}")
+                        database.query {
+                            update(songEntity.copy(inLibrary = null))
+                        }
+                        currentMediaMetadata.value = player.currentMetadata
+                    }
+                    .onFailure { e ->
+                        Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${songEntity.id}")
+                    }
+            } else {
+                Timber.w("[EPISODE_SAVE] No setVideoId found for ${songEntity.id}, removing from local DB only")
+                database.query {
+                    update(songEntity.copy(inLibrary = null))
+                }
+                currentMediaMetadata.value = player.currentMetadata
+            }
+        } else {
+            // Add to Episodes for Later
+            YouTube.addEpisodeToSavedEpisodes(songEntity.id)
+                .onSuccess {
+                    Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${songEntity.id}")
+                    database.query {
+                        update(songEntity.copy(inLibrary = java.time.LocalDateTime.now()))
+                    }
+                    currentMediaMetadata.value = player.currentMetadata
+                }
+                .onFailure { e ->
+                    Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${songEntity.id}")
+                }
         }
     }
 

@@ -314,18 +314,58 @@ fun SongMenu(
         song = song,
         badges = {},
         trailingContent = {
+            // For episodes, show saved state and toggle save for later
+            val isEpisode = song.song.isEpisode
+            val isFavorite = if (isEpisode) song.song.inLibrary != null else song.song.liked
             IconButton(
                 onClick = {
-                    val s = song.song.toggleLike()
-                    database.query {
-                        update(s)
+                    if (isEpisode) {
+                        // Episode: toggle save for later
+                        coroutineScope.launch(Dispatchers.IO) {
+                            val isCurrentlySaved = song.song.inLibrary != null
+                            if (isCurrentlySaved) {
+                                // Remove from Episodes for Later
+                                val setVideoIdEntity = database.getSetVideoId(song.id)
+                                val setVideoId = setVideoIdEntity?.setVideoId
+                                if (setVideoId != null) {
+                                    YouTube.removeEpisodeFromSavedEpisodes(song.id, setVideoId).onSuccess {
+                                        Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${song.id}")
+                                        database.query {
+                                            update(song.song.copy(inLibrary = null))
+                                        }
+                                    }.onFailure { e ->
+                                        Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${song.id}")
+                                    }
+                                } else {
+                                    database.query {
+                                        update(song.song.copy(inLibrary = null))
+                                    }
+                                }
+                            } else {
+                                // Add to Episodes for Later
+                                YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
+                                    Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
+                                    database.query {
+                                        update(song.song.copy(inLibrary = LocalDateTime.now()))
+                                    }
+                                }.onFailure { e ->
+                                    Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                }
+                            }
+                        }
+                    } else {
+                        // Regular song: toggle like
+                        val s = song.song.toggleLike()
+                        database.query {
+                            update(s)
+                        }
+                        syncUtils.likeSong(s)
                     }
-                    syncUtils.likeSong(s)
                 },
             ) {
                 Icon(
-                    painter = painterResource(if (song.song.liked) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (song.song.liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    painter = painterResource(if (isFavorite) R.drawable.favorite else R.drawable.favorite_border),
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     contentDescription = null,
                 )
             }

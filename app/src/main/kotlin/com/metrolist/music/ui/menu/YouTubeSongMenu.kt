@@ -216,30 +216,74 @@ fun YouTubeSongMenu(
                 )
             }
         },
-        trailingContent = {  
-            IconButton(  
-                onClick = {  
-                    database.transaction {  
-                        librarySong.let { librarySong ->  
-                            val s: SongEntity  
-                            if (librarySong == null) {  
-                                insert(song.toMediaMetadata(), SongEntity::toggleLike)  
-                                s = song.toMediaMetadata().toSongEntity().let(SongEntity::toggleLike)  
-                            } else {  
-                                s = librarySong.song.toggleLike()  
-                                update(s)  
-                            }  
-                            syncUtils.likeSong(s)  
-                        }  
-                    }  
-                },  
-            ) {  
-                Icon(  
-                    painter = painterResource(if (librarySong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border),  
-                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current,  
-                    contentDescription = null,  
-                )  
-            }  
+        trailingContent = {
+            // For episodes, show saved state and toggle save for later
+            val isEpisode = song.isEpisode
+            val isFavorite = if (isEpisode) librarySong?.song?.inLibrary != null else librarySong?.song?.liked == true
+            IconButton(
+                onClick = {
+                    if (isEpisode) {
+                        // Episode: toggle save for later
+                        coroutineScope.launch(Dispatchers.IO) {
+                            val currentLibrarySong = librarySong
+                            val isCurrentlySaved = currentLibrarySong?.song?.inLibrary != null
+                            if (isCurrentlySaved) {
+                                // Remove from Episodes for Later
+                                val setVideoId = song.setVideoId ?: database.getSetVideoId(song.id)?.setVideoId
+                                if (setVideoId != null) {
+                                    YouTube.removeEpisodeFromSavedEpisodes(song.id, setVideoId).onSuccess {
+                                        Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${song.id}")
+                                        database.query {
+                                            currentLibrarySong?.song?.let { update(it.copy(inLibrary = null)) }
+                                        }
+                                    }.onFailure { e ->
+                                        Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${song.id}")
+                                    }
+                                } else {
+                                    database.query {
+                                        currentLibrarySong?.song?.let { update(it.copy(inLibrary = null)) }
+                                    }
+                                }
+                            } else {
+                                // Add to Episodes for Later
+                                YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
+                                    Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
+                                    database.query {
+                                        if (currentLibrarySong != null) {
+                                            update(currentLibrarySong.song.copy(inLibrary = LocalDateTime.now()))
+                                        } else {
+                                            insert(song.toMediaMetadata().toSongEntity().copy(inLibrary = LocalDateTime.now(), isEpisode = true))
+                                        }
+                                    }
+                                }.onFailure { e ->
+                                    Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                }
+                            }
+                        }
+                    } else {
+                        // Regular song: toggle like
+                        database.transaction {
+                            librarySong.let { librarySong ->
+                                val s: SongEntity
+                                if (librarySong == null) {
+                                    insert(song.toMediaMetadata(), SongEntity::toggleLike)
+                                    s = song.toMediaMetadata().toSongEntity().let(SongEntity::toggleLike)
+                                } else {
+                                    s = librarySong.song.toggleLike()
+                                    update(s)
+                                }
+                                syncUtils.likeSong(s)
+                            }
+                        }
+                    }
+                },
+            ) {
+                Icon(
+                    painter = painterResource(if (isFavorite) R.drawable.favorite else R.drawable.favorite_border),
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    contentDescription = null,
+                )
+            }
         },  
     )  
 

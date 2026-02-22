@@ -1216,6 +1216,13 @@ fun HomeScreen(
                                                                                         is AlbumItem -> navController.navigate("album/${item.id}")
                                                                                         is ArtistItem -> navController.navigate("artist/${item.id}")
                                                                                         is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                                                                        is PodcastItem -> navController.navigate("online_podcast/${item.id}")
+                                                                                        is EpisodeItem -> playerConnection.playQueue(
+                                                                                            ListQueue(
+                                                                                                title = item.title,
+                                                                                                items = listOf(item.toMediaMetadata().toMediaItem())
+                                                                                            )
+                                                                                        )
                                                                                     }
                                                                                 },
                                                                                 onLongClick = {
@@ -1915,8 +1922,9 @@ fun HomeScreen(
                             }
                         }
                     }
-                } else {
-                    // Show "Your Shows" section from official API
+                }
+            } else {
+                // Show "Your Shows" section from official API
                     if (savedPodcastShows.isNotEmpty()) {
                         item(key = "00_your_shows_title") {
                             NavigationTitle(
@@ -2046,7 +2054,6 @@ fun HomeScreen(
                             }
                         }
                     }
-                }
                 }
             }
 
