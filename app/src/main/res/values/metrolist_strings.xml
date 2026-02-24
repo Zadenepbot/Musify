@@ -783,4 +783,9 @@
     <string name="wanna_play_favorite_song">Wanna play their favorite song?</string>
     <string name="yeah">Yeah</string>
     <string name="stands_with_palestine">This project stands with Palestine 🇵🇸</string>
+
+    <!-- Restore confirmation dialog -->
+    <string name="restore_confirm_title">Restore backup?</string>
+    <string name="restore_confirm_message">If you were logged in with Google when you created this backup, you will need to log in again. This prevents playback issues caused by stale session data.</string>
+    <string name="restore">Restore</string>
 </resources>
