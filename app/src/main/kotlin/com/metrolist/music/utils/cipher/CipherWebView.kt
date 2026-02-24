@@ -5,21 +5,22 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import timber.log.Timber
 import java.io.File
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 
-class CipherWebView private constructor(
-    context: Context,
-    private val playerJs: String,
-    private val sigInfo: FunctionNameExtractor.SigFunctionInfo?,
-    private val nFuncInfo: FunctionNameExtractor.NFunctionInfo?,
-    private val initContinuation: Continuation<CipherWebView>,
+class CipherWebView
+private constructor(
+        context: Context,
+        private val playerJs: String,
+        private val sigInfo: FunctionNameExtractor.SigFunctionInfo?,
+        private val nFuncInfo: FunctionNameExtractor.NFunctionInfo?,
+        private val initContinuation: Continuation<CipherWebView>,
 ) {
     private val webView = WebView(context)
     private var sigContinuation: Continuation<String>? = null
@@ -35,58 +36,73 @@ class CipherWebView private constructor(
 
     init {
         val settings = webView.settings
-        @Suppress("SetJavaScriptEnabled")
-        settings.javaScriptEnabled = true
+        @Suppress("SetJavaScriptEnabled") settings.javaScriptEnabled = true
         settings.allowFileAccess = true
-        @Suppress("DEPRECATION")
-        settings.allowFileAccessFromFileURLs = true
+        @Suppress("DEPRECATION") settings.allowFileAccessFromFileURLs = true
         settings.blockNetworkLoads = true
 
         webView.addJavascriptInterface(this, JS_INTERFACE)
 
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
-                if (m.message().contains("Uncaught") && !m.message().contains("is not defined")) {
-                    Timber.tag(TAG).e("WebView JS error: ${m.message()} at ${m.sourceId()}:${m.lineNumber()}")
+        webView.webChromeClient =
+                object : WebChromeClient() {
+                    override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                        if (m.message().contains("Uncaught") &&
+                                        !m.message().contains("is not defined")
+                        ) {
+                            Timber.tag(TAG)
+                                    .e(
+                                            "WebView JS error: ${m.message()} at ${m.sourceId()}:${m.lineNumber()}"
+                                    )
+                        }
+                        return super.onConsoleMessage(m)
+                    }
                 }
-                return super.onConsoleMessage(m)
-            }
-        }
     }
 
     private fun loadPlayerJsFromFile() {
         val sigFuncName = sigInfo?.name
         val nFuncName = nFuncInfo?.name
         val nArrayIdx = nFuncInfo?.arrayIndex
-        Timber.tag(TAG).d("Loading player JS from file (${playerJs.length} chars), exporting sig=$sigFuncName, nFunc=$nFuncName[$nArrayIdx]")
+        Timber.tag(TAG)
+                .d(
+                        "Loading player JS from file (${playerJs.length} chars), exporting sig=$sigFuncName, nFunc=$nFuncName[$nArrayIdx]"
+                )
 
         val exports = buildList {
             if (sigFuncName != null) {
-                add("window._cipherSigFunc = typeof $sigFuncName !== 'undefined' ? $sigFuncName : null;")
+                add(
+                        "window._cipherSigFunc = typeof $sigFuncName !== 'undefined' ? $sigFuncName : null;"
+                )
             }
             if (nFuncName != null) {
-                val nExpr = if (nArrayIdx != null) {
-                    "$nFuncName[$nArrayIdx]"
-                } else {
-                    nFuncName
-                }
+                val nExpr =
+                        if (nArrayIdx != null) {
+                            "$nFuncName[$nArrayIdx]"
+                        } else {
+                            nFuncName
+                        }
                 add("window._nTransformFunc = typeof $nFuncName !== 'undefined' ? $nExpr : null;")
             }
         }
 
-        val modifiedJs = if (exports.isNotEmpty()) {
-            val exportCode = "; " + exports.joinToString(" ")
-            playerJs.replace("})(_yt_player);", "$exportCode })(_yt_player);")
-        } else {
-            playerJs
-        }
+        val modifiedJs =
+                if (exports.isNotEmpty()) {
+                    val exportCode = "; " + exports.joinToString(" ")
+                    playerJs.replace("})(_yt_player);", "$exportCode })(_yt_player);")
+                } else {
+                    playerJs
+                }
 
         val cacheDir = File(webView.context.cacheDir, "cipher")
         cacheDir.mkdirs()
         File(cacheDir, "player.js").writeText(modifiedJs)
 
-        val html = """<!DOCTYPE html>
+        val html =
+                """<!DOCTYPE html>
 <html><head><script>
+// Suppress async eval errors from brute-force function testing (e.g. setTimeout polyfills)
+window.onerror = function() { return true; };
+
 function deobfuscateSig(funcName, constantArg, obfuscatedSig) {
     try {
         var func = window._cipherSigFunc;
@@ -159,8 +175,12 @@ function discoverAndInit() {
                     if (key.startsWith("webkit") || key === "CipherBridge" || key === "_cipherSigFunc" || key === "_nTransformFunc") continue;
                     var fn = window[key];
                     if (typeof fn !== 'function' || fn.length !== 1) continue;
+                    // Skip long-named functions (builtins, polyfills, setTimeout wrappers etc.)
+                    // Real YT n-transform functions are always minified to 2-3 char names
+                    if (key.length > 3) continue;
                     tested++;
-                    var result = fn(testInput);
+                    var result;
+                    try { result = fn(testInput); } catch(e) { continue; }
                     if (typeof result === 'string' && result !== testInput && result.length > 5) {
                         candidates.push(key + ":" + result.substring(0, 50));
                         if (result.indexOf('_w8_') >= 0) {
@@ -190,8 +210,11 @@ function discoverAndInit() {
 </head><body></body></html>"""
 
         webView.loadDataWithBaseURL(
-            "file://${cacheDir.absolutePath}/",
-            html, "text/html", "utf-8", null
+                "file://${cacheDir.absolutePath}/",
+                html,
+                "text/html",
+                "utf-8",
+                null
         )
     }
 
@@ -227,10 +250,11 @@ function discoverAndInit() {
         return withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { cont ->
                 sigContinuation = cont
-                val constArgJs = if (sigInfo.constantArg != null) "${sigInfo.constantArg}" else "null"
+                val constArgJs =
+                        if (sigInfo.constantArg != null) "${sigInfo.constantArg}" else "null"
                 webView.evaluateJavascript(
-                    "deobfuscateSig('${sigInfo.name}', $constArgJs, '${escapeJsString(obfuscatedSig)}')",
-                    null
+                        "deobfuscateSig('${sigInfo.name}', $constArgJs, '${escapeJsString(obfuscatedSig)}')",
+                        null
                 )
             }
         }
@@ -258,10 +282,7 @@ function discoverAndInit() {
         return withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { cont ->
                 nContinuation = cont
-                webView.evaluateJavascript(
-                    "transformN('${escapeJsString(nValue)}')",
-                    null
-                )
+                webView.evaluateJavascript("transformN('${escapeJsString(nValue)}')", null)
             }
         }
     }
@@ -291,10 +312,7 @@ function discoverAndInit() {
     }
 
     private fun escapeJsString(s: String): String {
-        return s.replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
+        return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
     }
 
     companion object {
@@ -302,10 +320,10 @@ function discoverAndInit() {
         private const val JS_INTERFACE = "CipherBridge"
 
         suspend fun create(
-            context: Context,
-            playerJs: String,
-            sigInfo: FunctionNameExtractor.SigFunctionInfo?,
-            nFuncInfo: FunctionNameExtractor.NFunctionInfo? = null,
+                context: Context,
+                playerJs: String,
+                sigInfo: FunctionNameExtractor.SigFunctionInfo?,
+                nFuncInfo: FunctionNameExtractor.NFunctionInfo? = null,
         ): CipherWebView {
             return withContext(Dispatchers.Main) {
                 suspendCancellableCoroutine { cont ->

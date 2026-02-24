@@ -29,6 +29,11 @@ proguard/
 
 # Log Files
 *.log
+metro*.txt
+build_log.txt
+metrolist_logs.txt
+fix.py
+test.kt
 
 # Android Studio Navigation editor temp files
 .navigation/

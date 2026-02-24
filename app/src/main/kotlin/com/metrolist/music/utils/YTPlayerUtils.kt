@@ -116,8 +116,6 @@ object YTPlayerUtils {
             println("[PLAYBACK_DEBUG] Main player response status: ${mainPlayerResponse.playabilityStatus.status}")
             println("[PLAYBACK_DEBUG] Playability reason: ${mainPlayerResponse.playabilityStatus.reason}")
             println("[PLAYBACK_DEBUG] Video details: title=${mainPlayerResponse.videoDetails?.title}, videoId=${mainPlayerResponse.videoDetails?.videoId}")
-            println("[PLAYBACK_DEBUG] Streaming data null? ${mainPlayerResponse.streamingData == null}")
-            println("[PLAYBACK_DEBUG] Adaptive formats count: ${mainPlayerResponse.streamingData?.adaptiveFormats?.size ?: 0}")
         }
 
         var usedAgeRestrictedClient: YouTubeClient? = null
@@ -212,16 +210,12 @@ object YTPlayerUtils {
             if (streamPlayerResponse?.playabilityStatus?.status == "OK") {
                 Timber.tag(logTag).d("Player response status OK for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
 
-                // Check if formats have direct URLs (no signatureCipher needed)
-                val hasDirectUrls = streamPlayerResponse.streamingData?.adaptiveFormats
-                    ?.any { !it.url.isNullOrEmpty() } == true
-                val hasSignatureCipher = streamPlayerResponse.streamingData?.adaptiveFormats
-                    ?.any { !it.signatureCipher.isNullOrEmpty() || !it.cipher.isNullOrEmpty() } == true
-
-                Timber.tag(logTag).d("URL check: hasDirectUrls=$hasDirectUrls, hasSignatureCipher=$hasSignatureCipher")
-
-                // Skip NewPipe - use direct URLs or custom cipher in findUrlOrNull
-                val responseToUse = streamPlayerResponse
+                // Try to get streams using newPipePlayer method (v13.0 stable fallback)
+                // This hydrates the player response with direct URLs scraped from the web
+                val newPipeResponse = if (wasOriginallyAgeRestricted) null else {
+                    YouTube.newPipePlayer(videoId, streamPlayerResponse)
+                }
+                val responseToUse = newPipeResponse ?: streamPlayerResponse
 
                 format =
                     findFormat(
@@ -253,8 +247,9 @@ object YTPlayerUtils {
                 // Check if this is a privately owned track
                 val isPrivatelyOwnedTrack = streamPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
 
-                // Apply n-transform FIRST for web clients (main branch order - critical!)
-                if (currentClient.useWebPoTokens) {
+                // Apply n-transform for throttle parameter handling (v13.0-v13.1 hybrid stability)
+                // We only apply this if it's a web client or if the URL clearly needs it
+                if (currentClient.useWebPoTokens || isPrivatelyOwnedTrack) {
                     try {
                         Timber.tag(logTag).d("Applying n-transform to stream URL for ${currentClient.clientName}")
                         val transformed = EjsNTransformSolver.transformNParamInUrl(streamUrl!!)
@@ -267,12 +262,14 @@ object YTPlayerUtils {
                     }
                 }
 
-                // Apply PoToken SECOND (after n-transform - main branch order)
-                // Note: pot token is base64 - do NOT Uri.encode it (breaks validation)
+                // Apply PoToken (only for clients that support/require it)
                 if (currentClient.useWebPoTokens && poToken?.streamingDataPoToken != null) {
                     Timber.tag(logTag).d("Appending pot= parameter to stream URL")
                     val separator = if ("?" in streamUrl!!) "&" else "?"
-                    streamUrl = "${streamUrl}${separator}pot=${poToken.streamingDataPoToken}"
+                    // We append it without encoding per previous findings, but only if it's not already there
+                    if (!streamUrl!!.contains("pot=")) {
+                        streamUrl = "${streamUrl}${separator}pot=${poToken.streamingDataPoToken}"
+                    }
                 }
 
                 streamExpiresInSeconds = streamPlayerResponse.streamingData?.expiresInSeconds
@@ -294,7 +291,6 @@ object YTPlayerUtils {
                     /** skip [validateStatus] for last client or private tracks */
                     if (isPrivatelyOwned) {
                         Timber.tag(logTag).d("Skipping validation for privately owned track: ${currentClient.clientName}")
-                        println("[PLAYBACK_DEBUG] Using stream without validation for PRIVATELY_OWNED_TRACK")
                     } else {
                         Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
                     }
@@ -342,7 +338,6 @@ object YTPlayerUtils {
         if (streamPlayerResponse == null) {
             Timber.tag(logTag).e("Bad stream player response - all clients failed")
             if (isUploadedTrack) {
-                println("[PLAYBACK_DEBUG] FAILURE: All clients failed for uploaded track videoId=$videoId")
             }
             throw Exception("Bad stream player response")
         }
@@ -351,7 +346,6 @@ object YTPlayerUtils {
             val errorReason = streamPlayerResponse.playabilityStatus.reason
             Timber.tag(logTag).e("Playability status not OK: $errorReason")
             if (isUploadedTrack) {
-                println("[PLAYBACK_DEBUG] FAILURE: Playability not OK for uploaded track - status=${streamPlayerResponse.playabilityStatus.status}, reason=$errorReason")
             }
             throw PlaybackException(
                 errorReason,
@@ -377,7 +371,6 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).d("Successfully obtained playback data with format: ${format.mimeType}, bitrate: ${format.bitrate}")
         if (isUploadedTrack) {
-            println("[PLAYBACK_DEBUG] SUCCESS: Got playback data for uploaded track - format=${format.mimeType}, streamUrl=${streamUrl?.take(100)}...")
         }
         PlaybackData(
             audioConfig,
@@ -388,7 +381,6 @@ object YTPlayerUtils {
             streamExpiresInSeconds,
         )
     }.onFailure { e ->
-        println("[PLAYBACK_DEBUG] EXCEPTION during playback for videoId=$videoId: ${e::class.simpleName}: ${e.message}")
         e.printStackTrace()
     }
     /**
