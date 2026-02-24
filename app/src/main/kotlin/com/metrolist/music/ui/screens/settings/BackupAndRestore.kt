@@ -350,17 +350,20 @@ fun BackupAndRestore(
         ) {
             // Supporting text
             Text(
-                text = buildString {
-                    append(stringResource(R.string.restore_confirm_message))
-                    // Only show "account will be signed out" if we successfully fetched account info
-                    if (backupPreviewInfo?.accountName != null) {
-                        append(" ")
-                        append(stringResource(R.string.restore_account_signout))
-                    }
-                },
+                text = stringResource(R.string.restore_confirm_message),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
+
+            // Show warning about account sign out if account found
+            if (backupPreviewInfo?.accountName != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.restore_account_warning),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
 
             // Show loading or account info
             if (isLoadingAccountInfo) {
