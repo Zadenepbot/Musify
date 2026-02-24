@@ -1923,9 +1923,12 @@ fun HomeScreen(
                         }
                     }
                 }
-            } else {
+            }
+
+            // Show podcast sections only when podcast chip is selected
+            if (selectedChip?.title?.contains("Podcast", ignoreCase = true) == true) {
                 // Show "Your Shows" section from official API
-                    if (savedPodcastShows.isNotEmpty()) {
+                if (savedPodcastShows.isNotEmpty()) {
                         item(key = "00_your_shows_title") {
                             NavigationTitle(
                                 title = stringResource(R.string.your_shows),
