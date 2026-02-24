@@ -9,9 +9,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
+import com.metrolist.music.constants.DataSyncIdKey
+import com.metrolist.music.constants.InnerTubeCookieKey
+import com.metrolist.music.constants.VisitorDataKey
 import com.metrolist.music.db.InternalDatabase
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.ArtistEntity
@@ -23,6 +27,7 @@ import com.metrolist.music.extensions.zipInputStream
 import com.metrolist.music.extensions.zipOutputStream
 import com.metrolist.music.playback.MusicService
 import com.metrolist.music.playback.MusicService.Companion.PERSISTENT_QUEUE_FILE
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -77,9 +82,9 @@ class BackupRestoreViewModel @Inject constructor(
         }
     }
 
-    fun restore(context: Context, uri: Uri) {
+    fun restore(context: Context, uri: Uri, clearAuthData: Boolean = false) {
         runCatching {
-            Timber.tag("RESTORE").i("Starting restore from URI: $uri")
+            Timber.tag("RESTORE").i("Starting restore from URI: $uri, clearAuthData: $clearAuthData")
             context.applicationContext.contentResolver.openInputStream(uri)?.use { raw ->
                 raw.zipInputStream().use { inputStream ->
                     var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
@@ -120,6 +125,18 @@ class BackupRestoreViewModel @Inject constructor(
                 }
             } ?: run {
                 Timber.tag("RESTORE").e("Could not open input stream for uri: $uri")
+            }
+
+            // Clear stale auth data to prevent playback issues
+            if (clearAuthData) {
+                Timber.tag("RESTORE").i("Clearing auth data to prevent stale session issues")
+                runBlocking(Dispatchers.IO) {
+                    context.dataStore.edit { preferences ->
+                        preferences.remove(InnerTubeCookieKey)
+                        preferences.remove(VisitorDataKey)
+                        preferences.remove(DataSyncIdKey)
+                    }
+                }
             }
 
             context.stopService(Intent(context, MusicService::class.java))

@@ -818,4 +818,9 @@
         <item quantity="one">%d episode</item>
         <item quantity="other">%d episodes</item>
     </plurals>
+
+    <!-- Restore confirmation dialog -->
+    <string name="restore_confirm_title">Restore backup?</string>
+    <string name="restore_confirm_message">If you were logged in with Google when you created this backup, you will need to log in again. This prevents playback issues caused by stale session data.</string>
+    <string name="restore">Restore</string>
 </resources>

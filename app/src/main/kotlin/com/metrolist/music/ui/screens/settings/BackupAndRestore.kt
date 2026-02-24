@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ import androidx.navigation.NavController
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 import com.metrolist.music.db.entities.Song
+import com.metrolist.music.ui.component.DefaultDialog
 import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.component.Material3SettingsGroup
 import com.metrolist.music.ui.component.Material3SettingsItem
@@ -86,6 +88,10 @@ fun BackupAndRestore(
     val csvRecentLogs = remember { mutableStateListOf<ConvertedSongLog>() }
     var pendingCsvUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
+    // Restore confirmation dialog state
+    var showRestoreConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -98,7 +104,8 @@ fun BackupAndRestore(
     val restoreLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
-                viewModel.restore(context, uri)
+                pendingRestoreUri = uri
+                showRestoreConfirmDialog = true
             }
         }
     val importPlaylistFromCsv =
@@ -263,5 +270,39 @@ fun BackupAndRestore(
             // Cannot dismiss while importing
         },
     )
+
+    // Restore confirmation dialog
+    if (showRestoreConfirmDialog) {
+        DefaultDialog(
+            onDismiss = {
+                showRestoreConfirmDialog = false
+                pendingRestoreUri = null
+            },
+            title = { Text(stringResource(R.string.restore_confirm_title)) },
+            buttons = {
+                TextButton(
+                    onClick = {
+                        showRestoreConfirmDialog = false
+                        pendingRestoreUri = null
+                    }
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(
+                    onClick = {
+                        showRestoreConfirmDialog = false
+                        pendingRestoreUri?.let { uri ->
+                            viewModel.restore(context, uri, clearAuthData = true)
+                        }
+                        pendingRestoreUri = null
+                    }
+                ) {
+                    Text(stringResource(R.string.restore))
+                }
+            }
+        ) {
+            Text(text = stringResource(R.string.restore_confirm_message))
+        }
+    }
 }
 
