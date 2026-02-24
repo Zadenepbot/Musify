@@ -127,7 +127,7 @@ android {
             externalNativeBuild {
                 cmake {
                     arguments += listOf(
-                        "-DENABLE_LTO=ON",
+                        "-DENABLE_LTO=OFF",
                         "-DCMAKE_BUILD_TYPE=Release"
                     )
                 }
