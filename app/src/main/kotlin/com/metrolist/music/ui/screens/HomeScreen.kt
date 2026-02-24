@@ -824,10 +824,10 @@ fun HomeScreen(
 
         if (!chipActive && speedDialItems.isNotEmpty()) list.add(HomeSection.SpeedDial)
         if (!chipActive && quickPicks?.isNotEmpty() == true) list.add(HomeSection.QuickPicks)
-        if (communityPlaylists?.isNotEmpty() == true) list.add(HomeSection.FromTheCommunity)
-        if (dailyDiscover?.isNotEmpty() == true) list.add(HomeSection.DailyDiscover)
+        if (!chipActive && communityPlaylists?.isNotEmpty() == true) list.add(HomeSection.FromTheCommunity)
+        if (!chipActive && dailyDiscover?.isNotEmpty() == true) list.add(HomeSection.DailyDiscover)
         if (!chipActive && keepListening?.isNotEmpty() == true) list.add(HomeSection.KeepListening)
-        if (accountPlaylists?.isNotEmpty() == true) list.add(HomeSection.AccountPlaylists)
+        if (!chipActive && accountPlaylists?.isNotEmpty() == true) list.add(HomeSection.AccountPlaylists)
         if (!chipActive && forgottenFavorites?.isNotEmpty() == true) list.add(HomeSection.ForgottenFavorites)
 
         if (!chipActive) {
