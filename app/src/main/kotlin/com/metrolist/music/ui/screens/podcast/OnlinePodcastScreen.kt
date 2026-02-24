@@ -132,11 +132,12 @@ fun OnlinePodcastScreen(
             } else {
                 podcast?.let { podcastItem ->
                     item(key = "podcast_header") {
+                        val context = LocalContext.current
                         PodcastHeader(
                             podcast = podcastItem,
                             episodeCount = episodes.size,
                             inLibrary = libraryPodcast?.inLibrary == true,
-                            onLibraryClick = { viewModel.toggleLibrary() }
+                            onLibraryClick = { viewModel.toggleLibrary(context) }
                         )
                     }
 

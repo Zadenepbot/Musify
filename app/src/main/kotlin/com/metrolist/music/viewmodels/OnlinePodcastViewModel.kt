@@ -76,7 +76,7 @@ class OnlinePodcastViewModel @Inject constructor(
      * Toggle saving podcast to library.
      * Uses YouTube.savePodcast() which calls the like/like endpoint with playlistId.
      */
-    fun toggleSubscription() {
+    fun toggleSubscription(context: android.content.Context) {
         val currentPodcast = podcast.value ?: return
         val existingEntity = libraryPodcast.value
         val isCurrentlySaved = existingEntity?.inLibrary == true
@@ -85,14 +85,7 @@ class OnlinePodcastViewModel @Inject constructor(
         Timber.d("[PODCAST_LIB] isCurrentlySaved: $isCurrentlySaved")
 
         viewModelScope.launch(Dispatchers.IO) {
-            // Use savePodcast API to save/unsave podcast show
-            YouTube.savePodcast(currentPodcast.id, !isCurrentlySaved).onSuccess {
-                Timber.d("[PODCAST_LIB] savePodcast API success!")
-            }.onFailure { e ->
-                Timber.e(e, "[PODCAST_LIB] savePodcast API failed")
-            }
-
-            // Update local database
+            // Optimistic UI update - update local database first
             database.transaction {
                 if (existingEntity != null) {
                     update(existingEntity.toggleBookmark())
@@ -108,13 +101,28 @@ class OnlinePodcastViewModel @Inject constructor(
                     )
                 }
             }
+
+            // Use savePodcast API to save/unsave podcast show
+            YouTube.savePodcast(currentPodcast.id, !isCurrentlySaved).onSuccess {
+                Timber.d("[PODCAST_LIB] savePodcast API success!")
+            }.onFailure { e ->
+                Timber.e(e, "[PODCAST_LIB] savePodcast API failed")
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isCurrentlySaved) com.metrolist.music.R.string.error_podcast_unsubscribe
+                        else com.metrolist.music.R.string.error_podcast_subscribe,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 
     /**
      * Legacy method - now calls toggleSubscription
      */
-    fun toggleLibrary() = toggleSubscription()
+    fun toggleLibrary(context: android.content.Context) = toggleSubscription(context)
 
     fun retry() {
         fetchPodcastData()

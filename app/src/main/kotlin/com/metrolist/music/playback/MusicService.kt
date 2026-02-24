@@ -1724,41 +1724,27 @@ class MusicService :
 
     private suspend fun toggleEpisodeSaveForLater(songEntity: com.metrolist.music.db.entities.SongEntity) {
         val isCurrentlySaved = songEntity.inLibrary != null
+        // Update database first, then sync with YouTube
+        database.query {
+            update(songEntity.copy(inLibrary = if (isCurrentlySaved) null else java.time.LocalDateTime.now()))
+        }
+        currentMediaMetadata.value = player.currentMetadata
+
+        // Sync with YouTube in background
         if (isCurrentlySaved) {
-            // Remove from Episodes for Later
-            val setVideoIdEntity = database.getSetVideoId(songEntity.id)
-            val setVideoId = setVideoIdEntity?.setVideoId
+            val setVideoId = database.getSetVideoId(songEntity.id)?.setVideoId
             if (setVideoId != null) {
                 YouTube.removeEpisodeFromSavedEpisodes(songEntity.id, setVideoId)
-                    .onSuccess {
-                        Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${songEntity.id}")
-                        database.query {
-                            update(songEntity.copy(inLibrary = null))
-                        }
-                        currentMediaMetadata.value = player.currentMetadata
-                    }
                     .onFailure { e ->
-                        Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${songEntity.id}")
+                        Timber.e(e, "[EPISODE_SAVE] Failed to remove: ${songEntity.id}")
+                        android.widget.Toast.makeText(this, R.string.error_episode_remove, android.widget.Toast.LENGTH_SHORT).show()
                     }
-            } else {
-                Timber.w("[EPISODE_SAVE] No setVideoId found for ${songEntity.id}, removing from local DB only")
-                database.query {
-                    update(songEntity.copy(inLibrary = null))
-                }
-                currentMediaMetadata.value = player.currentMetadata
             }
         } else {
-            // Add to Episodes for Later
             YouTube.addEpisodeToSavedEpisodes(songEntity.id)
-                .onSuccess {
-                    Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${songEntity.id}")
-                    database.query {
-                        update(songEntity.copy(inLibrary = java.time.LocalDateTime.now()))
-                    }
-                    currentMediaMetadata.value = player.currentMetadata
-                }
                 .onFailure { e ->
-                    Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${songEntity.id}")
+                    Timber.e(e, "[EPISODE_SAVE] Failed to save: ${songEntity.id}")
+                    android.widget.Toast.makeText(this, R.string.error_episode_save, android.widget.Toast.LENGTH_SHORT).show()
                 }
         }
     }

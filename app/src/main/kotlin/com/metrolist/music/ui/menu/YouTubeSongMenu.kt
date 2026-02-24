@@ -7,6 +7,7 @@ package com.metrolist.music.ui.menu
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.widget.Toast
 import android.content.res.Configuration
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -88,6 +89,7 @@ import com.metrolist.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.LocalDateTime
 
@@ -224,39 +226,36 @@ fun YouTubeSongMenu(
                 onClick = {
                     if (isEpisode) {
                         // Episode: toggle save for later
+                        val currentLibrarySong = librarySong
+                        val isCurrentlySaved = currentLibrarySong?.song?.inLibrary != null
+                        database.query {
+                            if (currentLibrarySong != null) {
+                                update(currentLibrarySong.song.copy(inLibrary = if (isCurrentlySaved) null else LocalDateTime.now()))
+                            } else {
+                                insert(song.toMediaMetadata().toSongEntity().copy(inLibrary = LocalDateTime.now(), isEpisode = true))
+                            }
+                        }
                         coroutineScope.launch(Dispatchers.IO) {
-                            val currentLibrarySong = librarySong
-                            val isCurrentlySaved = currentLibrarySong?.song?.inLibrary != null
                             if (isCurrentlySaved) {
-                                // Remove from Episodes for Later
                                 val setVideoId = song.setVideoId ?: database.getSetVideoId(song.id)?.setVideoId
                                 if (setVideoId != null) {
                                     YouTube.removeEpisodeFromSavedEpisodes(song.id, setVideoId).onSuccess {
                                         Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${song.id}")
-                                        database.query {
-                                            currentLibrarySong?.song?.let { update(it.copy(inLibrary = null)) }
-                                        }
                                     }.onFailure { e ->
                                         Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${song.id}")
-                                    }
-                                } else {
-                                    database.query {
-                                        currentLibrarySong?.song?.let { update(it.copy(inLibrary = null)) }
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, R.string.error_episode_remove, Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             } else {
-                                // Add to Episodes for Later
                                 YouTube.addEpisodeToSavedEpisodes(song.id).onSuccess {
                                     Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${song.id}")
-                                    database.query {
-                                        if (currentLibrarySong != null) {
-                                            update(currentLibrarySong.song.copy(inLibrary = LocalDateTime.now()))
-                                        } else {
-                                            insert(song.toMediaMetadata().toSongEntity().copy(inLibrary = LocalDateTime.now(), isEpisode = true))
-                                        }
-                                    }
                                 }.onFailure { e ->
                                     Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${song.id}")
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, R.string.error_episode_save, Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         }
@@ -449,12 +448,19 @@ fun YouTubeSongMenu(
                                     onClick = {
                                         coroutineScope.launch(Dispatchers.IO) {
                                             Timber.d("[EPISODE_SAVE] Removing episode ${song.id} from Episodes for Later")
+                                            // Optimistic UI update - remove from library immediately
+                                            database.query {
+                                                librarySong?.song?.let { update(it.copy(inLibrary = null)) }
+                                            }
                                             YouTube.removeEpisodeFromSavedEpisodes(song.id, song.setVideoId!!)
                                                 .onSuccess {
                                                     Timber.d("[EPISODE_SAVE] Successfully removed from Episodes for Later")
                                                 }
                                                 .onFailure { e ->
                                                     Timber.e(e, "[EPISODE_SAVE] Failed to remove from Episodes for Later")
+                                                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                                        android.widget.Toast.makeText(context, R.string.error_episode_remove, android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
                                         }
                                         onDismiss()
@@ -476,12 +482,23 @@ fun YouTubeSongMenu(
                                     onClick = {
                                         coroutineScope.launch(Dispatchers.IO) {
                                             Timber.d("[EPISODE_SAVE] Saving episode ${song.id} to Episodes for Later")
+                                            // Optimistic UI update - add to library immediately
+                                            database.query {
+                                                if (librarySong != null) {
+                                                    update(librarySong!!.song.copy(inLibrary = java.time.LocalDateTime.now()))
+                                                } else {
+                                                    insert(song.toMediaMetadata().toSongEntity().copy(inLibrary = java.time.LocalDateTime.now(), isEpisode = true))
+                                                }
+                                            }
                                             YouTube.addEpisodeToSavedEpisodes(song.id)
                                                 .onSuccess {
                                                     Timber.d("[EPISODE_SAVE] Successfully saved to Episodes for Later")
                                                 }
                                                 .onFailure { e ->
                                                     Timber.e(e, "[EPISODE_SAVE] Failed to save to Episodes for Later")
+                                                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                                        android.widget.Toast.makeText(context, R.string.error_episode_save, android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
                                         }
                                         onDismiss()

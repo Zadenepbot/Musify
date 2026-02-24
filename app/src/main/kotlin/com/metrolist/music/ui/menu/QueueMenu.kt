@@ -199,33 +199,32 @@ fun QueueMenu(
                             if (songEntity.isEpisode) {
                                 // Episode: toggle save for later
                                 val isCurrentlySaved = songEntity.inLibrary != null
-                                if (isCurrentlySaved) {
-                                    // Remove from Episodes for Later
-                                    val setVideoIdEntity = database.getSetVideoId(songEntity.id)
-                                    val setVideoId = setVideoIdEntity?.setVideoId
-                                    if (setVideoId != null) {
-                                        YouTube.removeEpisodeFromSavedEpisodes(songEntity.id, setVideoId).onSuccess {
-                                            timber.log.Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${songEntity.id}")
-                                            database.query {
-                                                update(songEntity.copy(inLibrary = null))
+                                database.query {
+                                    update(songEntity.copy(inLibrary = if (isCurrentlySaved) null else java.time.LocalDateTime.now()))
+                                }
+                                launch {
+                                    if (isCurrentlySaved) {
+                                        val setVideoIdEntity = database.getSetVideoId(songEntity.id)
+                                        val setVideoId = setVideoIdEntity?.setVideoId
+                                        if (setVideoId != null) {
+                                            YouTube.removeEpisodeFromSavedEpisodes(songEntity.id, setVideoId).onSuccess {
+                                                timber.log.Timber.d("[EPISODE_SAVE] Removed episode from Episodes for Later: ${songEntity.id}")
+                                            }.onFailure { e ->
+                                                timber.log.Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${songEntity.id}")
+                                                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                                    android.widget.Toast.makeText(context, R.string.error_episode_remove, android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             }
-                                        }.onFailure { e ->
-                                            timber.log.Timber.e(e, "[EPISODE_SAVE] Failed to remove episode: ${songEntity.id}")
                                         }
                                     } else {
-                                        database.query {
-                                            update(songEntity.copy(inLibrary = null))
+                                        YouTube.addEpisodeToSavedEpisodes(songEntity.id).onSuccess {
+                                            timber.log.Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${songEntity.id}")
+                                        }.onFailure { e ->
+                                            timber.log.Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${songEntity.id}")
+                                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                                android.widget.Toast.makeText(context, R.string.error_episode_save, android.widget.Toast.LENGTH_SHORT).show()
+                                            }
                                         }
-                                    }
-                                } else {
-                                    // Add to Episodes for Later
-                                    YouTube.addEpisodeToSavedEpisodes(songEntity.id).onSuccess {
-                                        timber.log.Timber.d("[EPISODE_SAVE] Saved episode to Episodes for Later: ${songEntity.id}")
-                                        database.query {
-                                            update(songEntity.copy(inLibrary = java.time.LocalDateTime.now()))
-                                        }
-                                    }.onFailure { e ->
-                                        timber.log.Timber.e(e, "[EPISODE_SAVE] Failed to save episode: ${songEntity.id}")
                                     }
                                 }
                             } else {
