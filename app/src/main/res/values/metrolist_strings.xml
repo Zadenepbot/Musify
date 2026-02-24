@@ -229,6 +229,21 @@
     <string name="open_app_settings_error">Couldn\'t open app settings</string>
 
     <string name="release_notes">Release notes</string>
+    <string name="changelog">Changelog</string>
+    <string name="changelog_empty">No changelogs available</string>
+    <string name="github_releases_url">https://github.com/MetrolistGroup/Metrolist/releases</string>
+    <string name="list_bullet">•</string>
+    <string name="view_on_github">View on GitHub</string>
+    <string name="current_version">Current version</string>
+    <string name="version_format">Version: %s</string>
+    <string name="update_settings">Update settings</string>
+    <string name="check_for_updates_title">Check for updates</string>
+    <string name="checking_for_updates">Checking for updates…</string>
+    <string name="latest_version_format">Latest: %s</string>
+    <string name="check_for_updates_button">Check for updates</string>
+    <string name="hide_changelog">Hide changelog</string>
+    <string name="view_changelog">View changelog</string>
+    <string name="failed_to_check_updates">Failed to check for updates: %s</string>
 
     <string name="all_time">All time</string>
     <string name="past_24_hours">Past 24 hours</string>
@@ -254,6 +269,10 @@
         <item quantity="one">1 second</item>
         <item quantity="other">%d seconds</item>
     </plurals>
+
+    <!-- Sleep timer -->
+    <string name="set_as_default">Set as default</string>
+    <string name="sleep_timer_default_set">Sleep timer default set to %d min</string>
 
     <!-- Player Settings -->
     <string name="disable_load_more_when_repeat_all">Disable load more when repeat all</string>
@@ -745,4 +764,23 @@
     <string name="logout_dialog_message">Do you want to keep your playlists and library data? Downloaded songs will be kept regardless.</string>
     <string name="logout_keep">Keep</string>
     <string name="logout_clear">Clear</string>
+    <!-- Credits / About Screen -->
+    <string name="credits_lead_developer">Lead Developer</string>
+    <string name="credits_collaborator">Collaborator</string>
+    <string name="credits_collaborators_section">Collaborators</string>
+    <string name="credits_license_name">GNU General Public License v3.0</string>
+    <string name="credits_license_desc">Free, open-source software. You may use, study, share and improve it.</string>
+    <string name="credits_discord">Discord Server</string>
+    <string name="credits_telegram">Telegram Channel</string>
+    <string name="credits_website">Website</string>
+    <string name="credits_github">GitHub</string>
+    <string name="credits_view_repo">View Repository</string>
+    <string name="app_version_info">%1$s • %2$s</string>
+    <string name="like_what_i_do">Like what I do?</string>
+    <string name="buy_mo_a_coffee">Buy me a coffee</string>
+    <string name="community_and_info">Community &amp; Info</string>
+    <string name="metrolist">METROLIST</string>
+    <string name="wanna_play_favorite_song">Wanna play their favorite song?</string>
+    <string name="yeah">Yeah</string>
+    <string name="stands_with_palestine">This project stands with Palestine 🇵🇸</string>
 </resources>
