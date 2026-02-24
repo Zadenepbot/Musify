@@ -786,6 +786,9 @@
 
     <!-- Restore confirmation dialog -->
     <string name="restore_confirm_title">Restore backup?</string>
-    <string name="restore_confirm_message">If you were logged in with Google when you created this backup, you will need to log in again. This prevents playback issues caused by stale session data.</string>
+    <string name="restore_confirm_message">This will restore your app data from the backup. You will need to log in again after restore.</string>
+    <string name="restore_account_signout">The following account will be signed out:</string>
     <string name="restore">Restore</string>
+    <string name="checking_previous_account">Checking for previous account…</string>
+    <string name="no_account_found">No account found</string>
 </resources>
