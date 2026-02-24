@@ -11,7 +11,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
-import com.metrolist.music.MainActivity
 import com.metrolist.music.R
 import com.metrolist.music.constants.DataSyncIdKey
 import com.metrolist.music.constants.InnerTubeCookieKey
@@ -37,7 +36,6 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import javax.inject.Inject
-import kotlin.system.exitProcess
 
 data class CsvImportState(
     val previewRows: List<List<String>> = emptyList(),
@@ -141,8 +139,11 @@ class BackupRestoreViewModel @Inject constructor(
 
             context.stopService(Intent(context, MusicService::class.java))
             context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
-            context.startActivity(Intent(context, MainActivity::class.java))
-            exitProcess(0)
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            context.startActivity(intent)
+            Runtime.getRuntime().exit(0)
         }.onFailure {
             reportException(it)
             Timber.tag("RESTORE").e(it, "Restore failed")
