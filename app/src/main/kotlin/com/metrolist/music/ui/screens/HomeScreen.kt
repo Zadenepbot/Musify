@@ -903,7 +903,8 @@ fun HomeScreen(
             list.add(HomeSection.HomePageSection(i))
         }
 
-        if (explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
+        // Only show Mood and Genres when no chip is selected (not in filtered view)
+        if (!chipActive && explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
 
         if (randomizeHomeOrder) {
             list.sortedByDescending { section ->
@@ -1044,6 +1045,148 @@ fun HomeScreen(
                                         shape = RoundedCornerShape(16.dp),
                                         modifier = Modifier.width(72.dp)
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Show podcast sections FIRST when podcast chip is selected (fixed at top)
+                if (selectedChip?.title?.contains("Podcast", ignoreCase = true) == true) {
+                    // Show "Your Shows" section from official API
+                    if (savedPodcastShows.isNotEmpty()) {
+                        item(key = "00_your_shows_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.your_shows),
+                                onClick = {
+                                    navController.navigate("youtube_browse/FEmusic_library_non_music_audio_list")
+                                }
+                            )
+                        }
+
+                        item(key = "00_your_shows_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(savedPodcastShows) { podcast ->
+                                    ytGridItem(podcast)
+                                }
+                            }
+                        }
+                    }
+
+                    // Show "Episodes for Later" section from official API
+                    if (episodesForLater.isNotEmpty()) {
+                        item(key = "00_episodes_for_later_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.episodes_for_later),
+                                onClick = {
+                                    navController.navigate("online_playlist/SE")
+                                }
+                            )
+                        }
+
+                        item(key = "00_episodes_for_later_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(episodesForLater) { episode ->
+                                    ytGridItem(episode)
+                                }
+                            }
+                        }
+                    }
+
+                    // Show Podcast Channels row if we have any (extracted from episodes)
+                    // Only show if "Your Shows" from official API is empty (to avoid duplicates)
+                    if (featuredPodcasts.isNotEmpty() && savedPodcastShows.isEmpty()) {
+                        item(key = "0_podcast_channels_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.podcast_channels),
+                            )
+                        }
+
+                        item(key = "0_podcast_channels_list") {
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(featuredPodcasts) { podcast ->
+                                    ytGridItem(podcast)
+                                }
+                            }
+                        }
+                    }
+
+                    // Add "Latest Episodes" header before episode sections (if we have any sections)
+                    if (homeSections.filterIsInstance<HomeSection.HomePageSection>().isNotEmpty()) {
+                        item(key = "0_latest_episodes_title") {
+                            NavigationTitle(
+                                title = stringResource(R.string.latest_episodes),
+                            )
+                        }
+                    }
+
+                    // Render the regular sections from the chip (episodes grouped by category)
+                    // Use key prefix "1_" to ensure episodes sort after channels "0_"
+                    // Skip sections that duplicate official API sections (Your Shows, Episodes for Later)
+                    homeSections.filterIsInstance<HomeSection.HomePageSection>().forEach { section ->
+                        val sectionData = homePage?.sections?.getOrNull(section.index)
+                        // Skip if this section duplicates an official API section
+                        val skipTitles = listOf("your shows", "episodes for later", "podcast channels", "new episodes")
+                        if (sectionData?.title?.lowercase()?.let { title -> skipTitles.any { title.contains(it) } } == true) {
+                            return@forEach
+                        }
+                        sectionData?.let {
+                            item(key = "1_chip_section_title_${section.index}") {
+                                NavigationTitle(
+                                    title = sectionData.title,
+                                    label = sectionData.label,
+                                    thumbnail = sectionData.thumbnail?.let { thumbnailUrl ->
+                                        {
+                                            val shape =
+                                                if (sectionData.endpoint?.isArtistEndpoint == true) CircleShape else RoundedCornerShape(
+                                                    ThumbnailCornerRadius
+                                                )
+                                            AsyncImage(
+                                                model = thumbnailUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(ListThumbnailSize)
+                                                    .clip(shape)
+                                            )
+                                        }
+                                    },
+                                    onClick = sectionData.endpoint?.let { endpoint ->
+                                        {
+                                            when {
+                                                endpoint.browseId == "FEmusic_moods_and_genres" ->
+                                                    navController.navigate("mood_and_genres")
+                                                endpoint.params != null ->
+                                                    navController.navigate("youtube_browse/${endpoint.browseId}?params=${endpoint.params}")
+                                                else ->
+                                                    navController.navigate("browse/${endpoint.browseId}")
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
+
+                            item(key = "1_chip_section_list_${section.index}") {
+                                LazyRow(
+                                    contentPadding = WindowInsets.systemBars
+                                        .only(WindowInsetsSides.Horizontal)
+                                        .asPaddingValues(),
+                                ) {
+                                    items(sectionData.items) { item ->
+                                        ytGridItem(item)
+                                    }
                                 }
                             }
                         }
@@ -1702,6 +1845,11 @@ fun HomeScreen(
                             }
                         }
                         is HomeSection.HomePageSection -> {
+                            // Skip HomePageSection rendering when podcast chip is selected
+                            // Podcast sections are handled separately with special UI
+                            if (selectedChip?.title?.contains("Podcast", ignoreCase = true) == true) {
+                                return@forEach
+                            }
                             val sectionData = homePage?.sections?.getOrNull(section.index)
                             sectionData?.let {
                                 // Check if section contains songs for Play All functionality
@@ -1879,7 +2027,8 @@ fun HomeScreen(
                     }
                 }
 
-            if (isLoading || homePage?.continuation != null && homePage?.sections?.isNotEmpty() == true) {
+            // Only show shimmer during initial loading, not for pagination
+            if (isLoading && homePage?.sections.isNullOrEmpty()) {
                 item(key = "loading_shimmer") {
                     ShimmerHost(
                         modifier = Modifier.animateItem()
@@ -1924,140 +2073,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // Show podcast sections only when podcast chip is selected
-            if (selectedChip?.title?.contains("Podcast", ignoreCase = true) == true) {
-                // Show "Your Shows" section from official API
-                if (savedPodcastShows.isNotEmpty()) {
-                        item(key = "00_your_shows_title") {
-                            NavigationTitle(
-                                title = stringResource(R.string.your_shows),
-                                onClick = {
-                                    navController.navigate("youtube_browse/FEmusic_library_non_music_audio_list")
-                                }
-                            )
-                        }
-
-                        item(key = "00_your_shows_list") {
-                            LazyRow(
-                                contentPadding = WindowInsets.systemBars
-                                    .only(WindowInsetsSides.Horizontal)
-                                    .asPaddingValues(),
-                            ) {
-                                items(savedPodcastShows) { podcast ->
-                                    ytGridItem(podcast)
-                                }
-                            }
-                        }
-                    }
-
-                    // Show "Episodes for Later" section from official API
-                    if (episodesForLater.isNotEmpty()) {
-                        item(key = "00_episodes_for_later_title") {
-                            NavigationTitle(
-                                title = stringResource(R.string.episodes_for_later),
-                                onClick = {
-                                    navController.navigate("online_playlist/SE")
-                                }
-                            )
-                        }
-
-                        item(key = "00_episodes_for_later_list") {
-                            LazyRow(
-                                contentPadding = WindowInsets.systemBars
-                                    .only(WindowInsetsSides.Horizontal)
-                                    .asPaddingValues(),
-                            ) {
-                                items(episodesForLater) { episode ->
-                                    ytGridItem(episode)
-                                }
-                            }
-                        }
-                    }
-
-                    // Show Podcast Channels row if we have any (extracted from episodes)
-                    // Use key prefix "0_" to ensure channels sort before episode sections "1_"
-                    if (featuredPodcasts.isNotEmpty()) {
-                        item(key = "0_podcast_channels_title") {
-                            NavigationTitle(
-                                title = stringResource(R.string.podcast_channels),
-                            )
-                        }
-
-                        item(key = "0_podcast_channels_list") {
-                            LazyRow(
-                                contentPadding = WindowInsets.systemBars
-                                    .only(WindowInsetsSides.Horizontal)
-                                    .asPaddingValues(),
-                            ) {
-                                items(featuredPodcasts) { podcast ->
-                                    ytGridItem(podcast)
-                                }
-                            }
-                        }
-
-                        // Add "Latest Episodes" header before episode sections
-                        item(key = "0_latest_episodes_title") {
-                            NavigationTitle(
-                                title = stringResource(R.string.latest_episodes),
-                            )
-                        }
-                    }
-
-                    // Render the regular sections from the chip (episodes grouped by category)
-                    // Use key prefix "1_" to ensure episodes sort after channels "0_"
-                    homeSections.filterIsInstance<HomeSection.HomePageSection>().forEach { section ->
-                        val sectionData = homePage?.sections?.getOrNull(section.index)
-                        sectionData?.let {
-                            item(key = "1_chip_section_title_${section.index}") {
-                                NavigationTitle(
-                                    title = sectionData.title,
-                                    label = sectionData.label,
-                                    thumbnail = sectionData.thumbnail?.let { thumbnailUrl ->
-                                        {
-                                            val shape =
-                                                if (sectionData.endpoint?.isArtistEndpoint == true) CircleShape else RoundedCornerShape(
-                                                    ThumbnailCornerRadius
-                                                )
-                                            AsyncImage(
-                                                model = thumbnailUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(ListThumbnailSize)
-                                                    .clip(shape)
-                                            )
-                                        }
-                                    },
-                                    onClick = sectionData.endpoint?.let { endpoint ->
-                                        {
-                                            when {
-                                                endpoint.browseId == "FEmusic_moods_and_genres" ->
-                                                    navController.navigate("mood_and_genres")
-                                                endpoint.params != null ->
-                                                    navController.navigate("youtube_browse/${endpoint.browseId}?params=${endpoint.params}")
-                                                else ->
-                                                    navController.navigate("browse/${endpoint.browseId}")
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            item(key = "1_chip_section_list_${section.index}") {
-                                LazyRow(
-                                    contentPadding = WindowInsets.systemBars
-                                        .only(WindowInsetsSides.Horizontal)
-                                        .asPaddingValues(),
-                                ) {
-                                    items(sectionData.items) { item ->
-                                        ytGridItem(item)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
             HideOnScrollFAB(

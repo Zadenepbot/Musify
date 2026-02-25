@@ -843,16 +843,21 @@ object YouTube {
         // Use authentication for library endpoints
         val needsLogin = browseId.startsWith("FEmusic_library") || browseId == "VLSE" || browseId == "VLRDPN"
         val response = innerTube.browse(WEB_REMIX, browseId = browseId, params = params, setLogin = needsLogin).body<BrowseResponse>()
+        val sectionContents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents
         BrowseResult(
             title = response.header?.musicHeaderRenderer?.title?.runs?.firstOrNull()?.text,
-            items = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.mapNotNull { content ->
+            items = sectionContents?.mapNotNull { content ->
                 when {
                     content.gridRenderer != null -> {
                         BrowseResult.Item(
                             title = content.gridRenderer.header?.gridHeaderRenderer?.title?.runs?.firstOrNull()?.text,
                             items = content.gridRenderer.items
                                 .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
-                                .mapNotNull(RelatedPage.Companion::fromMusicTwoRowItemRenderer)
+                                .mapNotNull { renderer ->
+                                    // Try LibraryPage first (more lenient for library endpoints), fall back to RelatedPage
+                                    LibraryPage.fromMusicTwoRowItemRenderer(renderer)
+                                        ?: RelatedPage.fromMusicTwoRowItemRenderer(renderer)
+                                }
                         )
                     }
 
@@ -861,7 +866,28 @@ object YouTube {
                             title = content.musicCarouselShelfRenderer.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text,
                             items = content.musicCarouselShelfRenderer.contents
                                 .mapNotNull(MusicCarouselShelfRenderer.Content::musicTwoRowItemRenderer)
-                                .mapNotNull(RelatedPage.Companion::fromMusicTwoRowItemRenderer)
+                                .mapNotNull { renderer ->
+                                    LibraryPage.fromMusicTwoRowItemRenderer(renderer)
+                                        ?: RelatedPage.fromMusicTwoRowItemRenderer(renderer)
+                                }
+                        )
+                    }
+
+                    content.musicShelfRenderer != null -> {
+                        BrowseResult.Item(
+                            title = content.musicShelfRenderer.title?.runs?.firstOrNull()?.text,
+                            items = content.musicShelfRenderer.contents
+                                ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                                ?.mapNotNull(LibraryPage.Companion::fromMusicResponsiveListItemRenderer)
+                                ?: emptyList()
+                        )
+                    }
+
+                    content.musicPlaylistShelfRenderer != null -> {
+                        BrowseResult.Item(
+                            title = null, // MusicPlaylistShelfRenderer doesn't have a title
+                            items = content.musicPlaylistShelfRenderer.contents.getItems()
+                                .mapNotNull(LibraryPage.Companion::fromMusicResponsiveListItemRenderer)
                         )
                     }
 

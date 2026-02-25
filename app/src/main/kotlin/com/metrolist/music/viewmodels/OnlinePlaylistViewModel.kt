@@ -127,6 +127,10 @@ class OnlinePlaylistViewModel @Inject constructor(
                         reportException(throwable)
                     }
             }
+            else -> {
+                _error.value = "Unknown podcast playlist"
+                _isLoading.value = false
+            }
         }
     }
 
