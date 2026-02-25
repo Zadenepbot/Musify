@@ -84,7 +84,7 @@ import com.metrolist.music.viewmodels.LibraryPodcastsViewModel
 @Composable
 fun LibraryPodcastsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
+    filterContent: @Composable () -> Unit,
     viewModel: LibraryPodcastsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -140,6 +140,13 @@ fun LibraryPodcastsScreen(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
+            item(
+                key = "filter",
+                contentType = CONTENT_TYPE_HEADER,
+            ) {
+                filterContent()
+            }
+
             // Subscribed Channels Section
             if (subscribedChannels.isNotEmpty()) {
                 item(
@@ -305,28 +312,6 @@ fun LibraryPodcastsScreen(
                     contentType = CONTENT_TYPE_HEADER,
                 ) {
                     Spacer(Modifier.height(8.dp))
-                }
-            }
-
-            item(
-                key = "filter",
-                contentType = CONTENT_TYPE_HEADER,
-            ) {
-                Row {
-                    Spacer(Modifier.width(12.dp))
-                    FilterChip(
-                        label = { Text(stringResource(R.string.filter_podcasts)) },
-                        selected = true,
-                        colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
-                        onClick = onDeselect,
-                        shape = RoundedCornerShape(16.dp),
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.close),
-                                contentDescription = ""
-                            )
-                        },
-                    )
                 }
             }
 

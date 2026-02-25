@@ -903,8 +903,7 @@ fun HomeScreen(
             list.add(HomeSection.HomePageSection(i))
         }
 
-        // Only show Mood and Genres when no chip is selected (not in filtered view)
-        if (!chipActive && explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
+        if (explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
 
         if (randomizeHomeOrder) {
             list.sortedByDescending { section ->
@@ -1990,6 +1989,10 @@ fun HomeScreen(
                             }
                         }
                         HomeSection.MoodAndGenres -> {
+                            // Skip MoodAndGenres when podcast chip is selected
+                            if (selectedChip?.title?.contains("Podcast", ignoreCase = true) == true) {
+                                return@forEach
+                            }
                             explorePage?.moodAndGenres?.let { moodAndGenres ->
                                 item(key = "mood_and_genres_title") {
                                     NavigationTitle(

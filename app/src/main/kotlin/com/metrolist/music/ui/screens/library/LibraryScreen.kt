@@ -69,7 +69,7 @@ fun LibraryScreen(navController: NavController) {
 
             LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
                 navController,
-                { filterType = LibraryFilter.LIBRARY })
+                filterContent)
         }
     }
 }
