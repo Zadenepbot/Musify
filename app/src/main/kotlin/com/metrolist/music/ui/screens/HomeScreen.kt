@@ -1880,11 +1880,15 @@ fun HomeScreen(
                                         onClick = sectionData.endpoint?.let { endpoint ->
                                             {
                                                 when {
-                                                    endpoint.browseId == "FEmusic_moods_and_genres" -> 
+                                                    endpoint.browseId == "FEmusic_moods_and_genres" ->
                                                         navController.navigate("mood_and_genres")
-                                                    endpoint.params != null -> 
+                                                    // Handle podcast-related browse endpoints
+                                                    endpoint.browseId.startsWith("FEmusic_library_non_music_audio") ||
+                                                    endpoint.browseId.startsWith("FEmusic_non_music_audio") ->
+                                                        navController.navigate("youtube_browse/${endpoint.browseId}")
+                                                    endpoint.params != null ->
                                                         navController.navigate("youtube_browse/${endpoint.browseId}?params=${endpoint.params}")
-                                                    else -> 
+                                                    else ->
                                                         navController.navigate("browse/${endpoint.browseId}")
                                                 }
                                             }
