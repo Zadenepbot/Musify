@@ -293,8 +293,8 @@ fun AboutScreen(
     val localSnackbarHostState = remember { SnackbarHostState() }
     val wannaPlayStr = stringResource(R.string.wanna_play_favorite_song)
     val yeahStr = stringResource(R.string.yeah)
-    val softBurstShape = remember { MaterialShapes.SoftBurst.toShape() }
-    val leadDeveloperShape = remember { leadDeveloper.polygon?.toShape() ?: CircleShape }
+    val softBurstShape = MaterialShapes.SoftBurst.toShape()
+    val leadDeveloperShape = leadDeveloper.polygon?.toShape() ?: CircleShape
     
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -481,7 +481,7 @@ fun AboutScreen(
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     collaborators.forEachIndexed { index, contributor ->
                         var clickCount by remember(contributor.name) { mutableIntStateOf(0) }
-                        val contributorShape = remember(contributor.name) { contributor.polygon?.toShape() ?: CircleShape }
+                        val contributorShape = contributor.polygon?.toShape() ?: CircleShape
                         ListItem(
                             headlineContent = {
                                 Text(
