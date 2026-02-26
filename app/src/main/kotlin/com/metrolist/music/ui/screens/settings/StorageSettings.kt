@@ -382,24 +382,24 @@ fun StorageSettings(
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.timer),
-                    title = { Text(stringResource(R.string.cache_after_seconds)) },
+                    title = { Text(stringResource(R.string.cache_at_percent)) },
                     description = {
                         Column {
                             Text(
                                 text = if (cacheAfterSeconds == 0) {
                                     stringResource(R.string.disable)
                                 } else {
-                                    stringResource(R.string.n_seconds, cacheAfterSeconds)
+                                    stringResource(R.string.n_percent, cacheAfterSeconds)
                                 }
                             )
-                            val cacheAfterSecondsValues = remember { listOf(0, 10, 30, 60, 120, 300) }
+                            val cacheAfterPercentValues = remember { listOf(0, 25, 50, 75, 90) }
                             Slider(
-                                value = cacheAfterSecondsValues.indexOf(cacheAfterSeconds).toFloat(),
+                                value = cacheAfterPercentValues.indexOf(cacheAfterSeconds).takeIf { it >= 0 }?.toFloat() ?: 0f,
                                 onValueChange = {
-                                    onCacheAfterSecondsChange(cacheAfterSecondsValues[it.roundToInt()])
+                                    onCacheAfterSecondsChange(cacheAfterPercentValues[it.roundToInt()])
                                 },
-                                steps = cacheAfterSecondsValues.size - 2,
-                                valueRange = 0f..(cacheAfterSecondsValues.size - 1).toFloat()
+                                steps = cacheAfterPercentValues.size - 2,
+                                valueRange = 0f..(cacheAfterPercentValues.size - 1).toFloat()
                             )
                         }
                     }

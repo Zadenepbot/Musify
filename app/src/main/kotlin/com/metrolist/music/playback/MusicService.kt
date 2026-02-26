@@ -2649,14 +2649,22 @@ class MusicService :
     }
 
     private fun scheduleCacheForMedia(mediaId: String) {
-        val cacheAfterSeconds = dataStore[CacheAfterSecondsKey] ?: 0
-        if (cacheAfterSeconds <= 0) return
+        val cacheAfterPercent = dataStore[CacheAfterSecondsKey] ?: 0
+        if (cacheAfterPercent <= 0) return
 
         scope.launch {
-            delay(cacheAfterSeconds * 1000L)
-            if (player.currentMediaItem?.mediaId == mediaId && player.isPlaying) {
-                cacheEnabledMediaIds.add(mediaId)
-                Timber.tag(TAG).d("Enabled cache for $mediaId after $cacheAfterSeconds seconds")
+            while (player.currentMediaItem?.mediaId == mediaId && player.isPlaying) {
+                val duration = player.duration
+                if (duration > 0) {
+                    val cacheAfterMs = (duration * cacheAfterPercent / 100)
+                    delay(cacheAfterMs)
+                    if (player.currentMediaItem?.mediaId == mediaId && player.isPlaying) {
+                        cacheEnabledMediaIds.add(mediaId)
+                        Timber.tag(TAG).d("Enabled cache for $mediaId at $cacheAfterPercent% ($cacheAfterMs ms)")
+                    }
+                    break
+                }
+                delay(100)
             }
         }
     }
