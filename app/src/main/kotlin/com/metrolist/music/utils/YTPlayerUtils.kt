@@ -252,7 +252,7 @@ object YTPlayerUtils {
                 if (needsNTransform) {
                     try {
                         Timber.tag(logTag).d("Applying n-transform to stream URL for ${currentClient.clientName}")
-                        streamUrl = EjsNTransformSolver.transformNParamInUrl(streamUrl!!)
+                        streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl!!)
 
                         // Append pot= parameter (base64 - do NOT Uri.encode)
                         if ((currentClient.useWebPoTokens || isPrivatelyOwnedTrack) && sessionId != null) {
