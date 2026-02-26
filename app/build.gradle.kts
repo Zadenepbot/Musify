@@ -23,8 +23,8 @@ android {
         applicationId = "com.metrolist.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 140
-        versionName = "13.0.0"
+        versionCode = 141
+        versionName = "13.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -289,6 +289,8 @@ dependencies {
     implementation(project(":shazamkit"))
 
     implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
 
     // Protobuf for message serialization (lite version for Android)
@@ -297,6 +299,5 @@ dependencies {
 
     coreLibraryDesugaring(libs.desugaring)
 
-    implementation(libs.mlkit.language.id)
     implementation(libs.timber)
 }
