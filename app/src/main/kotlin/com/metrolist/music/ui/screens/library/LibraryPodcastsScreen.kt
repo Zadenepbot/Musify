@@ -116,6 +116,7 @@ fun LibraryPodcastsScreen(
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsState()
     val sePlaylist by viewModel.sePlaylist.collectAsState()
     val podcastChannels by viewModel.podcastChannels.collectAsState()
+    val rdpnThumbnailUrl by viewModel.rdpnThumbnailUrl.collectAsState()
 
     Timber.d("[PODCAST_LIB] filter=$podcastFilter channels=${subscribedChannels.size} downloaded=${downloadedEpisodes.size} se=${sePlaylist?.id}")
 
@@ -201,7 +202,7 @@ fun LibraryPodcastsScreen(
                     item(key = "rdpn_playlist", contentType = CONTENT_TYPE_HEADER) {
                         AutoPlaylistCard(
                             title = stringResource(R.string.new_episodes),
-                            thumbnailUrl = null,
+                            thumbnailUrl = rdpnThumbnailUrl,
                             episodeCount = null,
                             onClick = { navController.navigate("online_playlist/RDPN") },
                         )

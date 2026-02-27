@@ -395,6 +395,10 @@ constructor(
     private val _sePlaylist = MutableStateFlow<com.metrolist.innertube.models.PlaylistItem?>(null)
     val sePlaylist = _sePlaylist.asStateFlow()
 
+    // RDPN "New Episodes" thumbnail (from first new episode)
+    private val _rdpnThumbnailUrl = MutableStateFlow<String?>(null)
+    val rdpnThumbnailUrl = _rdpnThumbnailUrl.asStateFlow()
+
     // Podcast host channels fetched from YT Music library/podcast_channels
     private val _podcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
     val podcastChannels = _podcastChannels.asStateFlow()
@@ -433,12 +437,24 @@ constructor(
         }
     }
 
+    private suspend fun fetchRdpnThumbnail() {
+        YouTube.newEpisodes().onSuccess { episodes ->
+            _rdpnThumbnailUrl.value = episodes.firstOrNull()?.thumbnail
+            timber.log.Timber.d("[PODCAST] RDPN thumbnail: ${_rdpnThumbnailUrl.value}")
+        }.onFailure {
+            timber.log.Timber.e(it, "[PODCAST] Failed to fetch RDPN thumbnail")
+        }
+    }
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             fetchSePlaylist()
         }
         viewModelScope.launch(Dispatchers.IO) {
             fetchPodcastChannels()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchRdpnThumbnail()
         }
         viewModelScope.launch(Dispatchers.IO) {
             syncUtils.syncPodcastSubscriptionsSuspend()
@@ -454,6 +470,7 @@ constructor(
     suspend fun refreshAll() {
         fetchSePlaylist()
         fetchPodcastChannels()
+        fetchRdpnThumbnail()
         syncUtils.syncPodcastSubscriptionsSuspend()
         syncUtils.syncEpisodesForLaterSuspend()
     }
