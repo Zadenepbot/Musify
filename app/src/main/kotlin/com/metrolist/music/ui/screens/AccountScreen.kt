@@ -82,6 +82,7 @@ fun AccountScreen(
     val albums by viewModel.albums.collectAsState()
     val artists by viewModel.artists.collectAsState()
     val sePlaylist by viewModel.sePlaylist.collectAsState()
+    val rdpnPlaylist by viewModel.rdpnPlaylist.collectAsState()
     val selectedContentType by viewModel.selectedContentType.collectAsState()
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
 
@@ -211,6 +212,21 @@ fun AccountScreen(
             }
 
             AccountContentType.PODCASTS -> {
+                // Show RDPN "New Episodes" playlist if available
+                rdpnPlaylist?.let { rdpn ->
+                    item(
+                        key = "rdpn_playlist",
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        SePlaylistAccountItem(
+                            thumbnailUrl = rdpn.thumbnail,
+                            title = stringResource(R.string.new_episodes),
+                            subtitle = stringResource(R.string.auto_playlist),
+                            onClick = { navController.navigate("online_playlist/RDPN") },
+                        )
+                    }
+                }
+
                 // Show SE "Episodes for Later" playlist if available
                 sePlaylist?.let { se ->
                     item(
@@ -226,7 +242,7 @@ fun AccountScreen(
                     }
                 }
 
-                if (sePlaylist == null && playlists == null) {
+                if (rdpnPlaylist == null && sePlaylist == null && playlists == null) {
                     items(4, span = { GridItemSpan(maxLineSpan) }) {
                         ShimmerHost {
                             ListItemPlaceHolder()

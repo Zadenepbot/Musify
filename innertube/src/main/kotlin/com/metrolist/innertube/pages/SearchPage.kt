@@ -30,8 +30,63 @@ object SearchPage {
                 ?.splitBySeparator()
                 ?: return null
         return when {
+            // CRITICAL: Check isEpisode BEFORE isSong — both can match isSong (watchEndpoint or
+            // null navigationEndpoint), so episodes must be identified first.
+            renderer.isEpisode -> {
+                val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
+                EpisodeItem(
+                    id = renderer.playlistItemData?.videoId ?: return null,
+                    title =
+                        renderer.flexColumns
+                            .firstOrNull()
+                            ?.musicResponsiveListItemFlexColumnRenderer
+                            ?.text
+                            ?.runs
+                            ?.firstOrNull()
+                            ?.text ?: return null,
+                    author =
+                        secondaryLine.firstOrNull()?.firstOrNull()?.let {
+                            Artist(
+                                name = it.text,
+                                id = it.navigationEndpoint?.browseEndpoint?.browseId,
+                            )
+                        },
+                    podcast =
+                        secondaryLine.getOrNull(1)?.firstOrNull()?.takeIf {
+                            it.navigationEndpoint?.browseEndpoint != null
+                        }?.let {
+                            Album(
+                                name = it.text,
+                                id = it.navigationEndpoint?.browseEndpoint?.browseId!!,
+                            )
+                        },
+                    duration =
+                        secondaryLine
+                            .lastOrNull()
+                            ?.firstOrNull()
+                            ?.text
+                            ?.parseTime(),
+                    publishDateText =
+                        secondaryLine
+                            .getOrNull(2)
+                            ?.firstOrNull()
+                            ?.text,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                    explicit =
+                        renderer.badges?.find {
+                            it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
+                        } != null,
+                    endpoint = renderer.overlay
+                        ?.musicItemThumbnailOverlayRenderer
+                        ?.content
+                        ?.musicPlayButtonRenderer
+                        ?.playNavigationEndpoint
+                        ?.watchEndpoint,
+                    libraryAddToken = libraryTokens.addToken,
+                    libraryRemoveToken = libraryTokens.removeToken,
+                )
+            }
             renderer.isSong -> {
-                // Extract library tokens using the new method that properly handles multiple toggle items
                 val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
                 SongItem(
@@ -273,60 +328,6 @@ object SearchPage {
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
                             ?.watchPlaylistEndpoint,
-                )
-            }
-            renderer.isEpisode -> {
-                val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
-                EpisodeItem(
-                    id = renderer.playlistItemData?.videoId ?: return null,
-                    title =
-                        renderer.flexColumns
-                            .firstOrNull()
-                            ?.musicResponsiveListItemFlexColumnRenderer
-                            ?.text
-                            ?.runs
-                            ?.firstOrNull()
-                            ?.text ?: return null,
-                    author =
-                        secondaryLine.firstOrNull()?.firstOrNull()?.let {
-                            Artist(
-                                name = it.text,
-                                id = it.navigationEndpoint?.browseEndpoint?.browseId,
-                            )
-                        },
-                    podcast =
-                        secondaryLine.getOrNull(1)?.firstOrNull()?.takeIf {
-                            it.navigationEndpoint?.browseEndpoint != null
-                        }?.let {
-                            Album(
-                                name = it.text,
-                                id = it.navigationEndpoint?.browseEndpoint?.browseId!!,
-                            )
-                        },
-                    duration =
-                        secondaryLine
-                            .lastOrNull()
-                            ?.firstOrNull()
-                            ?.text
-                            ?.parseTime(),
-                    publishDateText =
-                        secondaryLine
-                            .getOrNull(2)
-                            ?.firstOrNull()
-                            ?.text,
-                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
-                    explicit =
-                        renderer.badges?.find {
-                            it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
-                        } != null,
-                    endpoint = renderer.overlay
-                        ?.musicItemThumbnailOverlayRenderer
-                        ?.content
-                        ?.musicPlayButtonRenderer
-                        ?.playNavigationEndpoint
-                        ?.watchEndpoint,
-                    libraryAddToken = libraryTokens.addToken,
-                    libraryRemoveToken = libraryTokens.removeToken,
                 )
             }
             else -> null

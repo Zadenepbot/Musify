@@ -395,9 +395,9 @@ constructor(
     private val _sePlaylist = MutableStateFlow<com.metrolist.innertube.models.PlaylistItem?>(null)
     val sePlaylist = _sePlaylist.asStateFlow()
 
-    // RDPN "New Episodes" thumbnail (from first new episode)
-    private val _rdpnThumbnailUrl = MutableStateFlow<String?>(null)
-    val rdpnThumbnailUrl = _rdpnThumbnailUrl.asStateFlow()
+    // RDPN "New Episodes" playlist fetched from YouTube Music (real thumbnail + episode count)
+    private val _rdpnPlaylist = MutableStateFlow<com.metrolist.innertube.models.PlaylistItem?>(null)
+    val rdpnPlaylist = _rdpnPlaylist.asStateFlow()
 
     // Podcast host channels fetched from YT Music library/podcast_channels
     private val _podcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
@@ -437,12 +437,12 @@ constructor(
         }
     }
 
-    private suspend fun fetchRdpnThumbnail() {
-        YouTube.newEpisodes().onSuccess { episodes ->
-            _rdpnThumbnailUrl.value = episodes.firstOrNull()?.thumbnail
-            timber.log.Timber.d("[PODCAST] RDPN thumbnail: ${_rdpnThumbnailUrl.value}")
+    private suspend fun fetchRdpnPlaylist() {
+        YouTube.playlist("RDPN").onSuccess { page ->
+            _rdpnPlaylist.value = page.playlist
+            timber.log.Timber.d("[PODCAST] RDPN playlist: ${page.playlist.title}, thumbnail: ${page.playlist.thumbnail}")
         }.onFailure {
-            timber.log.Timber.e(it, "[PODCAST] Failed to fetch RDPN thumbnail")
+            timber.log.Timber.e(it, "[PODCAST] Failed to fetch RDPN playlist")
         }
     }
 
@@ -454,7 +454,7 @@ constructor(
             fetchPodcastChannels()
         }
         viewModelScope.launch(Dispatchers.IO) {
-            fetchRdpnThumbnail()
+            fetchRdpnPlaylist()
         }
         viewModelScope.launch(Dispatchers.IO) {
             syncUtils.syncPodcastSubscriptionsSuspend()
@@ -470,7 +470,7 @@ constructor(
     suspend fun refreshAll() {
         fetchSePlaylist()
         fetchPodcastChannels()
-        fetchRdpnThumbnail()
+        fetchRdpnPlaylist()
         syncUtils.syncPodcastSubscriptionsSuspend()
         syncUtils.syncEpisodesForLaterSuspend()
     }

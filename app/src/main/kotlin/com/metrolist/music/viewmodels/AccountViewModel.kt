@@ -41,6 +41,8 @@ class AccountViewModel @Inject constructor(
     val artists = MutableStateFlow<List<ArtistItem>?>(null)
     // SE "Episodes for Later" playlist shown in Podcasts tab
     val sePlaylist = MutableStateFlow<PlaylistItem?>(null)
+    // RDPN "New Episodes" playlist (real thumbnail + count from YouTube)
+    val rdpnPlaylist = MutableStateFlow<PlaylistItem?>(null)
 
     // Selected content type for chips
     val selectedContentType = MutableStateFlow(AccountContentType.PLAYLISTS)
@@ -73,6 +75,13 @@ class AccountViewModel @Inject constructor(
                         thumbnail = artist.thumbnail?.resize(544, 544)
                     )
                 }
+            }.onFailure {
+                reportException(it)
+            }
+        }
+        viewModelScope.launch {
+            YouTube.playlist("RDPN").onSuccess {
+                rdpnPlaylist.value = it.playlist
             }.onFailure {
                 reportException(it)
             }
