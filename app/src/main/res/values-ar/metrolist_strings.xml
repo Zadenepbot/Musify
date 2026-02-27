@@ -654,22 +654,4 @@
     <string name="discord_activity_name_description">اسم مخصص للنشاط (اتركه فارغًا للافتراضي)</string>
     <string name="discord_advanced_mode">الوضع المتقدم</string>
     <string name="discord_advanced_mode_description">عرض خيارات تخصيص إضافية لـ Rich Presence</string>
-    <!-- Podcasts -->
-    <string name="filter_episodes">الحلقات</string>
-    <string name="filter_channels">القنوات</string>
-    <string name="auto_playlist">قائمة تشغيل تلقائية</string>
-    <string name="new_episodes">حلقات جديدة</string>
-    <string name="episodes_for_later">حلقات للاستماع لاحقاً</string>
-    <string name="downloaded_episodes">الحلقات المحملة</string>
-    <string name="episodes_for_later_empty">لا توجد حلقات محفوظة بعد</string>
-    <string name="no_subscribed_channels">لا توجد قنوات مشترك بها</string>
-    <string name="no_downloaded_episodes">لا توجد حلقات محملة</string>
-    <plurals name="n_channel">
-        <item quantity="zero">لا توجد قنوات</item>
-        <item quantity="one">قناة واحدة</item>
-        <item quantity="two">قناتان</item>
-        <item quantity="few">%d قنوات</item>
-        <item quantity="many">%d قناة</item>
-        <item quantity="other">%d قناة</item>
-    </plurals>
 </resources>
