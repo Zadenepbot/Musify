@@ -177,6 +177,7 @@ fun OnlineSearchScreen(
                 isActive = when (item) {
                     is SongItem -> mediaMetadata?.id == item.id
                     is AlbumItem -> mediaMetadata?.album?.id == item.id
+                    is EpisodeItem -> mediaMetadata?.id == item.id
                     else -> false
                 },
                 isPlaying = isPlaying,
@@ -269,7 +270,7 @@ fun OnlineSearchScreen(
                                     onDismiss()
                                 }
                                 is PodcastItem -> {
-                                    navController.navigate("online_playlist/${item.id}")
+                                    navController.navigate("online_podcast/${item.id}")
                                     onDismiss()
                                 }
                                 is EpisodeItem -> {
