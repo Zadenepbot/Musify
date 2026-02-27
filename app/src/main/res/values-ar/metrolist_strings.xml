@@ -658,6 +658,8 @@
     <string name="filter_episodes">الحلقات</string>
     <string name="filter_channels">القنوات</string>
     <string name="auto_playlist">قائمة تشغيل تلقائية</string>
+    <string name="new_episodes">حلقات جديدة</string>
+    <string name="episodes_for_later">حلقات للاستماع لاحقاً</string>
     <string name="downloaded_episodes">الحلقات المحملة</string>
     <string name="episodes_for_later_empty">لا توجد حلقات محفوظة بعد</string>
     <string name="no_subscribed_channels">لا توجد قنوات مشترك بها</string>

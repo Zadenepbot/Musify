@@ -197,9 +197,20 @@ fun LibraryPodcastsScreen(
                         chipsHeader()
                     }
 
+                    // RDPN "New Episodes" auto-playlist card
+                    item(key = "rdpn_playlist", contentType = CONTENT_TYPE_HEADER) {
+                        AutoPlaylistCard(
+                            title = stringResource(R.string.new_episodes),
+                            thumbnailUrl = null,
+                            episodeCount = null,
+                            onClick = { navController.navigate("online_playlist/RDPN") },
+                        )
+                    }
+
                     // SE "Episodes for Later" playlist card — fetched from YT Music
                     item(key = "se_playlist", contentType = CONTENT_TYPE_HEADER) {
-                        SePlaylistCard(
+                        AutoPlaylistCard(
+                            title = stringResource(R.string.episodes_for_later),
                             thumbnailUrl = sePlaylist?.thumbnail,
                             episodeCount = sePlaylist?.songCountText,
                             onClick = { navController.navigate("online_playlist/SE") },
@@ -441,9 +452,10 @@ fun LibraryPodcastsScreen(
     }
 }
 
-/** SE "Episodes for Later" playlist card — mirrors YT Music design */
+/** Auto-playlist card — mirrors YT Music design. Used for both SE and RDPN playlists. */
 @Composable
-private fun SePlaylistCard(
+private fun AutoPlaylistCard(
+    title: String,
     thumbnailUrl: String?,
     episodeCount: String?,
     onClick: () -> Unit,
@@ -486,7 +498,7 @@ private fun SePlaylistCard(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.episodes_for_later),
+                text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
