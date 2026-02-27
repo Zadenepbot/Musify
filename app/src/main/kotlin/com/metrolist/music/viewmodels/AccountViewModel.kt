@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 enum class AccountContentType {
-    PLAYLISTS, ALBUMS, ARTISTS
+    PLAYLISTS, ALBUMS, ARTISTS, PODCASTS
 }
 
 @HiltViewModel
@@ -39,6 +39,8 @@ class AccountViewModel @Inject constructor(
     val playlists = MutableStateFlow<List<PlaylistItem>?>(null)
     val albums = MutableStateFlow<List<AlbumItem>?>(null)
     val artists = MutableStateFlow<List<ArtistItem>?>(null)
+    // SE "Episodes for Later" playlist shown in Podcasts tab
+    val sePlaylist = MutableStateFlow<PlaylistItem?>(null)
 
     // Selected content type for chips
     val selectedContentType = MutableStateFlow(AccountContentType.PLAYLISTS)
@@ -46,7 +48,10 @@ class AccountViewModel @Inject constructor(
     private suspend fun loadPlaylists() {
         val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
         YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
-            playlists.value = it.items.filterIsInstance<PlaylistItem>()
+            val all = it.items.filterIsInstance<PlaylistItem>()
+            // Extract SE playlist separately for Podcasts tab
+            sePlaylist.value = all.find { it.id == "SE" }
+            playlists.value = all
                 .filterNot { it.id == "SE" }
                 .filterYoutubeShorts(hideYoutubeShorts)
         }.onFailure {

@@ -1339,22 +1339,29 @@ object YouTube {
                 setLogin = true
             ).body<BrowseResponse>()
 
-            val contents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-                ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()
+            val contentList = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents ?: emptyList()
 
-            val items = when {
-                contents?.gridRenderer != null -> {
-                    contents.gridRenderer.items
-                        .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
-                        .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+            val items = contentList.flatMap { content ->
+                when {
+                    content.gridRenderer != null -> {
+                        content.gridRenderer.items
+                            .mapNotNull(GridRenderer.Item::musicTwoRowItemRenderer)
+                            .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+                    }
+                    content.musicShelfRenderer != null -> {
+                        content.musicShelfRenderer.contents
+                            ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
+                            ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
+                            ?: emptyList()
+                    }
+                    content.musicCarouselShelfRenderer != null -> {
+                        content.musicCarouselShelfRenderer.contents
+                            .mapNotNull(MusicCarouselShelfRenderer.Content::musicTwoRowItemRenderer)
+                            .mapNotNull { LibraryPage.fromMusicTwoRowItemRenderer(it) }
+                    }
+                    else -> emptyList()
                 }
-                contents?.musicShelfRenderer != null -> {
-                    contents.musicShelfRenderer.contents
-                        ?.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
-                        ?.mapNotNull { LibraryPage.fromMusicResponsiveListItemRenderer(it) }
-                        ?: emptyList()
-                }
-                else -> emptyList()
             }
 
             LibraryPage(
