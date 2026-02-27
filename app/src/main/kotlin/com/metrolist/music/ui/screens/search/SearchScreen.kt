@@ -215,25 +215,31 @@ fun SearchScreen(
         Box(
             modifier = Modifier
                 .padding(paddingValues)
-                .padding(bottom = bottomPadding)
                 .fillMaxSize()
         ) {
-            when (searchSource) {
-                SearchSource.LOCAL -> LocalSearchScreen(
-                    query = query.text,
-                    navController = navController,
-                    onDismiss = { navController.navigateUp() },
-                    pureBlack = pureBlack
-                )
-                SearchSource.ONLINE -> OnlineSearchScreen(
-                    query = query.text,
-                    onQueryChange = { query = it },
-                    navController = navController,
-                    onSearch = onSearchFromSuggestion,
-                    onDismiss = { /* Don't dismiss when searching from suggestions */ },
-                    pureBlack = pureBlack
-                )
+            Box(
+                modifier = Modifier
+                    .padding(bottom = bottomPadding)
+                    .fillMaxSize()
+            ) {
+                when (searchSource) {
+                    SearchSource.LOCAL -> LocalSearchScreen(
+                        query = query.text,
+                        navController = navController,
+                        onDismiss = { navController.navigateUp() },
+                        pureBlack = pureBlack
+                    )
+                    SearchSource.ONLINE -> OnlineSearchScreen(
+                        query = query.text,
+                        onQueryChange = { query = it },
+                        navController = navController,
+                        onSearch = onSearchFromSuggestion,
+                        onDismiss = { /* Don't dismiss when searching from suggestions */ },
+                        pureBlack = pureBlack
+                    )
+                }
             }
+            
             HideOnScrollFAB(
                 lazyListState = lazyListState,
                 icon = R.drawable.mic,
