@@ -636,7 +636,7 @@ object YouTube {
                 Timber.d("[PODCAST] Button[$i].menuItems[$j]: toggle=${item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType}, nav=${item.menuNavigationItemRenderer?.icon?.iconType}")
                 // Check for SUBSCRIBE button (like artists have)
                 if (item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE") {
-                    val channelIds = item.toggleMenuServiceItemRenderer.defaultServiceEndpoint?.subscribeEndpoint?.channelIds
+                    val channelIds = item.toggleMenuServiceItemRenderer.defaultServiceEndpoint.subscribeEndpoint?.channelIds
                     Timber.d("[PODCAST] Found SUBSCRIBE button! channelIds=$channelIds")
                 }
             }

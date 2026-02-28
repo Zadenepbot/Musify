@@ -94,9 +94,9 @@ data class HomePage(
 
                 return Section(
                     title = title,
-                    label = renderer.header.musicCarouselShelfBasicHeaderRenderer?.strapline?.runs?.firstOrNull()?.text,
-                    thumbnail = renderer.header.musicCarouselShelfBasicHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
-                    endpoint = renderer.header.musicCarouselShelfBasicHeaderRenderer?.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
+                    label = renderer.header.musicCarouselShelfBasicHeaderRenderer.strapline?.runs?.firstOrNull()?.text,
+                    thumbnail = renderer.header.musicCarouselShelfBasicHeaderRenderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
+                    endpoint = renderer.header.musicCarouselShelfBasicHeaderRenderer.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
                     items = items
                 )
             }
@@ -348,7 +348,7 @@ data class HomePage(
                                 it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                             } == true,
                             endpoint = renderer.thumbnailOverlay
-                                .musicItemThumbnailOverlayRenderer?.content
+                                .musicItemThumbnailOverlayRenderer.content
                                 ?.musicPlayButtonRenderer?.playNavigationEndpoint
                                 ?.watchEndpoint,
                             libraryAddToken = libraryTokens.addToken,
