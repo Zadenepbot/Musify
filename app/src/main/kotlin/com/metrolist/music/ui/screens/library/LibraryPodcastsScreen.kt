@@ -701,7 +701,7 @@ private fun PodcastArtistChannelItem(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(56.dp)
-                .clip(RoundedCornerShape(ThumbnailCornerRadius)),
+                .clip(CircleShape),
         )
 
         Spacer(Modifier.width(12.dp))

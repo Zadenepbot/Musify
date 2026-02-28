@@ -16,6 +16,7 @@ import androidx.lifecycle.viewModelScope
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.filterExplicit
 import com.metrolist.innertube.models.filterVideoSongs
+import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.filterYoutubeShorts
 import com.metrolist.innertube.pages.SearchSummaryPage
 import com.metrolist.music.constants.HideExplicitKey
@@ -79,6 +80,15 @@ constructor(
                                     ItemsPage(
                                         result.items
                                             .distinctBy { it.id }
+                                            // When the episode filter is active the API may return
+                                            // user-channel entries (ArtistItem) alongside episodes.
+                                            // Keep only EpisodeItem so channels never pollute the
+                                            // episode results list.
+                                            .let { items ->
+                                                if (filter == YouTube.SearchFilter.FILTER_EPISODE)
+                                                    items.filterIsInstance<EpisodeItem>()
+                                                else items
+                                            }
                                             .filterExplicit(
                                                 hideExplicit,
                                             )
@@ -96,10 +106,11 @@ constructor(
     }
 
     fun loadMore() {
-        val filter = filter.value?.value
+        val currentFilter = filter.value
+        val filterValue = currentFilter?.value
         viewModelScope.launch {
-            if (filter == null) return@launch
-            val viewState = viewStateMap[filter] ?: return@launch
+            if (filterValue == null) return@launch
+            val viewState = viewStateMap[filterValue] ?: return@launch
             val continuation = viewState.continuation
             if (continuation != null) {
                 val searchResult =
@@ -108,10 +119,15 @@ constructor(
                 val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
                 val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
                 val newItems = searchResult.items
+                    .let { items ->
+                        if (currentFilter == YouTube.SearchFilter.FILTER_EPISODE)
+                            items.filterIsInstance<EpisodeItem>()
+                        else items
+                    }
                     .filterExplicit(hideExplicit)
                     .filterVideoSongs(hideVideoSongs)
                     .filterYoutubeShorts(hideYoutubeShorts)
-                viewStateMap[filter] = ItemsPage(
+                viewStateMap[filterValue] = ItemsPage(
                     (viewState.items + newItems).distinctBy { it.id },
                     searchResult.continuation
                 )
