@@ -5,11 +5,14 @@
 
 package com.metrolist.music.ui.utils
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,8 +36,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.metrolist.music.R
 
+@Composable
+fun MediaInfoCard(label: String, displayText: String, iconsList: Int, context: Context) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .padding(bottom = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.3f
+            )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        MediaInfoCardItemRow(
+            item = MediaInfoCardItem(
+                icon = painterResource(iconsList),
+                title = { Text(label) },
+                description = { Text(displayText) },
+                onClick = {
+                    // LocalClipboard API may not expose direct setText; use Android ClipboardManager
+                    val cm =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(
+                        ClipData.newPlainText(
+                            "text",
+                            displayText
+                        )
+                    )
+                    Toast.makeText(
+                        context,
+                        R.string.copied,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            )
+        )
+    }
+}
 /**
  * Individual settings item row with Material 3 styling
  */
