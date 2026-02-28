@@ -59,15 +59,14 @@ data class MusicResponsiveListItemRenderer(
             }
             // Method 3: Check for podcast link in subtitle (backup detection).
             //
-            // In FILTER_EPISODE search results, episode items have:
+            // Episode items that appear in filtered search results may have:
             //   - navigationEndpoint.watchEndpoint  (playable) → isSong=true would wrongly match
             //   - playlistItemData = null            (not in a playlist context)
             //   - subtitle: [date · podcast-name]   (podcast-name links to PODCAST_SHOW_DETAIL_PAGE)
             //
             // The presence of a PODCAST_SHOW_DETAIL_PAGE browse link in the subtitle is unique to
-            // episodes — regular songs never carry such a link.  We intentionally accept either
-            // a playlistItemData videoId OR a direct watchEndpoint videoId so that filtered-search
-            // episodes are detected even when playlistItemData is absent.
+            // episodes — regular songs never carry such a link.  We accept either a playlistItemData
+            // videoId OR a direct watchEndpoint videoId to handle both playlist and standalone contexts.
             val hasPodcastLink = flexColumns.getOrNull(1)
                 ?.musicResponsiveListItemFlexColumnRenderer
                 ?.text?.runs?.any { run ->

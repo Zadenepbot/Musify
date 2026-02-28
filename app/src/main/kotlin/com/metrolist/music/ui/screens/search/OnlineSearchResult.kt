@@ -187,9 +187,6 @@ fun OnlineSearchResult(
         }
     }
     
-    // Suggestion states
-
-
     LaunchedEffect(lazyListState) {
         snapshotFlow {
             lazyListState.layoutInfo.visibleItemsInfo.any { it.key == "loading" }

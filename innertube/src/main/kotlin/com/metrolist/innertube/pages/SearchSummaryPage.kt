@@ -250,15 +250,6 @@ data class SearchSummaryPage(
                     ?.runs
                     ?.splitBySeparator()
                     ?: return null
-            val thirdLine =
-                renderer.flexColumns
-                    .getOrNull(2)
-                    ?.musicResponsiveListItemFlexColumnRenderer
-                    ?.text
-                    ?.runs
-                    ?.splitBySeparator()
-                    ?: emptyList()
-            val listRun = (secondaryLine + thirdLine).clean()
             return when {
                 // CRITICAL: Check isEpisode BEFORE isSong because both have videoId and no browseEndpoint
                 // Episodes are identified by firstSubtitle == "Episode" in unfiltered search
@@ -323,6 +314,15 @@ data class SearchSummaryPage(
                 renderer.isSong -> {
                     // Extract library tokens using the new method that properly handles multiple toggle items
                     val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
+                    val thirdLine =
+                        renderer.flexColumns
+                            .getOrNull(2)
+                            ?.musicResponsiveListItemFlexColumnRenderer
+                            ?.text
+                            ?.runs
+                            ?.splitBySeparator()
+                            ?: emptyList()
+                    val listRun = (secondaryLine + thirdLine).clean()
 
                     SongItem(
                         id = renderer.playlistItemData?.videoId ?: return null,
