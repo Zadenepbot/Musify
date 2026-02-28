@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,6 +57,7 @@ import com.metrolist.music.ui.component.ChipsRow
 import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.YouTubeGridItem
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.ui.component.shimmer.GridItemPlaceHolder
 import com.metrolist.music.ui.component.shimmer.ListItemPlaceHolder
 import com.metrolist.music.ui.component.shimmer.ShimmerHost
@@ -83,6 +86,8 @@ fun AccountScreen(
     val artists by viewModel.artists.collectAsState()
     val sePlaylist by viewModel.sePlaylist.collectAsState()
     val rdpnPlaylist by viewModel.rdpnPlaylist.collectAsState()
+    val podcastPlaylists by viewModel.podcastPlaylists.collectAsState()
+    val podcastChannels by viewModel.podcastChannels.collectAsState()
     val selectedContentType by viewModel.selectedContentType.collectAsState()
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
 
@@ -242,7 +247,64 @@ fun AccountScreen(
                     }
                 }
 
-                if (rdpnPlaylist == null && sePlaylist == null && playlists == null) {
+                // Subscribed podcast shows
+                if (podcastPlaylists.isNotEmpty()) {
+                    item(
+                        key = "podcasts_header",
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_podcasts),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    itemsIndexed(
+                        items = podcastPlaylists,
+                        key = { _, item -> "podcast_${item.id}" },
+                        span = { _, _ -> GridItemSpan(maxLineSpan) },
+                    ) { _, podcast ->
+                        PodcastAccountItem(
+                            thumbnailUrl = podcast.thumbnailUrl,
+                            title = podcast.title,
+                            subtitle = podcast.author,
+                            onClick = { navController.navigate("online_podcast/${podcast.id}") },
+                        )
+                    }
+                }
+
+                // Podcast channels
+                if (podcastChannels.isNotEmpty()) {
+                    item(
+                        key = "channels_header",
+                        span = { GridItemSpan(maxLineSpan) },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_channels),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    itemsIndexed(
+                        items = podcastChannels,
+                        key = { _, item -> "channel_${item.id}" },
+                        span = { _, _ -> GridItemSpan(maxLineSpan) },
+                    ) { _, channel ->
+                        PodcastChannelAccountItem(
+                            thumbnailUrl = channel.thumbnail,
+                            name = channel.title,
+                            onClick = { navController.navigate("artist/${channel.id}") },
+                        )
+                    }
+                }
+
+                if (rdpnPlaylist == null && sePlaylist == null && podcastPlaylists.isEmpty() && podcastChannels.isEmpty()) {
                     items(4, span = { GridItemSpan(maxLineSpan) }) {
                         ShimmerHost {
                             ListItemPlaceHolder()
@@ -331,6 +393,100 @@ private fun SePlaylistAccountItem(
         Icon(
             painter = painterResource(R.drawable.navigate_next),
             contentDescription = null,
+        )
+    }
+}
+
+@Composable
+private fun PodcastAccountItem(
+    thumbnailUrl: String?,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (thumbnailUrl != null) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.queue_music),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PodcastChannelAccountItem(
+    thumbnailUrl: String?,
+    name: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        AsyncImage(
+            model = thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
     }
 }

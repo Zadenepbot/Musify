@@ -15,6 +15,8 @@ import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.filterYoutubeShorts
 import com.metrolist.innertube.utils.completed
 import com.metrolist.music.constants.HideYoutubeShortsKey
+import com.metrolist.music.db.MusicDatabase
+import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.ui.utils.resize
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
@@ -23,8 +25,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,6 +39,7 @@ enum class AccountContentType {
 @HiltViewModel
 class AccountViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
+    database: MusicDatabase,
 ) : ViewModel() {
     val playlists = MutableStateFlow<List<PlaylistItem>?>(null)
     val albums = MutableStateFlow<List<AlbumItem>?>(null)
@@ -43,6 +48,11 @@ class AccountViewModel @Inject constructor(
     val sePlaylist = MutableStateFlow<PlaylistItem?>(null)
     // RDPN "New Episodes" playlist (real thumbnail + count from YouTube)
     val rdpnPlaylist = MutableStateFlow<PlaylistItem?>(null)
+    // Subscribed podcast shows (from local DB, synced from YT Music)
+    val podcastPlaylists = database.subscribedPodcasts()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    // Podcast host channels from YT Music library
+    val podcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
 
     // Selected content type for chips
     val selectedContentType = MutableStateFlow(AccountContentType.PLAYLISTS)
@@ -82,6 +92,13 @@ class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             YouTube.playlist("RDPN").onSuccess {
                 rdpnPlaylist.value = it.playlist
+            }.onFailure {
+                reportException(it)
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            YouTube.libraryPodcastChannels().onSuccess {
+                podcastChannels.value = it.items.filterIsInstance<ArtistItem>()
             }.onFailure {
                 reportException(it)
             }
