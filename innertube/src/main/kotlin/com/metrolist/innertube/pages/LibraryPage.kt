@@ -143,7 +143,7 @@ data class LibraryPage(
                         endpoint = renderer.thumbnailOverlay
                             .musicItemThumbnailOverlayRenderer.content
                             .musicPlayButtonRenderer.playNavigationEndpoint
-                            ?.watchEndpoint,
+                            .watchEndpoint,
                         libraryAddToken = libraryTokens.addToken,
                         libraryRemoveToken = libraryTokens.removeToken,
                         isEpisode = renderer.isEpisode,
