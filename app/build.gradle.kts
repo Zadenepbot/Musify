@@ -22,8 +22,8 @@ android {
         applicationId = "com.metrolist.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 142
-        versionName = "13.2.0"
+        versionCode = 141
+        versionName = "13.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -94,9 +94,6 @@ android {
         }
     }
 
-    // R8 optimization configuration for smaller DEX files
-    buildFeatures.aidl = false  // Disable AIDL if not used
-
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -133,10 +130,6 @@ android {
         }
     }
 
-    composeCompiler {
-        includeSourceInformation = false
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -162,7 +155,8 @@ android {
         jniLibs {
             useLegacyPackaging = false
             keepDebugSymbols += listOf(
-                "**/libandroidx.graphics.path.so"
+                "**/libandroidx.graphics.path.so",
+                "**/libdatastore_shared_counter.so"
             )
         }
         resources {
