@@ -349,7 +349,7 @@ data class HomePage(
                             } == true,
                             endpoint = renderer.thumbnailOverlay
                                 .musicItemThumbnailOverlayRenderer.content
-                                ?.musicPlayButtonRenderer?.playNavigationEndpoint
+                                .musicPlayButtonRenderer?.playNavigationEndpoint
                                 ?.watchEndpoint,
                             libraryAddToken = libraryTokens.addToken,
                             libraryRemoveToken = libraryTokens.removeToken,
