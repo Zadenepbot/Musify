@@ -144,7 +144,7 @@ object SearchSuggestionPage {
                         ?.navigationEndpoint
                         ?.watchPlaylistEndpoint ?: return null,
                     radioEndpoint = renderer.menu.menuRenderer.items
-                        ?.find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
+                        .find { it.menuNavigationItemRenderer?.icon?.iconType == "MIX" }
                         ?.menuNavigationItemRenderer
                         ?.navigationEndpoint
                         ?.watchPlaylistEndpoint ?: return null,
