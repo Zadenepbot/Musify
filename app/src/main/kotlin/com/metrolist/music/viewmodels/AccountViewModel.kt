@@ -90,8 +90,8 @@ class AccountViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            YouTube.playlist("RDPN").onSuccess {
-                rdpnPlaylist.value = it.playlist
+            YouTube.newEpisodesPlaylistInfo().onSuccess {
+                rdpnPlaylist.value = it
             }.onFailure {
                 reportException(it)
             }

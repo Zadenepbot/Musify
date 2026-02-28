@@ -438,11 +438,11 @@ constructor(
     }
 
     private suspend fun fetchRdpnPlaylist() {
-        YouTube.playlist("RDPN").onSuccess { page ->
-            _rdpnPlaylist.value = page.playlist
-            timber.log.Timber.d("[PODCAST] RDPN playlist: ${page.playlist.title}, thumbnail: ${page.playlist.thumbnail}")
+        YouTube.newEpisodesPlaylistInfo().onSuccess { item ->
+            _rdpnPlaylist.value = item
+            timber.log.Timber.d("[PODCAST] RDPN playlist: ${item.title}, thumbnail: ${item.thumbnail}")
         }.onFailure {
-            timber.log.Timber.e(it, "[PODCAST] Failed to fetch RDPN playlist")
+            timber.log.Timber.e(it, "[PODCAST] Failed to fetch RDPN playlist info")
         }
     }
 

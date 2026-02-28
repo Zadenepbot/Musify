@@ -67,6 +67,7 @@ import com.metrolist.music.R
 import com.metrolist.music.constants.CONTENT_TYPE_HEADER
 import com.metrolist.music.constants.CONTENT_TYPE_SONG
 import com.metrolist.music.constants.PodcastFilter
+import com.metrolist.music.constants.ThumbnailCornerRadius
 import com.metrolist.music.constants.PodcastFilterKey
 import com.metrolist.music.constants.SongSortDescendingKey
 import com.metrolist.music.constants.SongSortType
@@ -472,7 +473,7 @@ private fun AutoPlaylistCard(
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(ThumbnailCornerRadius))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
@@ -483,7 +484,7 @@ private fun AutoPlaylistCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(ThumbnailCornerRadius)),
                 )
             } else {
                 Icon(
@@ -538,7 +539,7 @@ private fun PodcastEpisodePlaylistItem(
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(ThumbnailCornerRadius))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
@@ -549,7 +550,7 @@ private fun PodcastEpisodePlaylistItem(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(ThumbnailCornerRadius)),
                 )
             } else {
                 Icon(
@@ -700,7 +701,7 @@ private fun PodcastArtistChannelItem(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(56.dp)
-                .clip(CircleShape),
+                .clip(RoundedCornerShape(ThumbnailCornerRadius)),
         )
 
         Spacer(Modifier.width(12.dp))

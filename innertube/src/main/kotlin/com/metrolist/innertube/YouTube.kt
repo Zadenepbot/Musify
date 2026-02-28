@@ -1458,6 +1458,50 @@ object YouTube {
     }
 
     /**
+     * Fetch the RDPN "New Episodes" playlist info (title + thumbnail).
+     * Uses the same VLRDPN browse call as [newEpisodes] but parses the header instead.
+     * Falls back to the first episode thumbnail if no header thumbnail is found.
+     */
+    suspend fun newEpisodesPlaylistInfo(): Result<PlaylistItem> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "VLRDPN",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        // Try all known header renderers in priority order
+        val thumbnail: String? =
+            response.header?.musicImmersiveHeaderRenderer?.thumbnail
+                ?.musicThumbnailRenderer?.getThumbnailUrl()
+                ?: response.header?.musicVisualHeaderRenderer?.thumbnail
+                    ?.musicThumbnailRenderer?.getThumbnailUrl()
+                ?: response.header?.musicDetailHeaderRenderer?.thumbnail
+                    ?.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails?.lastOrNull()?.url
+                // Fall back: thumbnail of the first episode in the list
+                ?: response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents
+                    ?.sectionListRenderer?.contents?.firstOrNull()
+                    ?.musicShelfRenderer?.contents?.firstOrNull()
+                    ?.musicMultiRowListItemRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+
+        val title = response.header?.musicImmersiveHeaderRenderer?.title?.runs
+            ?.joinToString("") { it.text }
+            ?: response.header?.musicVisualHeaderRenderer?.title?.runs
+                ?.joinToString("") { it.text }
+            ?: "New Episodes"
+
+        PlaylistItem(
+            id = "RDPN",
+            title = title,
+            author = null,
+            songCountText = null,
+            thumbnail = thumbnail,
+            playEndpoint = null,
+            shuffleEndpoint = null,
+            radioEndpoint = null,
+        )
+    }
+
+    /**
      * Fetch "Episodes for Later" playlist (VLSE).
      * Returns manually saved episodes.
      */
