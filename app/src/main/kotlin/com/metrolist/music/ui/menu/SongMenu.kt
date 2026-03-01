@@ -353,11 +353,7 @@ fun SongMenu(
                         }
                     } else {
                         // Regular song: toggle like
-                        val s = song.song.toggleLike()
-                        database.query {
-                            update(s)
-                        }
-                        syncUtils.likeSong(s)
+                        playerConnection::toggleLike()
                     }
                 },
             ) {
@@ -525,10 +521,10 @@ fun SongMenu(
                 items = buildList {
                     add(
                         Material3MenuItemData(
-                            title = { 
+                            title = {
                                 Text(
-                                    text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial" 
-                                ) 
+                                    text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial"
+                                )
                             },
                             icon = {
                                 Icon(
