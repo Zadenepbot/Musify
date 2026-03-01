@@ -111,7 +111,7 @@ jobs:
       - name: Sign APK
         uses: ilharp/sign-android-release@v2.0.0
         with:
-          releaseDir: app/build/outputs/apk/${{ matrix.variant == 'foss' && 'foss' || 'gms' }}/release/
+          releaseDir: app/build/outputs/apk/${{ matrix.variant }}/release/
           signingKey: ${{ secrets.KEYSTORE }}
           keyAlias: ${{ secrets.KEY_ALIAS }}
           keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Move and rename signed APKs
         run: |
-          OUTPUT_DIR="app/build/outputs/apk/${{ matrix.variant == 'foss' && 'foss' || 'gms' }}/release"
+          OUTPUT_DIR="app/build/outputs/apk/${{ matrix.variant }}/release"
           mkdir -p "$OUTPUT_DIR/out"
 
           SIGNED_APK=$(find "$OUTPUT_DIR" -name "*-signed.apk" -o -name "*-unsigned-signed.apk" | head -1)
@@ -146,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.variant == 'gms' && 'Metrolist-with-Google-Cast' || 'Metrolist' }}
-          path: app/build/outputs/apk/${{ matrix.variant == 'foss' && 'foss' || 'gms' }}/release/out/*.apk
+          path: app/build/outputs/apk/${{ matrix.variant }}/release/out/*.apk
 
   create-release:
     needs: [check-version, build]
