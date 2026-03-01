@@ -121,42 +121,39 @@ class ArtistViewModel @Inject constructor(
         _isChannelSubscribed.value = !isCurrentlySubscribed
 
         viewModelScope.launch(Dispatchers.IO) {
-            // Retry up to 3 times on failure
-            var success = false
-            var lastError: Throwable? = null
-            for (attempt in 1..3) {
-                YouTube.subscribeChannel(channelId, !isCurrentlySubscribed)
-                    .onSuccess {
-                        Timber.d("[ARTIST_CHANNEL] subscribeChannel API success on attempt $attempt")
-                        success = true
-                        // Trigger library refresh
-                        com.metrolist.music.utils.PodcastRefreshTrigger.triggerRefresh()
-                        kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            android.widget.Toast.makeText(
-                                appContext,
-                                if (!isCurrentlySubscribed) com.metrolist.music.R.string.subscribed_to_channel
-                                else com.metrolist.music.R.string.unsubscribed_from_channel,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+            // Use NonCancellable to ensure API call completes even if user navigates away
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                var success = false
+                for (attempt in 1..3) {
+                    YouTube.subscribeChannel(channelId, !isCurrentlySubscribed)
+                        .onSuccess {
+                            Timber.d("[ARTIST_CHANNEL] subscribeChannel API success on attempt $attempt")
+                            success = true
+                            com.metrolist.music.utils.PodcastRefreshTrigger.triggerRefresh()
+                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    appContext,
+                                    if (!isCurrentlySubscribed) com.metrolist.music.R.string.subscribed_to_channel
+                                    else com.metrolist.music.R.string.unsubscribed_from_channel,
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
-                    }
-                    .onFailure { e ->
-                        Timber.e(e, "[ARTIST_CHANNEL] subscribeChannel API failed on attempt $attempt")
-                        lastError = e
-                    }
-                if (success) break
-                if (attempt < 3) kotlinx.coroutines.delay(500)
-            }
+                        .onFailure { e ->
+                            Timber.e(e, "[ARTIST_CHANNEL] subscribeChannel API failed on attempt $attempt")
+                        }
+                    if (success) break
+                    if (attempt < 3) kotlinx.coroutines.delay(500)
+                }
 
-            if (!success) {
-                // Revert optimistic update on final failure
-                _isChannelSubscribed.value = isCurrentlySubscribed
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        appContext,
-                        com.metrolist.music.R.string.error_subscribe_channel,
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                if (!success) {
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            appContext,
+                            com.metrolist.music.R.string.error_subscribe_channel,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         }
