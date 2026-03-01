@@ -483,6 +483,15 @@ constructor(
         syncUtils.syncPodcastSubscriptionsSuspend()
         syncUtils.syncEpisodesForLaterSuspend()
     }
+
+    /**
+     * Force refresh podcast channels. Called when screen becomes visible.
+     */
+    fun refreshChannels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchPodcastChannels()
+        }
+    }
 }
 
 @HiltViewModel
