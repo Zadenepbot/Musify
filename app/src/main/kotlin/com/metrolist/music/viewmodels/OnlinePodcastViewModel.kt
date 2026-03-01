@@ -7,7 +7,6 @@ import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.music.db.MusicDatabase
-import com.metrolist.music.db.entities.ArtistEntity
 import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.utils.SyncUtils
 import com.metrolist.music.utils.reportException
@@ -18,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -59,9 +57,7 @@ class OnlinePodcastViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            YouTube.podcastWithDebug(podcastId) { msg ->
-                Timber.d(msg)
-            }
+            YouTube.podcast(podcastId)
                 .onSuccess { podcastPage ->
                     Timber.d("Success! Podcast: ${podcastPage.podcast.title}, Episodes: ${podcastPage.episodes.size}")
                     podcast.value = podcastPage.podcast
@@ -109,30 +105,6 @@ class OnlinePodcastViewModel @Inject constructor(
                 )
                 Timber.d("[PODCAST_TOGGLE] Inserting new entity: ${newEntity.id}")
                 database.insert(newEntity)
-            }
-
-            // Also update ArtistEntity so channel page shows correct state
-            if (channelId != null) {
-                val existingArtist = database.artist(channelId).firstOrNull()
-                if (existingArtist != null) {
-                    val newBookmark = if (shouldBeSaved) {
-                        existingArtist.artist.bookmarkedAt ?: LocalDateTime.now()
-                    } else {
-                        null
-                    }
-                    database.update(existingArtist.artist.copy(bookmarkedAt = newBookmark))
-                    Timber.d("[PODCAST_TOGGLE] Updated artist bookmark: $channelId -> $newBookmark")
-                } else if (shouldBeSaved) {
-                    database.insert(
-                        ArtistEntity(
-                            id = channelId,
-                            name = currentPodcast.author?.name ?: currentPodcast.title,
-                            thumbnailUrl = currentPodcast.thumbnail,
-                            bookmarkedAt = LocalDateTime.now(),
-                        )
-                    )
-                    Timber.d("[PODCAST_TOGGLE] Inserted new artist: $channelId")
-                }
             }
 
             Timber.d("[PODCAST_TOGGLE] Database updated, calling syncUtils.savePodcast(${currentPodcast.id}, $shouldBeSaved)")

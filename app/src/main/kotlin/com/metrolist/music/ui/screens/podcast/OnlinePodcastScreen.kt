@@ -178,7 +178,7 @@ fun OnlinePodcastScreen(
                                 onViewChannelClick = {
                                     val channelId = podcastItem.channelId ?: podcastItem.author?.id
                                     if (channelId != null) {
-                                        navController.navigate("artist/$channelId")
+                                        navController.navigate("artist/$channelId?isPodcastChannel=true")
                                     }
                                 }
                             )

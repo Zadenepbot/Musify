@@ -403,31 +403,27 @@ constructor(
     // Podcast host channels fetched from YT Music library/podcast_channels
     private val _apiPodcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
 
-    // Combined podcast channels: API results + channels derived from locally subscribed podcasts
+    // Podcast channels: API subscriptions + locally bookmarked artists that have podcasts
+    // Only shows channels explicitly subscribed to (not derived from saved podcasts)
     val podcastChannels = kotlinx.coroutines.flow.combine(
         _apiPodcastChannels,
-        database.subscribedPodcasts()
-    ) { apiChannels, localPodcasts ->
-        // Convert local podcasts to ArtistItem format (only if we have a valid channelId)
-        // Use distinctBy to avoid duplicates when multiple podcasts have the same channelId
-        val localAsArtistItems = localPodcasts.mapNotNull { podcast ->
-            // Only include if we have channelId and author name to display
-            val channelId = podcast.channelId
-            if (channelId != null && podcast.author != null) {
-                ArtistItem(
-                    id = channelId,
-                    title = podcast.author,
-                    thumbnail = podcast.thumbnailUrl,
-                    shuffleEndpoint = null,
-                    radioEndpoint = null,
-                )
-            } else null
-        }.distinctBy { it.id }
+        database.bookmarkedPodcastChannels()
+    ) { apiChannels, localPodcastChannels ->
+        // Convert locally bookmarked podcast channels to ArtistItem format
+        val localAsArtistItems = localPodcastChannels.map { artist ->
+            ArtistItem(
+                id = artist.id,
+                title = artist.artist.name,
+                thumbnail = artist.artist.thumbnailUrl,
+                shuffleEndpoint = null,
+                radioEndpoint = null,
+            )
+        }
 
         // Combine and deduplicate by ID (prefer API version if exists)
         val apiIds = apiChannels.map { it.id }.toSet()
-        val uniqueFromPodcasts = localAsArtistItems.filter { it.id !in apiIds }
-        apiChannels + uniqueFromPodcasts
+        val uniqueLocalChannels = localAsArtistItems.filter { it.id !in apiIds }
+        apiChannels + uniqueLocalChannels
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Downloaded podcast episodes

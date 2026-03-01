@@ -1733,6 +1733,17 @@ interface DatabaseDao {
     @Query("SELECT EXISTS(SELECT 1 FROM podcast WHERE channelId = :channelId AND bookmarkedAt IS NOT NULL)")
     fun hasSubscribedPodcastByChannelId(channelId: String): Flow<Boolean>
 
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query("""
+        SELECT *, (SELECT COUNT(1) FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = artist.id AND song.inLibrary IS NOT NULL) AS songCount
+        FROM artist
+        WHERE artist.bookmarkedAt IS NOT NULL
+        AND artist.isPodcastChannel = 1
+        ORDER BY artist.name COLLATE NOCASE ASC
+    """)
+    fun bookmarkedPodcastChannels(): Flow<List<Artist>>
+
     @Query("SELECT * FROM podcast WHERE channelId = :channelId")
     fun podcastsByChannelId(channelId: String): Flow<List<PodcastEntity>>
 
