@@ -106,7 +106,6 @@ fun OnlinePodcastScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val libraryPodcast by viewModel.libraryPodcast.collectAsState()
-    val isChannelSubscribed by viewModel.isChannelSubscribed.collectAsState()
 
     val lazyListState = rememberLazyListState()
 
@@ -176,8 +175,12 @@ fun OnlinePodcastScreen(
                                 episodeCount = episodes.size,
                                 inLibrary = libraryPodcast?.inLibrary == true,
                                 onLibraryClick = { viewModel.toggleLibrary(context) },
-                                isChannelSubscribed = isChannelSubscribed,
-                                onSubscribeClick = { viewModel.toggleChannelSubscription(context) }
+                                onViewChannelClick = {
+                                    val channelId = podcastItem.channelId ?: podcastItem.author?.id
+                                    if (channelId != null) {
+                                        navController.navigate("artist/$channelId")
+                                    }
+                                }
                             )
                         }
                     }
@@ -302,8 +305,7 @@ private fun PodcastHeader(
     episodeCount: Int,
     inLibrary: Boolean,
     onLibraryClick: () -> Unit,
-    isChannelSubscribed: Boolean,
-    onSubscribeClick: () -> Unit
+    onViewChannelClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -354,9 +356,9 @@ private fun PodcastHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedButton(
                 onClick = onLibraryClick,
@@ -381,24 +383,18 @@ private fun PodcastHeader(
             }
 
             OutlinedButton(
-                onClick = onSubscribeClick,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (isChannelSubscribed)
-                        MaterialTheme.colorScheme.secondaryContainer
-                    else
-                        Color.Transparent
-                ),
+                onClick = onViewChannelClick,
                 shape = RoundedCornerShape(50),
                 modifier = Modifier.height(40.dp)
             ) {
                 Icon(
-                    painter = painterResource(if (isChannelSubscribed) R.drawable.subscribed else R.drawable.subscribe),
+                    painter = painterResource(R.drawable.person),
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(
-                    text = stringResource(if (isChannelSubscribed) R.string.subscribed else R.string.subscribe)
+                    text = stringResource(R.string.view_channel)
                 )
             }
         }
