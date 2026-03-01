@@ -1164,6 +1164,41 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
 
+    // Saved episodes (in library but not necessarily downloaded)
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND inLibrary IS NOT NULL ORDER BY inLibrary DESC")
+    fun savedPodcastEpisodesByCreateDateAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND inLibrary IS NOT NULL ORDER BY title")
+    fun savedPodcastEpisodesByNameAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND inLibrary IS NOT NULL ORDER BY totalPlayTime")
+    fun savedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
+
+    fun savedPodcastEpisodes(
+        sortType: SongSortType,
+        descending: Boolean,
+    ) = when (sortType) {
+        SongSortType.CREATE_DATE -> savedPodcastEpisodesByCreateDateAsc()
+        SongSortType.NAME ->
+            savedPodcastEpisodesByNameAsc().map { songs ->
+                val collator = Collator.getInstance(Locale.getDefault())
+                collator.strength = Collator.PRIMARY
+                songs.sortedWith(compareBy(collator) { it.song.title })
+            }
+        SongSortType.ARTIST ->
+            savedPodcastEpisodesByNameAsc().map { songs ->
+                val collator = Collator.getInstance(Locale.getDefault())
+                collator.strength = Collator.PRIMARY
+                songs.sortedWith(compareBy(collator) { song ->
+                    song.artists.joinToString("") { it.name }
+                })
+            }
+        SongSortType.PLAY_TIME -> savedPodcastEpisodesByPlayTimeAsc()
+    }.map { it.reversed(descending) }
+
     fun downloadedPodcastEpisodes(
         sortType: SongSortType,
         descending: Boolean,
@@ -1694,6 +1729,12 @@ interface DatabaseDao {
 
     @Query("SELECT * FROM podcast WHERE id = :id")
     fun podcast(id: String): Flow<PodcastEntity?>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM podcast WHERE channelId = :channelId AND bookmarkedAt IS NOT NULL)")
+    fun hasSubscribedPodcastByChannelId(channelId: String): Flow<Boolean>
+
+    @Query("SELECT * FROM podcast WHERE channelId = :channelId")
+    fun podcastsByChannelId(channelId: String): Flow<List<PodcastEntity>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(podcast: PodcastEntity): Long
