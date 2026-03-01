@@ -24,7 +24,11 @@ jobs:
 
     strategy:
       matrix:
-        variant: ["foss", "gms"]
+        include:
+          - variant: foss
+            variantName: Foss
+          - variant: gms
+            variantName: Gms
 
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +54,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK and Run Lint
-        run: ./gradlew --console=plain assemble${{ matrix.variant == 'foss' && 'Foss' || 'Gms' }}Release :app:lint${{ matrix.variant == 'foss' && 'Foss' || 'Gms' }}Release --warning-mode summary
+        run: ./gradlew --console=plain assemble${{ matrix.variantName }}Release :app:lint${{ matrix.variantName }}Release --warning-mode summary
         env:
           PULL_REQUEST: "false"
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -81,7 +85,7 @@ jobs:
       - name: Upload Signed APK
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.variant == 'gms' && 'app-universal-with-Google-Cast' || 'app-universal-release' }}
+          name: ${{ matrix.variant == 'gms' && 'app-with-Google-Cast' || 'app-release' }}
           path: app/build/outputs/apk/${{ matrix.variant }}/release/out/*
 
   build_debug:
@@ -91,7 +95,11 @@ jobs:
 
     strategy:
       matrix:
-        variant: ["foss", "gms"]
+        include:
+          - variant: foss
+            variantName: Foss
+          - variant: gms
+            variantName: Gms
 
     steps:
       - uses: actions/checkout@v6
@@ -121,7 +129,7 @@ jobs:
           echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ./app/persistent-debug.keystore
 
       - name: Build Debug APK and Run Lint
-        run: ./gradlew --console=plain assemble${{ matrix.variant == 'foss' && 'Foss' || 'Gms' }}Debug :app:lint${{ matrix.variant == 'foss' && 'Foss' || 'Gms' }}Debug --warning-mode summary
+        run: ./gradlew --console=plain assemble${{ matrix.variantName }}Debug :app:lint${{ matrix.variantName }}Debug --warning-mode summary
         env:
           PULL_REQUEST: "false"
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -131,5 +139,5 @@ jobs:
       - name: Upload Debug APK
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.variant == 'gms' && 'app-universal-debug-gms' || 'app-universal-debug' }}
+          name: ${{ matrix.variant == 'gms' && 'app-debug-gms' || 'app-debug' }}
           path: app/build/outputs/apk/${{ matrix.variant }}/debug/*.apk
