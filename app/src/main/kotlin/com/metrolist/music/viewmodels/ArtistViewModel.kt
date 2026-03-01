@@ -28,13 +28,17 @@ import com.metrolist.music.utils.get
 import com.metrolist.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import com.metrolist.music.extensions.filterVideoSongs as filterVideoSongsLocal
 
@@ -47,6 +51,10 @@ class ArtistViewModel @Inject constructor(
 ) : ViewModel() {
     val artistId = savedStateHandle.get<String>("artistId")!!
     var artistPage by mutableStateOf<ArtistPage?>(null)
+
+    private val _isChannelSubscribed = MutableStateFlow(false)
+    val isChannelSubscribed = _isChannelSubscribed.asStateFlow()
+
     val libraryArtist = database.artist(artistId)
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
     val librarySongs = context.dataStore.data
@@ -96,8 +104,46 @@ class ArtistViewModel @Inject constructor(
                         .filter { section -> section.items.isNotEmpty() }
 
                     artistPage = page.copy(sections = filteredSections)
+                    _isChannelSubscribed.value = page.isSubscribed
                 }.onFailure {
                     reportException(it)
+                }
+        }
+    }
+
+    fun toggleChannelSubscription(appContext: Context) {
+        val channelId = artistPage?.artist?.channelId ?: artistId
+        val isCurrentlySubscribed = _isChannelSubscribed.value
+
+        Timber.d("[ARTIST_CHANNEL] toggleChannelSubscription - channelId: $channelId, isCurrentlySubscribed: $isCurrentlySubscribed")
+
+        // Optimistic UI update
+        _isChannelSubscribed.value = !isCurrentlySubscribed
+
+        viewModelScope.launch(Dispatchers.IO) {
+            YouTube.subscribeChannel(channelId, !isCurrentlySubscribed)
+                .onSuccess {
+                    Timber.d("[ARTIST_CHANNEL] subscribeChannel API success!")
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            appContext,
+                            if (!isCurrentlySubscribed) com.metrolist.music.R.string.subscribed_to_channel
+                            else com.metrolist.music.R.string.unsubscribed_from_channel,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .onFailure { e ->
+                    Timber.e(e, "[ARTIST_CHANNEL] subscribeChannel API failed")
+                    // Revert optimistic update on failure
+                    _isChannelSubscribed.value = isCurrentlySubscribed
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            appContext,
+                            com.metrolist.music.R.string.error_subscribe_channel,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
         }
     }
