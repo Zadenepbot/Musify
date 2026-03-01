@@ -353,7 +353,7 @@ fun SongMenu(
                         }
                     } else {
                         // Regular song: toggle like
-                        playerConnection::toggleLike()
+                        (playerConnection::toggleLike)()
                     }
                 },
             ) {
