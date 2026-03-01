@@ -48,7 +48,7 @@ fun encodeDayTimes(map: Map<Int, Pair<String, String>>): String =
     map.entries.joinToString(";") { (day, times) -> "$day=${times.first}-${times.second}" }
 
 private const val DEFAULT_START = "22:00"
-private const val DEFAULT_END   = "6:00"
+private const val DEFAULT_END   = "06:00"
 
 private val WEEKDAY_INDICES = 0..4  // Monday to Friday
 private val WEEKEND_INDICES = 5..6  // Saturday and Sunday
