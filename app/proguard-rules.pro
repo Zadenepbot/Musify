@@ -93,6 +93,14 @@
 -dontwarn jdk.dynalink.**
 
 ## Listen Together Protobuf
+# Keep all protobuf lite generated message classes. R8 renames/removes the internal
+# fields (e.g. username_, type_) that protobuf lite accesses via reflection in its
+# dynamicMethod(). Using the GeneratedMessageLite superclass as the anchor ensures
+# every message class is covered regardless of package, even after code generation.
+-keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
+-keep class * extends com.google.protobuf.GeneratedMessageLite$Builder { *; }
+-keep class * extends com.google.protobuf.Internal$EnumLite { *; }
+# Package-level fallback (covers cases where the class is loaded by class name)
 -keep class com.metrolist.music.listentogether.proto.** { *; }
 -keepclassmembers class com.metrolist.music.listentogether.proto.** { *; }
 

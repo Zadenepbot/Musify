@@ -16,7 +16,7 @@ fi
 mkdir -p "$OUT_DIR"
 
 # Generate Java and Kotlin code (lite version for Android)
-protoc --java_out=lite:"$OUT_DIR" --kotlin_out="$OUT_DIR" \
+protoc --java_out=lite:"$OUT_DIR" --kotlin_out=lite:"$OUT_DIR" \
     -I="$PROTO_DIR" \
     "$PROTO_DIR/listentogether.proto"
 
