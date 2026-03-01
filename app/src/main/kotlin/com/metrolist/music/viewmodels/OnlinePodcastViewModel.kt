@@ -44,9 +44,6 @@ class OnlinePodcastViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
 
-    private val _isChannelSubscribed = MutableStateFlow(false)
-    val isChannelSubscribed = _isChannelSubscribed.asStateFlow()
-
     init {
         Timber.d("ViewModel init with podcastId: $podcastId")
         fetchPodcastData()
@@ -62,10 +59,9 @@ class OnlinePodcastViewModel @Inject constructor(
                 Timber.d(msg)
             }
                 .onSuccess { podcastPage ->
-                    Timber.d("Success! Podcast: ${podcastPage.podcast.title}, Episodes: ${podcastPage.episodes.size}, isChannelSubscribed: ${podcastPage.isChannelSubscribed}")
+                    Timber.d("Success! Podcast: ${podcastPage.podcast.title}, Episodes: ${podcastPage.episodes.size}")
                     podcast.value = podcastPage.podcast
                     episodes.value = podcastPage.episodes
-                    _isChannelSubscribed.value = podcastPage.isChannelSubscribed
                     _isLoading.value = false
                 }.onFailure { throwable ->
                     Timber.e(throwable, "Failed to load podcast: ${throwable.message}")
@@ -127,62 +123,6 @@ class OnlinePodcastViewModel @Inject constructor(
      * Legacy method - now calls toggleSubscription
      */
     fun toggleLibrary(context: android.content.Context) = toggleSubscription(context)
-
-    /**
-     * Toggle channel subscription (subscribe/unsubscribe to the YouTube channel behind the podcast).
-     * This makes the channel appear/disappear from the Channels tab in Library.
-     */
-    fun toggleChannelSubscription(context: android.content.Context) {
-        val currentPodcast = podcast.value ?: return
-        val channelId = currentPodcast.channelId ?: currentPodcast.author?.id ?: return
-        val isCurrentlySubscribed = _isChannelSubscribed.value
-
-        Timber.d("[PODCAST_CHANNEL] toggleChannelSubscription - channelId: $channelId, isCurrentlySubscribed: $isCurrentlySubscribed")
-
-        // Optimistic UI update
-        _isChannelSubscribed.value = !isCurrentlySubscribed
-
-        viewModelScope.launch(Dispatchers.IO) {
-            // Retry up to 3 times on failure
-            var success = false
-            var lastError: Throwable? = null
-            for (attempt in 1..3) {
-                YouTube.subscribeChannel(channelId, !isCurrentlySubscribed)
-                    .onSuccess {
-                        Timber.d("[PODCAST_CHANNEL] subscribeChannel API success on attempt $attempt")
-                        success = true
-                        // Trigger library refresh
-                        com.metrolist.music.utils.PodcastRefreshTrigger.triggerRefresh()
-                        kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            android.widget.Toast.makeText(
-                                context,
-                                if (!isCurrentlySubscribed) com.metrolist.music.R.string.subscribed_to_channel
-                                else com.metrolist.music.R.string.unsubscribed_from_channel,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                    .onFailure { e ->
-                        Timber.e(e, "[PODCAST_CHANNEL] subscribeChannel API failed on attempt $attempt")
-                        lastError = e
-                    }
-                if (success) break
-                if (attempt < 3) kotlinx.coroutines.delay(500)
-            }
-
-            if (!success) {
-                // Revert optimistic update on final failure
-                _isChannelSubscribed.value = isCurrentlySubscribed
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        context,
-                        com.metrolist.music.R.string.error_subscribe_channel,
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    }
 
     fun retry() {
         fetchPodcastData()
