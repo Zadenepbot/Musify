@@ -153,8 +153,7 @@
             "fieldPath": "playbackPosition",
             "columnName": "playbackPosition",
             "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "false"
+            "defaultValue": "NULL"
           },
           {
             "fieldPath": "uploadEntityId",
