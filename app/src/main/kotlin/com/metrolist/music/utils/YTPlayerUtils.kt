@@ -147,8 +147,6 @@ object YTPlayerUtils {
             }
         }
 
-        // If we still don't have a valid response, throw
-
         val audioConfig = mainPlayerResponse.playerConfig?.audioConfig
         val videoDetails = mainPlayerResponse.videoDetails
         val playbackTracking = mainPlayerResponse.playbackTracking
