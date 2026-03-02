@@ -183,7 +183,7 @@ object YouTube {
                                 is EpisodeItem -> "Episodes"
                                 is PodcastItem -> "Podcasts"
                                 is AlbumItem -> "Albums"
-                                is ArtistItem -> "Artists"
+                                is ArtistItem -> if (item.isProfile) "Profiles" else "Artists"
                                 is PlaylistItem -> "Playlists"
                                 is SongItem -> when {
                                     item.isEpisode -> "Episodes"
@@ -194,7 +194,7 @@ object YouTube {
                         }
 
                         // Add each group as a separate section in a logical order
-                        val sectionOrder = listOf("Songs", "Videos", "Albums", "Artists", "Playlists", "Podcasts", "Episodes", YouTubeConstants.DEFAULT_OTHER_RESULTS)
+                        val sectionOrder = listOf("Songs", "Videos", "Albums", "Artists", "Playlists", "Podcasts", "Episodes", "Profiles", YouTubeConstants.DEFAULT_OTHER_RESULTS)
                         sectionOrder.forEach { sectionName ->
                             grouped[sectionName]?.let { groupItems ->
                                 if (groupItems.isNotEmpty()) {
@@ -226,7 +226,8 @@ object YouTube {
                     "Playlists" -> 5
                     "Podcasts" -> 6
                     "Episodes" -> 7
-                    else -> 8
+                    "Profiles" -> 8
+                    else -> 9
                 }
             }
 
@@ -371,6 +372,16 @@ object YouTube {
             ?.let(::mapRuns)
             ?: response.header?.musicImmersiveHeaderRenderer?.description?.runs?.let(::mapRuns)
 
+        // Check subscription state from multiple locations:
+        // 1. musicImmersiveHeaderRenderer.subscriptionButton (regular artists)
+        // 2. musicVisualHeaderRenderer.subscriptionButton (podcast channels)
+        val immersiveSubscribed = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.subscribed
+        val visualSubscribed = response.header?.musicVisualHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.subscribed
+        val isSubscribed = immersiveSubscribed ?: visualSubscribed ?: false
+
+        // Also extract channelId from visual header if not in immersive header
+        val channelIdFromVisual = response.header?.musicVisualHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.channelId
+
         ArtistPage(
             artist = ArtistItem(
                 id = browseId,
@@ -380,7 +391,8 @@ object YouTube {
                 thumbnail = response.header?.musicImmersiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
                     ?: response.header?.musicVisualHeaderRenderer?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
                     ?: response.header?.musicDetailHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
-                channelId = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.channelId,
+                channelId = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.channelId
+                    ?: channelIdFromVisual,
                 playEndpoint = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                     ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicShelfRenderer
                     ?.contents?.firstOrNull()?.musicResponsiveListItemRenderer?.overlay?.musicItemThumbnailOverlayRenderer
@@ -401,7 +413,8 @@ object YouTube {
                     ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer
                         ?.shortSubscriberCountText?.runs?.firstOrNull()?.text,
             monthlyListenerCount = response.header?.musicImmersiveHeaderRenderer?.monthlyListenerCount?.runs?.firstOrNull()?.text,
-            descriptionRuns = descriptionRuns
+            descriptionRuns = descriptionRuns,
+            isSubscribed = isSubscribed
         )
     }
 
@@ -645,13 +658,16 @@ object YouTube {
             }
         }
 
-        // Extract channelId for subscription (like artists)
-        val channelId = header?.buttons?.flatMap { button ->
+        // Extract channelId and subscription state for subscription (like artists)
+        val subscribeToggle = header?.buttons?.flatMap { button ->
             button.menuRenderer?.items ?: emptyList()
         }?.find {
             it.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE"
-        }?.toggleMenuServiceItemRenderer?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds?.firstOrNull()
-        Timber.d("[PODCAST] Extracted channelId for subscription: $channelId")
+        }?.toggleMenuServiceItemRenderer
+        val channelId = subscribeToggle?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds?.firstOrNull()
+        // isSelected indicates user is currently subscribed (toggle is in "toggled" state)
+        val isChannelSubscribed = subscribeToggle?.isSelected == true
+        Timber.d("[PODCAST] Extracted channelId for subscription: $channelId, isSubscribed: $isChannelSubscribed")
 
         // Extract library tokens from the header's menu buttons OR toggle buttons
         var libraryTokens = header?.buttons?.flatMap { button ->
@@ -765,7 +781,8 @@ object YouTube {
                 ?.contents?.firstOrNull()?.musicShelfRenderer?.continuations?.getContinuation()
                 ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                     ?.tabRenderer?.content?.sectionListRenderer?.contents
-                    ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.continuations?.getContinuation()
+                    ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.continuations?.getContinuation(),
+            isChannelSubscribed = isChannelSubscribed,
         )
     }
 
@@ -1295,11 +1312,13 @@ object YouTube {
             innerTube.unlikePlaylist(WEB_REMIX, playlistId)
     }
 
-    suspend fun subscribeChannel(channelId: String, subscribe: Boolean) = runCatching {
+    suspend fun subscribeChannel(channelId: String, subscribe: Boolean, params: String? = null) = runCatching {
+        // Default params from YouTube Music API - required for subscription to work
+        val subscribeParams = params ?: "EgIIAhgA"
         if (subscribe)
-            innerTube.subscribeChannel(WEB_REMIX, channelId)
+            innerTube.subscribeChannel(WEB_REMIX, channelId, subscribeParams)
         else
-            innerTube.unsubscribeChannel(WEB_REMIX, channelId)
+            innerTube.unsubscribeChannel(WEB_REMIX, channelId, subscribeParams)
     }
 
     /**
@@ -1867,6 +1886,7 @@ object YouTube {
             val FILTER_COMMUNITY_PLAYLIST = SearchFilter("EgeKAQQoAEABagoQAxAEEAoQCRAF")
             val FILTER_PODCAST = SearchFilter("EgWKAQJQAWoKEAkQChAFEAMQBA%3D%3D")
             val FILTER_EPISODE = SearchFilter("EgWKAQJYAWoKEAkQChAFEAMQBA%3D%3D")
+            val FILTER_PROFILE = SearchFilter("EgWKAQJYAWoSEAUQCRADEAQQEBAVEAoQDhAR")
         }
     }
 
