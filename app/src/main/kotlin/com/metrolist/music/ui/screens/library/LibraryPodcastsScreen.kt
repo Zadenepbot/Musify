@@ -36,7 +36,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,9 +43,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,10 +59,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
-import com.metrolist.music.LocalSyncUtils
 import com.metrolist.music.R
 import com.metrolist.music.constants.CONTENT_TYPE_HEADER
 import com.metrolist.music.constants.CONTENT_TYPE_SONG
@@ -119,25 +115,11 @@ fun LibraryPodcastsScreen(
 
     val subscribedChannels by viewModel.subscribedChannels.collectAsState()
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsState()
-    val savedEpisodes by viewModel.savedEpisodes.collectAsState()
     val sePlaylist by viewModel.sePlaylist.collectAsState()
     val podcastChannels by viewModel.podcastChannels.collectAsState()
     val rdpnPlaylist by viewModel.rdpnPlaylist.collectAsState()
 
-
-    // Refresh channels when screen becomes visible (ON_RESUME)
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshChannels()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
+    Timber.d("[PODCAST_LIB] filter=$podcastFilter channels=${subscribedChannels.size} downloaded=${downloadedEpisodes.size} se=${sePlaylist?.id}")
 
     val lazyListState = rememberLazyListState()
 
@@ -227,14 +209,12 @@ fun LibraryPodcastsScreen(
                         )
                     }
 
-                    // Episodes for Later - card/folder (works both logged in and out)
-                    item(key = "episodes_for_later", contentType = CONTENT_TYPE_HEADER) {
+                    // SE "Episodes for Later" playlist card — fetched from YT Music
+                    item(key = "se_playlist", contentType = CONTENT_TYPE_HEADER) {
                         AutoPlaylistCard(
                             title = stringResource(R.string.episodes_for_later),
-                            thumbnailUrl = sePlaylist?.thumbnail ?: savedEpisodes.firstOrNull()?.song?.thumbnailUrl,
-                            episodeCount = sePlaylist?.songCountText ?: if (savedEpisodes.isNotEmpty()) {
-                                pluralStringResource(R.plurals.n_episode, savedEpisodes.size, savedEpisodes.size)
-                            } else null,
+                            thumbnailUrl = sePlaylist?.thumbnail,
+                            episodeCount = sePlaylist?.songCountText,
                             onClick = { navController.navigate("online_playlist/SE") },
                         )
                     }
@@ -620,7 +600,6 @@ private fun PodcastEpisodePlaylistMenu(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val syncUtils = LocalSyncUtils.current
     val isPinned by database.speedDialDao.isPinned(podcast.id).collectAsState(initial = false)
 
     val playlistId = podcast.id.removePrefix("MPSP")
@@ -639,12 +618,9 @@ private fun PodcastEpisodePlaylistMenu(
                         },
                         onClick = {
                             coroutineScope.launch(Dispatchers.IO) {
-                                // Update local database
                                 database.query {
                                     update(podcast.copy(bookmarkedAt = null))
                                 }
-                                // Sync with YouTube (unsave podcast only, don't unsubscribe channel)
-                                syncUtils.savePodcast(podcast.id, false)
                             }
                             onDismiss()
                         },

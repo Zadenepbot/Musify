@@ -51,6 +51,27 @@ android {
             dimension = "variant"
             buildConfigField("Boolean", "CAST_AVAILABLE", "true")
         }
+
+        create("universal") {
+            dimension = "abi"
+            buildConfigField("String", "ARCHITECTURE", "\"universal\"")
+        }
+        create("arm64") {
+            dimension = "abi"
+            buildConfigField("String", "ARCHITECTURE", "\"arm64\"")
+        }
+        create("armeabi") {
+            dimension = "abi"
+            buildConfigField("String", "ARCHITECTURE", "\"armeabi\"")
+        }
+        create("x86") {
+            dimension = "abi"
+            buildConfigField("String", "ARCHITECTURE", "\"x86\"")
+        }
+        create("x86_64") {
+            dimension = "abi"
+            buildConfigField("String", "ARCHITECTURE", "\"x86_64\"")
+        }
     }
 
     signingConfigs {
@@ -199,7 +220,7 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
-    implementation("androidx.media3:media3-ui:1.7.1")
+    implementation(libs.media3.ui)
 
     // Google Cast - only included in GMS flavor (not available in F-Droid/FOSS builds)
     "gmsImplementation"(libs.media3.cast)

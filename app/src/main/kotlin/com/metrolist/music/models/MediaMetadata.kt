@@ -15,6 +15,30 @@ import com.metrolist.music.ui.utils.resize
 import java.io.Serializable
 import java.time.LocalDateTime
 
+@Suppress("UNUSED")
+fun SongItem.toMediaMetadata(): MediaMetadata = MediaMetadata(
+    id = this.id,
+    title = this.title,
+    artists = this.artists.map { MediaMetadata.Artist(id = it.id, name = it.name) },
+    duration = this.duration ?: -1,
+    thumbnailUrl = this.thumbnail,
+    album = this.album?.let { MediaMetadata.Album(id = it.id, title = it.name, artworkUrl = null) },
+    setVideoId = this.setVideoId,
+    musicVideoType = this.musicVideoType,
+    explicit = this.explicit,
+    liked = false, // Not available in SongItem
+    likedDate = null,
+    inLibrary = null,
+    libraryAddToken = this.libraryAddToken,
+    libraryRemoveToken = this.libraryRemoveToken,
+    suggestedBy = null,
+    squareThumbnailUrl = this.squareThumbnail,
+    artworkUrl = null, // Not directly in SongItem
+    videoId = null, // Not directly in SongItem
+    isEpisode = this.isEpisode
+)
+
+
 @Immutable
 data class MediaMetadata(
     val id: String,
@@ -32,11 +56,18 @@ data class MediaMetadata(
     val libraryAddToken: String? = null,
     val libraryRemoveToken: String? = null,
     val suggestedBy: String? = null,
+    val squareThumbnailUrl: String? = null,
+    val artworkUrl: String? = null,
+    val videoId: String? = null,
     val isEpisode: Boolean = false,
-    val uploadEntityId: String? = null,
 ) : Serializable {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
+
+    val resolvedArtworkUrl: String?
+        get() = artworkUrl ?: thumbnailUrl
+    val resolvedVideoId: String?
+        get() = videoId ?: setVideoId
 
     data class Artist(
         val id: String?,
@@ -46,6 +77,7 @@ data class MediaMetadata(
     data class Album(
         val id: String,
         val title: String,
+        val artworkUrl: String? = null,
     ) : Serializable
 
     fun toSongEntity() =
@@ -63,8 +95,9 @@ data class MediaMetadata(
             libraryAddToken = libraryAddToken,
             libraryRemoveToken = libraryRemoveToken,
             isVideo = isVideoSong,
+            squareThumbnailUrl = squareThumbnailUrl,
             isEpisode = isEpisode,
-            uploadEntityId = uploadEntityId
+            videoId = videoId ?: setVideoId
         )
 }
 
@@ -72,63 +105,43 @@ fun Song.toMediaMetadata() =
     MediaMetadata(
         id = song.id,
         title = song.title,
-        artists =
-        artists.map {
+        artists = artists.map {
             MediaMetadata.Artist(
                 id = it.id,
                 name = it.name,
             )
         },
         duration = song.duration,
-        thumbnailUrl = song.thumbnailUrl,
-        album =
-        album?.let {
+        thumbnailUrl = song.thumbnailUrl?.resize(544, 544),
+        album = album?.let {
             MediaMetadata.Album(
                 id = it.id,
                 title = it.title,
+                artworkUrl = it.artworkUrl
             )
         } ?: song.albumId?.let { albumId ->
             MediaMetadata.Album(
                 id = albumId,
-                title = song.albumName.orEmpty(),
+                title = song.albumName ?: "",
+                artworkUrl = null
             )
         },
         explicit = song.explicit,
-        // Use a non-ATV type if isVideo is true to indicate it's a video song
-        musicVideoType = if (song.isVideo) "MUSIC_VIDEO_TYPE_OMV" else null,
+        liked = song.liked,
+        likedDate = song.likedDate,
+        inLibrary = song.inLibrary,
+        libraryAddToken = song.libraryAddToken,
+        libraryRemoveToken = song.libraryRemoveToken,
         suggestedBy = null,
+        setVideoId = song.videoId,
+        musicVideoType = if (song.isVideo) "MUSIC_VIDEO_TYPE_OMV" else MUSIC_VIDEO_TYPE_ATV,
+        squareThumbnailUrl = song.squareThumbnailUrl?.resize(544, 544),
+        artworkUrl = song.artworkUrl,
+        videoId = song.videoId,
         isEpisode = song.isEpisode,
+
     )
 
-fun SongItem.toMediaMetadata() =
-    MediaMetadata(
-        id = id,
-        title = title,
-        artists =
-        artists.map {
-            MediaMetadata.Artist(
-                id = it.id,
-                name = it.name,
-            )
-        },
-        duration = duration ?: -1,
-        thumbnailUrl = thumbnail.resize(544, 544),
-        album =
-        album?.let {
-            MediaMetadata.Album(
-                id = it.id,
-                title = it.name,
-            )
-        },
-        explicit = explicit,
-        setVideoId = setVideoId,
-        musicVideoType = musicVideoType,
-        libraryAddToken = libraryAddToken,
-        libraryRemoveToken = libraryRemoveToken,
-        suggestedBy = null,
-        isEpisode = isEpisode,
-        uploadEntityId = uploadEntityId
-    )
 
 fun EpisodeItem.toMediaMetadata() =
     MediaMetadata(

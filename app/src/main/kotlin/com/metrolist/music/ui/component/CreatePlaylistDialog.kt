@@ -83,6 +83,8 @@ fun CreatePlaylistDialog(
                 withContext(Dispatchers.Main) {
                     onPlaylistCreated?.invoke(playlistEntity.id)
                 }
+
+                onPlaylistCreated?.invoke(playlistEntity.id)
             }
         },
         extraContent = {

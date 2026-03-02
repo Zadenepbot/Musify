@@ -118,7 +118,7 @@ fun QueueMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = { playlist ->
-            database.withTransaction {
+            database.transaction {
                 insert(mediaMetadata)
             }
             coroutineScope.launch(Dispatchers.IO) {

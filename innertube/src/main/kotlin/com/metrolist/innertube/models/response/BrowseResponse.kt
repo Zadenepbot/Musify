@@ -114,7 +114,6 @@ data class BrowseResponse(
             val title: Runs,
             val foregroundThumbnail: ThumbnailRenderer,
             val thumbnail: ThumbnailRenderer?,
-            val subscriptionButton: SubscriptionButton?,
         )
 
         @Serializable

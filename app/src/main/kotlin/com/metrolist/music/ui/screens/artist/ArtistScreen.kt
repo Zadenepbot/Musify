@@ -153,7 +153,6 @@ fun ArtistScreen(
     val libraryArtist by viewModel.libraryArtist.collectAsState()
     val librarySongs by viewModel.librarySongs.collectAsState()
     val libraryAlbums by viewModel.libraryAlbums.collectAsState()
-    val isChannelSubscribed by viewModel.isChannelSubscribed.collectAsState()
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
     val showArtistDescription by rememberPreference(key = ShowArtistDescriptionKey, defaultValue = true)
     val showArtistSubscriberCount by rememberPreference(key = ShowArtistSubscriberCountKey, defaultValue = true)
@@ -343,10 +342,26 @@ fun ArtistScreen(
                                     // Subscribe Button
                                     OutlinedButton(
                                         onClick = {
-                                            viewModel.toggleChannelSubscription()
+                                            database.transaction {
+                                                val artist = libraryArtist?.artist
+                                                if (artist != null) {
+                                                    update(artist.toggleLike())
+                                                } else {
+                                                    artistPage?.artist?.let {
+                                                        insert(
+                                                            ArtistEntity(
+                                                                id = it.id,
+                                                                name = it.title,
+                                                                channelId = it.channelId,
+                                                                thumbnailUrl = it.thumbnail,
+                                                            ).toggleLike()
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         },
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = if (isChannelSubscribed)
+                                            containerColor = if (libraryArtist?.artist?.bookmarkedAt != null)
                                                 MaterialTheme.colorScheme.surface
                                             else
                                                 Color.Transparent
@@ -354,10 +369,11 @@ fun ArtistScreen(
                                         shape = RoundedCornerShape(50),
                                         modifier = Modifier.height(40.dp)
                                     ) {
+                                        val isSubscribed = libraryArtist?.artist?.bookmarkedAt != null
                                         Text(
-                                            text = stringResource(if (isChannelSubscribed) R.string.subscribed else R.string.subscribe),
+                                            text = stringResource(if (isSubscribed) R.string.subscribed else R.string.subscribe),
                                             fontSize = 14.sp,
-                                            color = if (!isChannelSubscribed) MaterialTheme.colorScheme.error else LocalContentColor.current
+                                            color = if (!isSubscribed) MaterialTheme.colorScheme.error else LocalContentColor.current
                                         )
                                     }
 

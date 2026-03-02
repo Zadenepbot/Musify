@@ -1,3 +1,8 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.metrolist.innertube.pages
 
 import com.metrolist.innertube.models.Album
@@ -64,6 +69,7 @@ object NextPage {
                 renderer.thumbnail.thumbnails
                     .lastOrNull()
                     ?.url ?: return null,
+            squareThumbnail = null,
             explicit =
                 renderer.badges?.find {
                     it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"

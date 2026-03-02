@@ -47,6 +47,7 @@ val UseNewPlayerDesignKey= booleanPreferencesKey("useNewPlayerDesign")
 val UseNewMiniPlayerDesignKey = booleanPreferencesKey("useNewMiniPlayerDesign")
 val HidePlayerThumbnailKey = booleanPreferencesKey("hidePlayerThumbnail")
 val CropAlbumArtKey = booleanPreferencesKey("cropAlbumArt")
+val EnableVideoPlaybackKey = booleanPreferencesKey("enableVideoPlayback")
 val SeekExtraSeconds = booleanPreferencesKey("seekExtraSeconds")
 val PauseOnMute = booleanPreferencesKey("pauseOnMute")
 val ResumeOnBluetoothConnectKey = booleanPreferencesKey("resumeOnBluetoothConnect")
@@ -436,19 +437,11 @@ val LyricsLineSpacingKey = floatPreferencesKey("lyricsLineSpacing")
 
 val PlayerVolumeKey = floatPreferencesKey("playerVolume")
 val SleepTimerDefaultKey = floatPreferencesKey("sleepTimerDefault")
-val SleepTimerStopAfterCurrentSongKey = booleanPreferencesKey("sleepTimerStopAfterCurrentSong")
-val SleepTimerFadeOutKey = booleanPreferencesKey("sleepTimerFadeOut")
 val RepeatModeKey = intPreferencesKey("repeatMode")
 
 val SearchSourceKey = stringPreferencesKey("searchSource")
 val SwipeThumbnailKey = booleanPreferencesKey("swipeThumbnail")
 val SwipeSensitivityKey = floatPreferencesKey("swipeSensitivity")
-val SleepTimerEnabledKey = booleanPreferencesKey("sleepTimerEnabled")
-val SleepTimerRepeatKey = stringPreferencesKey("sleepTimerRepeat")
-val SleepTimerStartTimeKey = stringPreferencesKey("sleepTimerStartTime")
-val SleepTimerEndTimeKey = stringPreferencesKey("sleepTimerEndTime")
-val SleepTimerCustomDaysKey = stringPreferencesKey("sleepTimerCustomDays")
-val SleepTimerDayTimesKey = stringPreferencesKey("sleepTimerDayTimes")
 
 enum class SearchSource {
     LOCAL,
@@ -663,6 +656,3 @@ val CountryCodeToName =
         "YE" to "Yemen",
         "ZW" to "Zimbabwe",
     )
-
-// Video playback preferences
-val EnableVideoPlaybackKey = booleanPreferencesKey("enableVideoPlayback")

@@ -170,7 +170,7 @@ class HomeViewModel @Inject constructor(
                     filled.addAll(available.take(needed))
                 }
             }
-            
+
             filled.take(targetSize)
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -273,12 +273,12 @@ class HomeViewModel @Inject constructor(
     private var isProcessingAccountData = false
 
     private suspend fun getDailyDiscover() {
-        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
         val likedSongs = database.likedSongsByCreateDateAsc().first()
         if (likedSongs.isEmpty()) return
 
         val seeds = likedSongs.shuffled().distinctBy { it.id }.take(5)
-        
+
         // Use a synchronized list to collect results safely from concurrent coroutines
         val items = java.util.Collections.synchronizedList(mutableListOf<DailyDiscoverItem>())
 
@@ -315,13 +315,13 @@ class HomeViewModel @Inject constructor(
                 }
             }.forEach { it.join() }
         }
-        
+
         // Final deduplication just in case multiple seeds recommended the same song
         dailyDiscover.value = items.toList().distinctBy { it.recommendation.id }.shuffled()
     }
 
     private suspend fun getQuickPicks() {
-        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
         when (quickPicksEnum.first()) {
             QuickPicks.QUICK_PICKS -> {
                 val relatedSongs = database.quickPicks().first().filterVideoSongs(hideVideoSongs)
@@ -380,8 +380,8 @@ class HomeViewModel @Inject constructor(
                     YouTube.artist(seed.id).onSuccess { page ->
                         page.sections.forEach { section ->
                             section.items.filterIsInstance<PlaylistItem>().forEach { playlist ->
-                                if (playlist.author?.name != "YouTube Music" && 
-                                    playlist.author?.name != "YouTube" && 
+                                if (playlist.author?.name != "YouTube Music" &&
+                                    playlist.author?.name != "YouTube" &&
                                     playlist.author?.name != "Playlist" &&
                                     playlist.author?.name != seed.artist.name &&
                                     !playlist.id.startsWith("RD") &&
@@ -394,15 +394,15 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             }
-            
+
             songSeeds.map { seed ->
                 launch(Dispatchers.IO) {
                     val endpoint = YouTube.next(WatchEndpoint(videoId = seed.id)).getOrNull()?.relatedEndpoint
                     if (endpoint != null) {
                         YouTube.related(endpoint).onSuccess { page ->
                             page.playlists.forEach { playlist ->
-                                if (playlist.author?.name != "YouTube Music" && 
-                                    playlist.author?.name != "YouTube" && 
+                                if (playlist.author?.name != "YouTube Music" &&
+                                    playlist.author?.name != "YouTube" &&
                                     playlist.author?.name != "Playlist" &&
                                     !playlist.id.startsWith("RD") &&
                                     !playlist.id.startsWith("OLAK")
@@ -442,7 +442,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun load() {
         isLoading.value = true
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
         val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
         val fromTimeStamp = System.currentTimeMillis() - 86400000L * 7 * 2
 
@@ -577,7 +577,7 @@ class HomeViewModel @Inject constructor(
     fun loadMoreYouTubeItems(continuation: String?) {
         if (continuation == null || _isLoadingMore.value) return
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
         val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -612,7 +612,7 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-            val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+            val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
             val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
             val nextSections = YouTube.home(params = chip.endpoint?.params).getOrNull() ?: return@launch
 
@@ -666,7 +666,7 @@ class HomeViewModel @Inject constructor(
             val currentChip = selectedChip.value
             if (currentChip != null) {
                 val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-                val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+                val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, true)
                 val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
                 val nextSections = YouTube.home(params = currentChip.endpoint?.params).getOrNull()
                 if (nextSections != null) {

@@ -187,14 +187,10 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable(
-        route = "artist/{artistId}?isPodcastChannel={isPodcastChannel}",
+        route = "artist/{artistId}",
         arguments = listOf(
             navArgument("artistId") {
                 type = NavType.StringType
-            },
-            navArgument("isPodcastChannel") {
-                type = NavType.BoolType
-                defaultValue = false
             },
         ),
     ) {

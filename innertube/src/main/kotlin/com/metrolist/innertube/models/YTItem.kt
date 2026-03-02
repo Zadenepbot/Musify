@@ -1,3 +1,8 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.metrolist.innertube.models
 
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_ATV
@@ -30,14 +35,14 @@ data class SongItem(
     val chartPosition: Int? = null,
     val chartChange: String? = null,
     override val thumbnail: String,
+    val squareThumbnail: String? = null,
     override val explicit: Boolean = false,
     val endpoint: WatchEndpoint? = null,
     val setVideoId: String? = null,
     val libraryAddToken: String? = null,
     val libraryRemoveToken: String? = null,
     val historyRemoveToken: String? = null,
-    val isEpisode: Boolean = false,
-    val uploadEntityId: String? = null
+    val isEpisode: Boolean = false
 ) : YTItem() {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
@@ -54,6 +59,7 @@ data class AlbumItem(
     val artists: List<Artist>?,
     val year: Int? = null,
     override val thumbnail: String,
+    val squareThumbnail: String? = null,
     override val explicit: Boolean = false,
 ) : YTItem() {
     override val shareLink: String
@@ -86,7 +92,6 @@ data class ArtistItem(
     val playEndpoint: WatchEndpoint? = null,
     val shuffleEndpoint: WatchEndpoint?,
     val radioEndpoint: WatchEndpoint?,
-    val isProfile: Boolean = false,
 ) : YTItem() {
     override val explicit: Boolean
         get() = false

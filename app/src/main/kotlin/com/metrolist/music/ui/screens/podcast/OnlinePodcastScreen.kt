@@ -174,13 +174,7 @@ fun OnlinePodcastScreen(
                                 podcast = podcastItem,
                                 episodeCount = episodes.size,
                                 inLibrary = libraryPodcast?.inLibrary == true,
-                                onLibraryClick = { viewModel.toggleLibrary() },
-                                onViewChannelClick = {
-                                    val channelId = podcastItem.channelId ?: podcastItem.author?.id
-                                    if (channelId != null) {
-                                        navController.navigate("artist/$channelId?isPodcastChannel=true")
-                                    }
-                                }
+                                onLibraryClick = { viewModel.toggleLibrary(context) }
                             )
                         }
                     }
@@ -304,8 +298,7 @@ private fun PodcastHeader(
     podcast: PodcastItem,
     episodeCount: Int,
     inLibrary: Boolean,
-    onLibraryClick: () -> Unit,
-    onViewChannelClick: () -> Unit
+    onLibraryClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -356,47 +349,26 @@ private fun PodcastHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        OutlinedButton(
+            onClick = onLibraryClick,
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (inLibrary)
+                    MaterialTheme.colorScheme.secondaryContainer
+                else
+                    Color.Transparent
+            ),
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.height(40.dp)
         ) {
-            OutlinedButton(
-                onClick = onLibraryClick,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (inLibrary)
-                        MaterialTheme.colorScheme.secondaryContainer
-                    else
-                        Color.Transparent
-                ),
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.height(40.dp)
-            ) {
-                Icon(
-                    painter = painterResource(if (inLibrary) R.drawable.library_add_check else R.drawable.library_add),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = stringResource(if (inLibrary) R.string.remove_from_library else R.string.add_to_library)
-                )
-            }
-
-            OutlinedButton(
-                onClick = onViewChannelClick,
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.height(40.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.person),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.view_channel)
-                )
-            }
+            Icon(
+                painter = painterResource(if (inLibrary) R.drawable.library_add_check else R.drawable.library_add),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = stringResource(if (inLibrary) R.string.remove_from_library else R.string.add_to_library)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

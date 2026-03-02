@@ -1,7 +1,7 @@
 /**
  * Metrolist Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
- * 
+ *
  * Optimized for minimal recomposition during navigation
  */
 
@@ -523,7 +523,7 @@ fun ArtistListItem(
     trailingContent: @Composable RowScope.() -> Unit = {},
 ) = ListItem(
     title = artist.artist.name,
-    subtitle = if (artist.songCount > 0) pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount) else null,
+    subtitle = pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount),
     badges = badges,
     thumbnailContent = {
         AsyncImage(
@@ -555,7 +555,7 @@ fun ArtistGridItem(
     fillMaxWidth: Boolean = false,
 ) = GridItem(
     title = artist.artist.name,
-    subtitle = if (artist.songCount > 0) pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount) else "",
+    subtitle = pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount),
     badges = badges,
     thumbnailContent = {
         AsyncImage(
@@ -1069,7 +1069,7 @@ fun YouTubeGridItem(
             Icon.Download(download?.state)
         }
     },
-    thumbnailRatio: Float = if (item is SongItem) 16f / 9 else 1f,
+    thumbnailRatio: Float = 1f,
     isActive: Boolean = false,
     isPlaying: Boolean = false,
     fillMaxWidth: Boolean = false,
@@ -1247,7 +1247,7 @@ fun ItemThumbnail(
     thumbnailRatio: Float = 1f
 ) {
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
-    
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -1329,7 +1329,7 @@ fun LocalThumbnail(
     thumbnailRatio: Float = 1f
 ) {
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
-    
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -1435,7 +1435,7 @@ fun PlaylistThumbnail(
     cacheKey: String? = null
 ) {
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
-    
+
     when (thumbnails.size) {
         0 -> Box(
             contentAlignment = Alignment.Center,

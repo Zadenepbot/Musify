@@ -43,6 +43,8 @@ import coil3.request.ImageRequest
 fun VideoPlayer(
     player: Player,
     modifier: Modifier = Modifier,
+    onHasVideoChanged: (Boolean) -> Unit = {},
+    onRenderedFirstFrame: () -> Unit = {},
 ) {
     var hasVideo by remember { mutableStateOf(false) }
 
@@ -51,18 +53,27 @@ fun VideoPlayer(
             object : Player.Listener {
                 override fun onTracksChanged(tracks: Tracks) {
                     super.onTracksChanged(tracks)
-                    hasVideo =
+                    val newHasVideo =
                         tracks.groups.any { trackGroup ->
                             trackGroup.type == C.TRACK_TYPE_VIDEO && trackGroup.isSupported
                         }
+                    hasVideo = newHasVideo
+                    onHasVideoChanged(newHasVideo)
+                }
+
+                override fun onRenderedFirstFrame() {
+                    super.onRenderedFirstFrame()
+                    onRenderedFirstFrame()
                 }
             }
         player.addListener(listener)
 
-        hasVideo =
+        val initialHasVideo =
             player.currentTracks.groups.any { trackGroup ->
                 trackGroup.type == C.TRACK_TYPE_VIDEO && trackGroup.isSupported
             }
+        hasVideo = initialHasVideo
+        onHasVideoChanged(initialHasVideo)
 
         onDispose { player.removeListener(listener) }
     }
@@ -81,8 +92,6 @@ fun VideoPlayer(
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                         setUseArtwork(false)
                         setBackgroundColor(0) // Transparent background
-                        // Ensure the surface view is also transparent if possible,
-                        // but usually PlayerView handles this with setBackgroundColor(0)
                         layoutParams =
                             FrameLayout.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,

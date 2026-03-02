@@ -162,6 +162,8 @@
     <string name="repeat_mode_off">Modalità ripetizione disattivata</string>
     <string name="repeat_mode_one">Ripeti brano corrente</string>
     <string name="repeat_mode_all">Ripeti coda</string>
+    <string name="song">Brano</string>
+    <string name="video">Video</string>
     <string name="queue_all_songs">Tutti i brani</string>
     <string name="queue_searched_songs">Brani cercati</string>
     <string name="music_player">Riproduttore</string>

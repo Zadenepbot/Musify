@@ -421,7 +421,6 @@ data class SearchSummaryPage(
                             ?.menuNavigationItemRenderer
                             ?.navigationEndpoint
                             ?.watchPlaylistEndpoint,
-                        isProfile = true,
                     )
                 }
 

@@ -6,18 +6,25 @@
 package com.metrolist.music.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import android.content.res.Configuration
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +38,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,6 +81,7 @@ import com.metrolist.music.LocalListenTogetherManager
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.constants.CropAlbumArtKey
+import com.metrolist.music.constants.EnableVideoPlaybackKey
 import com.metrolist.music.constants.HidePlayerThumbnailKey
 import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.constants.PlayerBackgroundStyleKey
@@ -82,6 +91,7 @@ import com.metrolist.music.constants.SwipeThumbnailKey
 import com.metrolist.music.constants.ThumbnailCornerRadius
 import com.metrolist.music.listentogether.RoomRole
 import com.metrolist.music.ui.component.CastButton
+import com.metrolist.music.ui.component.VideoPlayer
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.delay
@@ -146,11 +156,13 @@ private fun getMediaItems(
     val timeline = player.currentTimeline
     val currentIndex = player.currentMediaItemIndex
     val shuffleModeEnabled = player.shuffleModeEnabled
-    
+
     val currentMediaItem = try {
         player.currentMediaItem
-    } catch (e: Exception) { null }
-    
+    } catch (e: Exception) {
+        null
+    }
+
     val previousMediaItem = if (swipeThumbnail && !timeline.isEmpty) {
         val previousIndex = timeline.getPreviousWindowIndex(
             currentIndex,
@@ -158,7 +170,11 @@ private fun getMediaItems(
             shuffleModeEnabled
         )
         if (previousIndex != C.INDEX_UNSET) {
-            try { player.getMediaItemAt(previousIndex) } catch (e: Exception) { null }
+            try {
+                player.getMediaItemAt(previousIndex)
+            } catch (e: Exception) {
+                null
+            }
         } else null
     } else null
 
@@ -169,13 +185,17 @@ private fun getMediaItems(
             shuffleModeEnabled
         )
         if (nextIndex != C.INDEX_UNSET) {
-            try { player.getMediaItemAt(nextIndex) } catch (e: Exception) { null }
+            try {
+                player.getMediaItemAt(nextIndex)
+            } catch (e: Exception) {
+                null
+            }
         } else null
     } else null
 
     val items = listOfNotNull(previousMediaItem, currentMediaItem, nextMediaItem)
     val currentMediaIndex = items.indexOf(currentMediaItem)
-    
+
     return MediaItemsData(items, currentMediaIndex)
 }
 
@@ -218,19 +238,23 @@ fun Thumbnail(
     val swipeThumbnailPref by rememberPreference(SwipeThumbnailKey, true)
     val swipeThumbnail = swipeThumbnailPref && !isListenTogetherGuest
     val hidePlayerThumbnail by rememberPreference(HidePlayerThumbnailKey, false)
+    val enableVideoPlayback by rememberPreference(EnableVideoPlaybackKey, true)
     val cropAlbumArt by rememberPreference(CropAlbumArtKey, false)
     val playerBackground by rememberEnumPreference(
         key = PlayerBackgroundStyleKey,
         defaultValue = PlayerBackgroundStyle.DEFAULT
     )
-    
+
+    val artworkUrl = mediaMetadata?.resolvedArtworkUrl ?: mediaMetadata?.album?.artworkUrl
+    val videoId = mediaMetadata?.resolvedVideoId
+
     // Pre-calculate text color based on background style
     val textBackgroundColor = getTextColor(playerBackground)
-    
+
     // Grid state
     val thumbnailLazyGridState = rememberLazyGridState()
-    
-    // Calculate media items data - memoized
+
+    // Calculate media items data
     val mediaItemsData by remember(
         playerConnection.player.currentMediaItemIndex,
         playerConnection.player.shuffleModeEnabled,
@@ -241,7 +265,7 @@ fun Thumbnail(
             getMediaItems(playerConnection.player, swipeThumbnail)
         }
     }
-    
+
     val mediaItems = mediaItemsData.items
     val currentMediaIndex = mediaItemsData.currentIndex
 
@@ -318,7 +342,7 @@ fun Thumbnail(
             }
         }
 
-        // Main thumbnail view
+        // Main artwork/video view
         AnimatedVisibility(
             visible = error == null,
             enter = fadeIn(),
@@ -337,20 +361,21 @@ fun Thumbnail(
                     ThumbnailHeader(
                         queueTitle = queueTitle,
                         albumTitle = mediaMetadata?.album?.title,
-                        textColor = textBackgroundColor
+                        textColor = textBackgroundColor,
+                        enableVideoPlayback = enableVideoPlayback,
+                        onToggleVideoPlayback = { }
                     )
                 }
-                
-                // Thumbnail content
+
+                val onSeekCallback = { direction: String, isFlash: Boolean ->
+                    seekDirection = direction
+                    showSeekEffect = true
+                }
+
+                // Artwork o video (carousel swipable)
                 BoxWithConstraints(
-                    contentAlignment = Alignment.Center,
-                    modifier = if (isLandscape) {
-                        Modifier.weight(1f, false)
-                    } else {
-                        Modifier.fillMaxSize()
-                    }
+                    modifier = if (isLandscape) Modifier.weight(1f, false) else Modifier.fillMaxWidth()
                 ) {
-                    // Calculate dimensions once per size change, considering landscape mode
                     val dimensions = remember(maxWidth, maxHeight, isLandscape) {
                         calculateThumbnailDimensions(
                             containerWidth = maxWidth,
@@ -359,51 +384,59 @@ fun Thumbnail(
                         )
                     }
 
-                    // Remember the onSeek callback to prevent recomposition
-                    val onSeekCallback = remember {
-                        { direction: String, showEffect: Boolean ->
-                            seekDirection = direction
-                            showSeekEffect = showEffect
-                        }
-                    }
-                    
-                    // Derive scroll enabled state to prevent unnecessary recomposition
+                    // Calculate isScrollEnabled
                     val isScrollEnabled by remember(swipeThumbnail) {
                         derivedStateOf { swipeThumbnail && isPlayerExpanded() }
                     }
-                    
-                    LazyHorizontalGrid(
-                        state = thumbnailLazyGridState,
-                        rows = GridCells.Fixed(1),
-                        flingBehavior = rememberSnapFlingBehavior(thumbnailSnapLayoutInfoProvider),
-                        userScrollEnabled = isScrollEnabled,
-                        modifier = if (isLandscape) {
-                            Modifier.size(dimensions.thumbnailSize + (PlayerHorizontalPadding * 2))
-                        } else {
-                            Modifier.fillMaxSize()
-                        }
+
+                    val containerHeightTarget = maxWidth
+                    val containerHeight by animateDpAsState(
+                        targetValue = containerHeightTarget,
+                        animationSpec = tween(500),
+                        label = "playerThumbnailContainerHeight"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(containerHeight),
+                        contentAlignment = Alignment.Center
                     ) {
-                        items(
-                            items = mediaItems,
-                            key = { item -> 
-                                item.mediaId.ifEmpty { "unknown_${item.hashCode()}" }
+                        LazyHorizontalGrid(
+                            state = thumbnailLazyGridState,
+                            rows = GridCells.Fixed(1),
+                            flingBehavior = rememberSnapFlingBehavior(thumbnailSnapLayoutInfoProvider),
+                            userScrollEnabled = isScrollEnabled,
+                            modifier = if (isLandscape) {
+                                Modifier.size(dimensions.thumbnailSize + (PlayerHorizontalPadding * 2))
+                            } else {
+                                Modifier.fillMaxSize()
                             }
-                        ) { item ->
-                            ThumbnailItem(
-                                item = item,
-                                dimensions = dimensions,
-                                hidePlayerThumbnail = hidePlayerThumbnail,
-                                cropAlbumArt = cropAlbumArt,
-                                textBackgroundColor = textBackgroundColor,
-                                layoutDirection = layoutDirection,
-                                onSeek = onSeekCallback,
-                                playerConnection = playerConnection,
-                                context = context,
-                                isLandscape = isLandscape,
-                                isListenTogetherGuest = isListenTogetherGuest,
-                                currentMediaId = mediaMetadata?.id,
-                                currentMediaThumbnail = mediaMetadata?.thumbnailUrl
-                            )
+                        ) {
+                            items(
+                                items = mediaItems,
+                                key = { item ->
+                                    item.mediaId.ifEmpty { "unknown_${item.hashCode()}" }
+                                }
+                            ) { item ->
+                                ThumbnailItem(
+                                    item = item,
+                                    dimensions = dimensions,
+                                    hidePlayerThumbnail = hidePlayerThumbnail,
+                                    cropAlbumArt = cropAlbumArt,
+                                    enableVideoPlayback = enableVideoPlayback,
+                                    textBackgroundColor = textBackgroundColor,
+                                    layoutDirection = layoutDirection,
+                                    onSeek = onSeekCallback,
+                                    playerConnection = playerConnection,
+                                    context = context,
+                                    isLandscape = isLandscape,
+                                    isListenTogetherGuest = isListenTogetherGuest,
+                                    currentMediaId = mediaMetadata?.id,
+                                    currentMediaThumbnail = mediaMetadata?.thumbnailUrl,
+                                    isCurrentMediaVideo = mediaMetadata?.isVideoSong == true || !mediaMetadata?.resolvedVideoId.isNullOrBlank()
+                                )
+                            }
                         }
                     }
                 }
@@ -437,22 +470,41 @@ private fun ThumbnailHeader(
     queueTitle: String?,
     albumTitle: String?,
     textColor: Color,
+    enableVideoPlayback: Boolean,
+    onToggleVideoPlayback: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listenTogetherManager = LocalListenTogetherManager.current
     val listenTogetherRoleState = listenTogetherManager?.role?.collectAsState(initial = RoomRole.NONE)
     val isListenTogetherGuest = listenTogetherRoleState?.value == RoomRole.GUEST
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .statusBarsPadding() // Ensure it clears the status bar
     ) {
+        // Center: Now Playing / Listen Together info
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(horizontal = 48.dp)
+                .padding(horizontal = 48.dp) // Space for the switch
         ) {
+            // Song / Video Switch (Top Center)
+            SongVideoSwitch(
+                videoEnabled = enableVideoPlayback,
+                onToggle = { enable ->
+                    if (enable != enableVideoPlayback) {
+                        onToggleVideoPlayback()
+                    }
+                },
+                contentColor = textColor
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Listen Together indicator
             if (listenTogetherRoleState?.value != RoomRole.NONE) {
                 Text(
@@ -461,23 +513,74 @@ private fun ThumbnailHeader(
                     color = textColor
                 )
             } else {
+                // Determine source text (Album / Playlist / Queue)
+                val sourceText = queueTitle ?: albumTitle ?: stringResource(R.string.now_playing)
+
                 Text(
-                    text = stringResource(R.string.now_playing),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = textColor
-                )
-            }
-            val playingFrom = queueTitle ?: albumTitle
-            if (!playingFrom.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = playingFrom,
+                    text = sourceText,
                     style = MaterialTheme.typography.titleMedium,
                     color = textColor.copy(alpha = 0.8f),
                     maxLines = 1,
                     modifier = Modifier.basicMarquee()
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SongVideoSwitch(
+    videoEnabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = contentColor.copy(alpha = 0.1f)
+    val selectedBackgroundColor = contentColor.copy(alpha = 0.2f)
+
+    Row(
+        modifier = modifier
+            .height(32.dp)
+            .background(backgroundColor, RoundedCornerShape(16.dp))
+            .padding(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Song Option
+        Box(
+            modifier = Modifier
+                .weight(1f, fill = false) // Don't force equal width, let text decide or use fixed width?
+                .width(80.dp) // Fixed width for consistency
+                .fillMaxSize()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (!videoEnabled) selectedBackgroundColor else Color.Transparent)
+                .clickable { onToggle(false) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(R.string.song),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (!videoEnabled) FontWeight.Bold else FontWeight.Normal,
+                color = contentColor.copy(alpha = if (!videoEnabled) 1f else 0.7f)
+            )
+        }
+
+        // Video Option
+        Box(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .width(80.dp)
+                .fillMaxSize()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (videoEnabled) selectedBackgroundColor else Color.Transparent)
+                .clickable { onToggle(true) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(R.string.video),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (videoEnabled) FontWeight.Bold else FontWeight.Normal,
+                color = contentColor.copy(alpha = if (videoEnabled) 1f else 0.7f)
+            )
         }
     }
 }
@@ -491,6 +594,7 @@ private fun ThumbnailItem(
     dimensions: ThumbnailDimensions,
     hidePlayerThumbnail: Boolean,
     cropAlbumArt: Boolean,
+    enableVideoPlayback: Boolean,
     textBackgroundColor: Color,
     layoutDirection: LayoutDirection,
     onSeek: (String, Boolean) -> Unit,
@@ -500,6 +604,7 @@ private fun ThumbnailItem(
     isListenTogetherGuest: Boolean = false,
     currentMediaId: String? = null,
     currentMediaThumbnail: String? = null,
+    isCurrentMediaVideo: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val incrementalSeekSkipEnabled by rememberPreference(SeekExtraSeconds, defaultValue = false)
@@ -555,26 +660,60 @@ private fun ThumbnailItem(
             },
         contentAlignment = Alignment.Center
     ) {
+        val isCurrentItem = remember(item.mediaId, currentMediaId) {
+            item.mediaId == currentMediaId || (item.mediaId.isEmpty() && currentMediaId != null)
+        }
+        val shouldShowVideo = enableVideoPlayback && isCurrentItem && isCurrentMediaVideo
+
+        var isVideoReady by remember(item.mediaId, shouldShowVideo) { mutableStateOf(false) }
+
+        val itemHeightTarget = if (shouldShowVideo && isVideoReady) {
+            dimensions.thumbnailSize * (9f / 16f)
+        } else {
+            dimensions.thumbnailSize
+        }
+
+        val itemHeight by animateDpAsState(
+            targetValue = itemHeightTarget,
+            animationSpec = tween(500),
+            label = "playerThumbnailItemHeight"
+        )
+
         Box(
             modifier = Modifier
-                .size(dimensions.thumbnailSize)
+                .width(dimensions.thumbnailSize)
+                .height(itemHeight)
                 .clip(RoundedCornerShape(dimensions.cornerRadius))
         ) {
             if (hidePlayerThumbnail) {
                 HiddenThumbnailPlaceholder(textBackgroundColor = textBackgroundColor)
             } else {
-                val artworkUriToUse = if (item.mediaId == currentMediaId && !currentMediaThumbnail.isNullOrBlank()) {
-                    currentMediaThumbnail
-                } else {
-                    item.mediaMetadata.artworkUri?.toString()
-                }
+                val artworkUriToUse =
+                    if (item.mediaId == currentMediaId) {
+                        if (shouldShowVideo) {
+                             currentMediaThumbnail
+                        } else {
+                            // Prefer square artwork for 1:1 display
+                            (item as? com.metrolist.music.models.MediaMetadata)?.squareThumbnailUrl
+                                ?: currentMediaThumbnail
+                        }
+                    } else {
+                        item.mediaMetadata.artworkUri?.toString()
+                    }
 
-                ThumbnailImage(
+                val mediaTypeLabel = if (isCurrentMediaVideo) "video" else "brano"
+
+                ThumbnailContent(
                     artworkUri = artworkUriToUse,
-                    cropArtwork = cropAlbumArt
+                    cropArtwork = cropAlbumArt,
+                    showVideo = shouldShowVideo,
+                    player = playerConnection.player,
+                    isVideoReady = isVideoReady,
+                    onVideoReady = { isVideoReady = true },
+                    mediaTypeLabel = mediaTypeLabel
                 )
             }
-            
+
             // Cast button at top-right corner of thumbnail
             CastButton(
                 modifier = Modifier
@@ -610,7 +749,56 @@ private fun HiddenThumbnailPlaceholder(
 }
 
 /**
+ * Thumbnail content that shows either video player or static image.
+ */
+@Composable
+private fun ThumbnailContent(
+    artworkUri: String?,
+    cropArtwork: Boolean,
+    showVideo: Boolean,
+    player: Player,
+    isVideoReady: Boolean,
+    onVideoReady: () -> Unit,
+    mediaTypeLabel: String = "brano",
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .background(if (showVideo && isVideoReady) Color.Black else MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        // Show artwork as background/fallback until video is ready
+        if (!(showVideo && isVideoReady)) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(artworkUri)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED)
+                    .build(),
+                contentDescription = null,
+                contentScale = if (cropArtwork) ContentScale.Crop else ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        if (showVideo) {
+            // Overlay video player
+            VideoPlayer(
+                player = player,
+                onRenderedFirstFrame = onVideoReady,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+/**
  * Actual thumbnail image with caching and hardware layer rendering.
+ * @deprecated Use ThumbnailContent instead
  */
 @Composable
 private fun ThumbnailImage(

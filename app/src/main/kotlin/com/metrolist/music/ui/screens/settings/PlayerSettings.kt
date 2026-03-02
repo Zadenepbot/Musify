@@ -50,6 +50,7 @@ import com.metrolist.music.constants.AutoLoadMoreKey
 import com.metrolist.music.constants.AutoSkipNextOnErrorKey
 import com.metrolist.music.constants.DisableLoadMoreWhenRepeatAllKey
 import com.metrolist.music.constants.EnableGoogleCastKey
+import com.metrolist.music.constants.EnableVideoPlaybackKey
 import com.metrolist.music.constants.HistoryDuration
 import com.metrolist.music.constants.KeepScreenOn
 import com.metrolist.music.constants.PauseOnMute
@@ -73,16 +74,6 @@ import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
 import kotlin.math.roundToInt
-import com.metrolist.music.ui.component.SleepTimerDialog
-import com.metrolist.music.constants.SleepTimerEnabledKey
-import com.metrolist.music.constants.SleepTimerRepeatKey
-import com.metrolist.music.constants.SleepTimerCustomDaysKey
-import com.metrolist.music.constants.SleepTimerEndTimeKey
-import com.metrolist.music.constants.SleepTimerStartTimeKey
-import com.metrolist.music.constants.SleepTimerDayTimesKey
-import com.metrolist.music.ui.component.decodeDayTimes
-import com.metrolist.music.ui.component.encodeDayTimes
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,6 +121,11 @@ fun PlayerSettings(
 
     val (enableGoogleCast, onEnableGoogleCastChange) = rememberPreference(
         key = EnableGoogleCastKey,
+        defaultValue = true
+    )
+
+    val (enableVideoPlayback, onEnableVideoPlaybackChange) = rememberPreference(
+        EnableVideoPlaybackKey,
         defaultValue = true
     )
 
@@ -477,6 +473,27 @@ fun PlayerSettings(
                     ))
                 }
                 add(Material3SettingsItem(
+                    icon = painterResource(R.drawable.videocam),
+                    title = { Text(stringResource(R.string.enable_video_playback)) },
+                    description = { Text(stringResource(R.string.enable_video_playback_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = enableVideoPlayback,
+                            onCheckedChange = onEnableVideoPlaybackChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (enableVideoPlayback) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onEnableVideoPlaybackChange(!enableVideoPlayback) }
+                ))
+                add(Material3SettingsItem(
                     icon = painterResource(R.drawable.arrow_forward),
                     title = { Text(stringResource(R.string.seek_seconds_addup)) },
                     description = { Text(stringResource(R.string.seek_seconds_addup_description)) },
@@ -497,103 +514,6 @@ fun PlayerSettings(
                     },
                     onClick = { onSeekExtraSeconds(!seekExtraSeconds) }
                 ))
-            }
-        )
-
-        Spacer(modifier = Modifier.height(27.dp))
-
-        var showSleepTimerDialog by remember { mutableStateOf(false) }
-
-        val (sleepTimerEnabled, onSleepTimerEnabledChange) = rememberPreference(
-            SleepTimerEnabledKey,
-            defaultValue = false
-        )
-        val (sleepTimerRepeat, onSleepTimerRepeatChange) = rememberPreference(
-            SleepTimerRepeatKey,
-            defaultValue = "daily"
-        )
-        val (sleepTimerStartTime, onSleepTimerStartTimeChange) = rememberPreference(
-            SleepTimerStartTimeKey,
-            defaultValue = "22:00"
-        )
-        val (sleepTimerEndTime, onSleepTimerEndTimeChange) = rememberPreference(
-            SleepTimerEndTimeKey,
-            defaultValue = "6:00"
-        )
-        val (sleepTimerCustomDays, onSleepTimerCustomDaysChange) = rememberPreference(
-            SleepTimerCustomDaysKey,
-            defaultValue = "0,1,2,3,4"
-        )
-        // Per-day time ranges used in custom mode
-        val (sleepTimerDayTimes, onSleepTimerDayTimesChange) = rememberPreference(
-            SleepTimerDayTimesKey,
-            defaultValue = ""
-        )
-
-        if (showSleepTimerDialog) {
-            val customDays = sleepTimerCustomDays.split(",").mapNotNull { it.toIntOrNull() }
-            val dayTimesMap = decodeDayTimes(sleepTimerDayTimes)
-
-            SleepTimerDialog(
-                isVisible = true,
-                onDismiss = { showSleepTimerDialog = false },
-                onConfirm = { repeat, startTime, endTime, days, dayTimes ->
-                    onSleepTimerRepeatChange(repeat)
-                    onSleepTimerStartTimeChange(startTime)
-                    onSleepTimerEndTimeChange(endTime)
-                    onSleepTimerCustomDaysChange(days?.joinToString(",") ?: "0,1,2,3,4")
-                    onSleepTimerDayTimesChange(encodeDayTimes(dayTimes))
-                    showSleepTimerDialog = false
-                },
-                initialRepeat = sleepTimerRepeat,
-                initialStartTime = sleepTimerStartTime,
-                initialEndTime = sleepTimerEndTime,
-                initialCustomDays = customDays,
-                initialDayTimes = dayTimesMap
-            )
-        }
-
-        Material3SettingsGroup(
-            title = stringResource(R.string.sleep_timer),
-            items = buildList {
-                add(
-                    Material3SettingsItem(
-                        icon = painterResource(R.drawable.timer),
-                        title = { Text(stringResource(R.string.enable_automatic_sleeptimer)) },
-                        description = { Text(stringResource(R.string.sleeptimer_description)) },
-                        trailingContent = {
-                            Switch(
-                                checked = sleepTimerEnabled,
-                                onCheckedChange = onSleepTimerEnabledChange,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (sleepTimerEnabled) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
-                            )
-                        },
-                        onClick = { onSleepTimerEnabledChange(!sleepTimerEnabled) }
-                    )
-                )
-
-                if (sleepTimerEnabled) {
-                    add(
-                        Material3SettingsItem(
-                            icon = painterResource(R.drawable.baseline_event_repeat_24),
-                            title = { Text(stringResource(R.string.sleep_timer_repeat)) },
-                            description = {
-                                Text(
-                                    stringResource(R.string.sleep_timer_repeat_description)
-                                )
-                            },
-                            onClick = { showSleepTimerDialog = true }
-                        )
-                    )
-                }
             }
         )
 

@@ -28,6 +28,7 @@ import java.time.LocalDateTime
 data class SongEntity(
     @PrimaryKey val id: String,
     val title: String,
+    val artworkUrl: String? = null,
     val duration: Int = -1, // in seconds
     val thumbnailUrl: String? = null,
     val albumId: String? = null,
@@ -58,10 +59,8 @@ data class SongEntity(
     val isVideo: Boolean = false,
     @ColumnInfo(name = "isEpisode", defaultValue = false.toString())
     val isEpisode: Boolean = false,
-    @ColumnInfo(name = "playbackPosition", defaultValue = "NULL")
-    val playbackPosition: Long? = null,
-    @ColumnInfo(name = "uploadEntityId", defaultValue = "NULL")
-    val uploadEntityId: String? = null
+    val videoId: String? = null,
+    val squareThumbnailUrl: String? = null
 ) {
     fun localToggleLike() = copy(
         liked = !liked,
