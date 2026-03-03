@@ -10,7 +10,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -242,8 +247,19 @@ fun SleepTimerDialog(
                             .clickable { weekdaysEnabled = !weekdaysEnabled }
                             .padding(vertical = 8.dp)
                     ) {
-                        Checkbox(checked = weekdaysEnabled, onCheckedChange = { weekdaysEnabled = it })
-                        Text(stringResource(R.string.sleep_timer_weekdays), modifier = Modifier.padding(start = 8.dp))
+                        Text(text = stringResource(R.string.sleep_timer_weekdays), modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = weekdaysEnabled,
+                            onCheckedChange = { weekdaysEnabled = it },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(if (weekdaysEnabled) R.drawable.check else R.drawable.close),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            },
+                            modifier = Modifier.scale(0.85f)
+                        )
                     }
                     if (weekdaysEnabled) {
                         TimeRangeRow(
@@ -271,8 +287,19 @@ fun SleepTimerDialog(
                             .clickable { weekendsEnabled = !weekendsEnabled }
                             .padding(vertical = 8.dp)
                     ) {
-                        Checkbox(checked = weekendsEnabled, onCheckedChange = { weekendsEnabled = it })
-                        Text(stringResource(R.string.sleep_timer_weekends), modifier = Modifier.padding(start = 8.dp))
+                        Text(text = stringResource(R.string.sleep_timer_weekends), modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = weekendsEnabled,
+                            onCheckedChange = { weekendsEnabled = it },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(if (weekendsEnabled) R.drawable.check else R.drawable.close),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            },
+                            modifier = Modifier.scale(0.85f)
+                        )
                     }
                     if (weekendsEnabled) {
                         TimeRangeRow(
@@ -315,13 +342,21 @@ fun SleepTimerDialog(
                             }
                             .padding(vertical = 8.dp)
                     ) {
-                        Checkbox(
-                            checked         = isDaySelected,
+                        Text(text = stringResource(dayLabelRes[index]), modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = isDaySelected,
                             onCheckedChange = {
                                 selectedDays = if (index in selectedDays) selectedDays - index else selectedDays + index
-                            }
+                            },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(if (isDaySelected) R.drawable.check else R.drawable.close),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            },
+                            modifier = Modifier.scale(0.85f)
                         )
-                        Text(stringResource(dayLabelRes[index]), modifier = Modifier.padding(start = 8.dp))
                     }
                     if (isDaySelected) {
                         TimeRangeRow(
