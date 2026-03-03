@@ -520,7 +520,7 @@ fun PlayerSettings(
         )
         val (sleepTimerEndTime, onSleepTimerEndTimeChange) = rememberPreference(
             SleepTimerEndTimeKey,
-            defaultValue = "6:00"
+            defaultValue = "06:00"
         )
         val (sleepTimerCustomDays, onSleepTimerCustomDaysChange) = rememberPreference(
             SleepTimerCustomDaysKey,
