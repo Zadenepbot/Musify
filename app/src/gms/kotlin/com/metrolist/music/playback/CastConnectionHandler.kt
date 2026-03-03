@@ -18,6 +18,7 @@ import com.google.android.gms.cast.framework.SessionManager
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.google.android.gms.common.images.WebImage
+import com.metrolist.music.db.entities.LyricsEntity
 import com.metrolist.music.extensions.metadata
 import com.metrolist.music.models.MediaMetadata as AppMediaMetadata
 import com.metrolist.music.ui.utils.resize
@@ -28,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -483,7 +485,14 @@ class CastConnectionHandler(
      */
     private suspend fun buildMediaInfo(metadata: AppMediaMetadata): MediaInfo? {
         val streamUrl = musicService.getStreamUrl(metadata.id) ?: return null
-        
+
+        // Fetch synced lyrics to include in Cast payload
+        val lyrics = musicService.database.lyrics(metadata.id).firstOrNull()?.lyrics ?: try {
+            musicService.lyricsHelper.getLyrics(metadata).lyrics
+        } catch (e: Exception) {
+            null
+        }
+
         val castMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
             putString(MediaMetadata.KEY_TITLE, metadata.title)
             putString(MediaMetadata.KEY_ARTIST, metadata.artists.joinToString(", ") { it.name })
@@ -495,11 +504,18 @@ class CastConnectionHandler(
             }
         }
         
+        val customData = org.json.JSONObject().apply {
+            put("mediaId", metadata.id)
+            if (!lyrics.isNullOrBlank() && lyrics != LyricsEntity.LYRICS_NOT_FOUND) {
+                put("lyrics", lyrics)
+            }
+        }
+        
         return MediaInfo.Builder(streamUrl)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setContentType("audio/mp4")
             .setMetadata(castMetadata)
-            .setCustomData(org.json.JSONObject().put("mediaId", metadata.id))
+            .setCustomData(customData)
             .build()
     }
     

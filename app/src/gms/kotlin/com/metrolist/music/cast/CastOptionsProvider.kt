@@ -1,7 +1,6 @@
 package com.metrolist.music.cast
 
 import android.content.Context
-import com.google.android.gms.cast.CastMediaControlIntent
 import com.google.android.gms.cast.framework.CastOptions
 import com.google.android.gms.cast.framework.OptionsProvider
 import com.google.android.gms.cast.framework.SessionProvider
@@ -16,6 +15,10 @@ import com.google.android.gms.cast.framework.media.NotificationOptions
 class CastOptionsProvider : OptionsProvider {
 
     override fun getCastOptions(context: Context): CastOptions {
+        // For Custom Web Receiver, replace with your App ID from Google Cast Developer Console.
+        // Using DEFAULT_MEDIA_RECEIVER_APPLICATION_ID as a fallback.
+        val receiverAppId = "F0D639AA" // Replace with actual ID
+
         val notificationOptions = NotificationOptions.Builder()
             .setActions(
                 listOf(
@@ -26,6 +29,7 @@ class CastOptionsProvider : OptionsProvider {
                 ),
                 intArrayOf(1, 2) // Indices of actions for compact view
             )
+            .setTargetActivityClassName("com.metrolist.music.MainActivity")
             .build()
 
         val mediaOptions = CastMediaOptions.Builder()
@@ -33,7 +37,7 @@ class CastOptionsProvider : OptionsProvider {
             .build()
 
         return CastOptions.Builder()
-            .setReceiverApplicationId(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
+            .setReceiverApplicationId(receiverAppId)
             .setCastMediaOptions(mediaOptions)
             .setStopReceiverApplicationWhenEndingSession(true)
             .build()

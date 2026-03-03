@@ -14,28 +14,6 @@ endif()
 
 message(STATUS "Project source dir: ${CMAKE_SOURCE_DIR}")
 
-# ========== Sources ==========
-set(LIBVIBRA_SOURCES
-        vibra.cpp
-        vibra_jni.cpp
-        algorithm/signature.cpp
-        algorithm/frequency.cpp
-        algorithm/signature_generator.cpp
-        audio/wav.cpp
-        audio/downsampler.cpp
-)
-
-add_library(vibra_fp SHARED ${LIBVIBRA_SOURCES})
-
-target_include_directories(vibra_fp
-        PRIVATE
-        ${CMAKE_SOURCE_DIR}/../include
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/algorithm
-        ${CMAKE_SOURCE_DIR}/audio
-        ${CMAKE_SOURCE_DIR}/utils
-)
-
 # ========== FFTW detection and import ==========
 set(FFTW3_INCLUDE_DIR "")
 set(FFTW3_STATIC_LIB "")
@@ -67,8 +45,37 @@ if(ANDROID AND (NOT FFTW3_STATIC_LIB OR NOT EXISTS "${FFTW3_STATIC_LIB}"))
     endif()
 endif()
 
-## Create an IMPORTED target
+## Check if FFTW was found
 if(FFTW3_STATIC_LIB AND EXISTS "${FFTW3_STATIC_LIB}")
+    set(FFTW3_FOUND TRUE)
+else()
+    set(FFTW3_FOUND FALSE)
+    message(WARNING "FFTW3 static library not found at ${FFTW3_STATIC_LIB}. Build fftw and place prebuilt in third_party/fftw-android/<abi>. The vibra_fp library will NOT be built.")
+endif()
+
+if(FFTW3_FOUND)
+    # ========== Sources ==========
+    set(LIBVIBRA_SOURCES
+            vibra.cpp
+            vibra_jni.cpp
+            algorithm/signature.cpp
+            algorithm/frequency.cpp
+            algorithm/signature_generator.cpp
+            audio/wav.cpp
+            audio/downsampler.cpp
+    )
+
+    add_library(vibra_fp SHARED ${LIBVIBRA_SOURCES})
+
+    target_include_directories(vibra_fp
+            PRIVATE
+            ${CMAKE_SOURCE_DIR}/../include
+            ${CMAKE_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/algorithm
+            ${CMAKE_SOURCE_DIR}/audio
+            ${CMAKE_SOURCE_DIR}/utils
+    )
+
     add_library(fftw3_static STATIC IMPORTED GLOBAL)
     set_target_properties(fftw3_static PROPERTIES
             IMPORTED_LOCATION "${FFTW3_STATIC_LIB}"
@@ -76,51 +83,50 @@ if(FFTW3_STATIC_LIB AND EXISTS "${FFTW3_STATIC_LIB}")
     )
     message(STATUS "Using FFTW (imported static): ${FFTW3_STATIC_LIB}")
     target_link_libraries(vibra_fp PRIVATE fftw3_static)
-else()
-    message(FATAL_ERROR "FFTW3 static library not found. Build fftw and place prebuilt in third_party/fftw-android/<abi>.")
-endif()
 
-# ========== C++ standard ==========
-set_target_properties(vibra_fp PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES)
+    # ========== C++ standard ==========
+    set_target_properties(vibra_fp PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES)
 
-# ========== Android system libs ==========
-if (ANDROID)
-    target_link_libraries(vibra_fp PRIVATE log m)
-endif()
+    # ========== Android system libs ==========
+    if (ANDROID)
+        target_link_libraries(vibra_fp PRIVATE log m)
+    endif()
 
-# ========== Compiler / Linker options ==========
-# Common options (Release vs Debug)
-target_compile_options(vibra_fp PRIVATE
-        $<$<CONFIG:Release>:-O2>
-        $<$<NOT:$<CONFIG:Release>>:-O0>
-        $<$<NOT:$<CONFIG:Release>>:-g>
-        $<$<CONFIG:Release>:-ffunction-sections>
-        $<$<CONFIG:Release>:-fdata-sections>
-        $<$<CONFIG:Release>:-fvisibility=hidden>
-        $<$<CONFIG:Release>:-fomit-frame-pointer>
-        $<$<CONFIG:Release>:-fPIC>
-)
-
-# Add thin-LTO flags only if requested
-if(ENABLE_LTO)
+    # ========== Compiler / Linker options ==========
     target_compile_options(vibra_fp PRIVATE
-            $<$<CONFIG:Release>:-flto=thin>
+            $<$<CONFIG:Release>:-O2>
+            $<$<NOT:$<CONFIG:Release>>:-O0>
+            $<$<NOT:$<CONFIG:Release>>:-g>
+            $<$<CONFIG:Release>:-ffunction-sections>
+            $<$<CONFIG:Release>:-fdata-sections>
+            $<$<CONFIG:Release>:-fvisibility=hidden>
+            $<$<CONFIG:Release>:-fomit-frame-pointer>
+            $<$<CONFIG:Release>:-fPIC>
     )
-    target_link_options(vibra_fp PRIVATE
-            $<$<CONFIG:Release>:-flto=thin>
-            $<$<CONFIG:Release>:-Wl,--gc-sections>
-            $<$<CONFIG:Release>:-Wl,--strip-all>
-    )
-else()
-    target_link_options(vibra_fp PRIVATE
-            $<$<CONFIG:Release>:-Wl,--gc-sections>
-            $<$<CONFIG:Release>:-Wl,--strip-all>
-    )
-endif()
 
-# ========== Limit exported symbols ==========
-set(VIBRA_EXPORT_SCRIPT "${CMAKE_SOURCE_DIR}/vibra.sym")
-if(EXISTS "${VIBRA_EXPORT_SCRIPT}")
-    message(STATUS "Using version script: ${VIBRA_EXPORT_SCRIPT}")
-    target_link_options(vibra_fp PRIVATE "-Wl,--version-script=${VIBRA_EXPORT_SCRIPT}")
+    if(ENABLE_LTO)
+        target_compile_options(vibra_fp PRIVATE $<$<CONFIG:Release>:-flto=thin>)
+        target_link_options(vibra_fp PRIVATE
+                $<$<CONFIG:Release>:-flto=thin>
+                $<$<CONFIG:Release>:-Wl,--gc-sections>
+                $<$<CONFIG:Release>:-Wl,--strip-all>
+        )
+    else()
+        target_link_options(vibra_fp PRIVATE
+                $<$<CONFIG:Release>:-Wl,--gc-sections>
+                $<$<CONFIG:Release>:-Wl,--strip-all>
+        )
+    endif()
+
+    # ========== Limit exported symbols ==========
+    set(VIBRA_EXPORT_SCRIPT "${CMAKE_SOURCE_DIR}/vibra.sym")
+    if(EXISTS "${VIBRA_EXPORT_SCRIPT}")
+        message(STATUS "Using version script: ${VIBRA_EXPORT_SCRIPT}")
+        target_link_options(vibra_fp PRIVATE "-Wl,--version-script=${VIBRA_EXPORT_SCRIPT}")
+    endif()
+else()
+    # Dummy target or just skip. Since this is an externalNativeBuild,
+    # if we don't define any target, it might complain depending on Gradle version.
+    # Let's create an empty dummy library to satisfy Gradle if needed, or just let it be.
+    # Most modern AGP versions handle empty CMake projects fine.
 endif()

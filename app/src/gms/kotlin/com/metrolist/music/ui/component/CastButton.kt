@@ -159,16 +159,16 @@ fun CastButton(
                         Toast.makeText(context, "Play a song first to cast", Toast.LENGTH_SHORT).show()
                         return@clickable
                     }
-                    
+
                     // Get current connected route if casting
                     val currentRoute = if (isCasting) {
                         mediaRouter?.routes?.find { route ->
-                            routeSelector?.let { selector -> 
+                            routeSelector?.let { selector ->
                                 route.matchesSelector(selector) && route.isSelected
                             } == true
                         }
                     } else null
-                    
+
                     // Show bottom sheet with cast picker
                     menuState.show {
                         CastPickerSheet(

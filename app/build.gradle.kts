@@ -262,10 +262,16 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
 
+    implementation("androidx.mediarouter:mediarouter:1.7.0")
+    implementation("com.google.android.gms:play-services-cast-framework:21.4.0")
+
     // Google Cast - only included in GMS flavor (not available in F-Droid/FOSS builds)
     "gmsImplementation"(libs.media3.cast)
     "gmsImplementation"(libs.mediarouter)
     "gmsImplementation"(libs.cast.framework)
+    "gmsImplementation"("androidx.mediarouter:mediarouter:1.7.0")
+    "gmsImplementation"("com.google.android.gms:play-services-cast-framework:21.4.0")
+
 
     implementation(libs.room.runtime)
     implementation(libs.kuromoji.ipadic)
