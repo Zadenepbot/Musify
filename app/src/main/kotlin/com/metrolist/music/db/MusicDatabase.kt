@@ -115,7 +115,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 34,
+    version = 35,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -150,6 +150,7 @@ class MusicDatabase(
         AutoMigration(from = 31, to = 32),
         AutoMigration(from = 32, to = 33),
         AutoMigration(from = 33, to = 34),
+        AutoMigration(from = 34, to = 35, spec = Migration34To35::class),
     ],
 )
 @TypeConverters(Converters::class)
@@ -776,6 +777,37 @@ class Migration29To30 : AutoMigrationSpec {
         }
         if (!hasProvider) {
             db.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT NOT NULL DEFAULT 'Unknown'")
+        }
+    }
+}
+
+class Migration34To35 : AutoMigrationSpec {
+    override fun onPostMigrate(db: SupportSQLiteDatabase) {
+        // Add missing columns for video playback feature
+        var artworkUrlExists = false
+        var videoIdExists = false
+        var squareThumbExists = false
+
+        db.query("PRAGMA table_info('song')").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            if (nameIndex >= 0) {
+                while (cursor.moveToNext()) {
+                    val colName = cursor.getString(nameIndex)
+                    if (colName == "artworkUrl") artworkUrlExists = true
+                    if (colName == "videoId") videoIdExists = true
+                    if (colName == "squareThumbnailUrl") squareThumbExists = true
+                }
+            }
+        }
+
+        if (!artworkUrlExists) {
+            db.execSQL("ALTER TABLE `song` ADD COLUMN `artworkUrl` TEXT")
+        }
+        if (!videoIdExists) {
+            db.execSQL("ALTER TABLE `song` ADD COLUMN `videoId` TEXT")
+        }
+        if (!squareThumbExists) {
+            db.execSQL("ALTER TABLE `song` ADD COLUMN `squareThumbnailUrl` TEXT")
         }
     }
 }
