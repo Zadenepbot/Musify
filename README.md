@@ -2,8 +2,6 @@
 <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" style="display: block; margin: 0 auto"/>
 <h1>Metrolist</h1>
 <p>YouTube Music client for Android</p>
-<p>This fork is for extended casting functionality and a dedicated Android TV Application.</p>
-<p>This may get abandoned in the future as I tend to get busy with personal affairs.</p>
 
 <div style="padding: 16px; margin: 16px 0; background-color: #FFFBE5; border-left: 6px solid #FFC107; border-radius: 4px;">
 <h2 style="margin: 0;"><strong>⚠Warning</strong></h2>
