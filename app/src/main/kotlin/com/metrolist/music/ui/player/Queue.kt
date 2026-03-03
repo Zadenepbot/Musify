@@ -105,9 +105,7 @@ import com.metrolist.music.R
 import com.metrolist.music.constants.ListItemHeight
 import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.constants.QueueEditLockKey
-import com.metrolist.music.constants.SleepTimerFadeOutKey
 import com.metrolist.music.constants.UseNewPlayerDesignKey
-import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
 import com.metrolist.music.extensions.metadata
 import com.metrolist.music.extensions.move
 import com.metrolist.music.extensions.toggleRepeatMode
@@ -219,10 +217,6 @@ fun Queue(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     val sleepTimerDefault by rememberPreference(SleepTimerDefaultKey, 30f)
     var sleepTimerValue by remember { mutableFloatStateOf(sleepTimerDefault) }
-    val sleepTimerStopAfterCurrentSongDefault by rememberPreference(SleepTimerStopAfterCurrentSongKey, false)
-    var sleepTimerStopAfterCurrentSong by remember { mutableStateOf(sleepTimerStopAfterCurrentSongDefault) }
-    val sleepTimerFadeOutDefault by rememberPreference(SleepTimerFadeOutKey, false)
-    var sleepTimerFadeOut by remember { mutableStateOf(sleepTimerFadeOutDefault) }
     val sleepTimerEnabled = remember(
         playerConnection.service.sleepTimer.triggerTime,
         playerConnection.service.sleepTimer.pauseWhenSongEnd
@@ -538,8 +532,6 @@ fun Queue(
                         showSleepTimerDialog = false
                         playerConnection.service.sleepTimer.start(
                             minute = sleepTimerValue.roundToInt(),
-                            stopAfterCurrentSong = sleepTimerStopAfterCurrentSong,
-                            fadeOut = sleepTimerFadeOut,
                         )
                     },
                     onCancel = {
@@ -547,8 +539,6 @@ fun Queue(
                     },
                     onReset = {
                         sleepTimerValue = sleepTimerDefault
-                        sleepTimerStopAfterCurrentSong = sleepTimerStopAfterCurrentSongDefault
-                        sleepTimerFadeOut = sleepTimerFadeOutDefault
                     },
                     content = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -573,37 +563,11 @@ fun Queue(
 
                             Spacer(Modifier.height(8.dp))
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Checkbox(
-                                    checked = sleepTimerStopAfterCurrentSong,
-                                    onCheckedChange = { sleepTimerStopAfterCurrentSong = it },
-                                )
-                                Text(stringResource(R.string.sleep_timer_stop_after_current_song))
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Checkbox(
-                                    checked = sleepTimerFadeOut,
-                                    onCheckedChange = { sleepTimerFadeOut = it },
-                                )
-                                Text(stringResource(R.string.sleep_timer_fade_out))
-                            }
-
-                            Spacer(Modifier.height(8.dp))
-
                             OutlinedButton(
                                 onClick = {
                                     showSleepTimerDialog = false
                                     playerConnection.service.sleepTimer.start(
                                         minute = -1,
-                                        stopAfterCurrentSong = false,
-                                        fadeOut = sleepTimerFadeOut,
                                     )
                                 }
                             ) {
@@ -616,8 +580,6 @@ fun Queue(
                                     coroutineScope.launch {
                                         context.dataStore.edit { settings ->
                                             settings[SleepTimerDefaultKey] = sleepTimerValue
-                                            settings[SleepTimerStopAfterCurrentSongKey] = sleepTimerStopAfterCurrentSong
-                                            settings[SleepTimerFadeOutKey] = sleepTimerFadeOut
                                         }
                                     }
                                     Toast.makeText(
