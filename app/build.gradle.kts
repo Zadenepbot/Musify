@@ -23,6 +23,7 @@ plugins {
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.rikka.tools.refine)
 }
 
 android {
@@ -281,6 +282,16 @@ dependencies {
     // Protobuf for message serialization (lite version for Android)
     implementation(libs.protobuf.javalite)
     implementation(libs.protobuf.kotlin.lite)
+
+    // Shizuku for privileged installation
+    compileOnly(libs.rikka.hidden.stub)
+    implementation(libs.rikka.tools.refine.runtime)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
+    implementation(libs.lsposed.hiddenapibypass)
+
+    // libsu for root access
+    implementation(libs.libsu.core)
 
     coreLibraryDesugaring(libs.desugaring)
 
