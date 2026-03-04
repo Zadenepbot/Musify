@@ -293,6 +293,9 @@ dependencies {
     // libsu for root access
     implementation(libs.libsu.core)
 
+    // Dhizuku for device owner installation
+    implementation(libs.dhizuku.api)
+
     coreLibraryDesugaring(libs.desugaring)
 
     implementation(libs.timber)
