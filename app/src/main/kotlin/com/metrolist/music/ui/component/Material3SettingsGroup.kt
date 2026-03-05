@@ -111,7 +111,6 @@ private fun Material3SettingsItemRow(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .align(item.iconPosition ?: Alignment.CenterVertically)
                     .background(
                         MaterialTheme.colorScheme.primary.copy(
                             alpha = if (item.isHighlighted) 0.15f else 0.1f
@@ -208,6 +207,5 @@ data class Material3SettingsItem(
     val showBadge: Boolean = false,
     val isHighlighted: Boolean = false,
     val enabled: Boolean = true,
-    val onClick: (() -> Unit)? = null,
-    val iconPosition: Alignment.Vertical? = null
+    val onClick: (() -> Unit)? = null
 )

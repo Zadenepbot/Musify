@@ -129,7 +129,6 @@ fun ShowMediaInfo(videoId: String) {
                             stringResource(R.string.views) to info?.viewCount?.let(::numberFormatter).orEmpty(),
                             stringResource(R.string.likes) to info?.like?.let(::numberFormatter).orEmpty(),
                             stringResource(R.string.dislikes) to info?.dislike?.let(::numberFormatter).orEmpty(),
-                            stringResource(R.string.description) to info?.description,
                             "Itag" to currentFormat?.itag?.toString(),
                             stringResource(R.string.mime_type) to currentFormat?.mimeType,
                             stringResource(R.string.codecs) to currentFormat?.codecs,
@@ -151,6 +150,7 @@ fun ShowMediaInfo(videoId: String) {
 
                     val cardsBaseList = mutableListOf<Material3SettingsItem>()
                     val cardsExtendedList = mutableListOf<Material3SettingsItem>()
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
                     baseList.forEachIndexed { index, (label, text) ->
                         cardsBaseList += Material3SettingsItem(
@@ -158,7 +158,6 @@ fun ShowMediaInfo(videoId: String) {
                             description = { Text(text ?: "Unknown") },
                             icon = painterResource(baseIconsList[index]),
                             onClick = {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 cm.setPrimaryClip(ClipData.newPlainText("text", text ?: "Unknown"))
                                 Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
                             },
@@ -171,13 +170,9 @@ fun ShowMediaInfo(videoId: String) {
                             description = { Text(text ?: "Unknown") },
                             icon = painterResource(iconsList[index]),
                             onClick = {
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 cm.setPrimaryClip(ClipData.newPlainText("text", text ?: "Unknown"))
                                 Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
                             },
-                            // Use a different icon box alignment for the description so it won't look very weird
-                            // when the description is kind of long (description is at index #3)
-                            iconPosition = if (index == 3) Alignment.Top else Alignment.CenterVertically
                         )
                     }
 
@@ -191,6 +186,22 @@ fun ShowMediaInfo(videoId: String) {
                     Material3SettingsGroup(
                         title = stringResource(R.string.information),
                         items = cardsExtendedList
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Material3SettingsGroup(
+                        title = stringResource(R.string.description),
+                        items = listOf(
+                            Material3SettingsItem(
+                                title = { Text(stringResource(R.string.description)) },
+                                description = { Text(info?.description ?: "Unknown") },
+                                onClick = {
+                                    cm.setPrimaryClip(ClipData.newPlainText("text", info?.description ?: "Unknown"))
+                                    Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        )
                     )
                 }
             }
