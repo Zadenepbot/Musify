@@ -352,6 +352,59 @@ interface DatabaseDao {
         toTimeStamp: Long? = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
     ): Flow<List<SongWithStats>>
 
+    // Time Transfer
+    @Query("UPDATE event SET songId = :toSongId WHERE songId = :fromSongId")
+    suspend fun transferEvents(fromSongId: String, toSongId: String): Int
+
+    // 1) Load source rows
+    @Query("SELECT * FROM playCount WHERE song = :fromSongId")
+    suspend fun getPlayCountsForSong(fromSongId: String): List<PlayCountEntity>
+
+    // 2) Try to add into existing target row
+    @Query(
+        """
+    UPDATE playCount
+    SET count = count + :delta
+    WHERE song = :toSongId AND year = :year AND month = :month
+    """,
+    )
+    suspend fun addToPlayCountRow(toSongId: String, year: Int, month: Int, delta: Int): Int
+
+    // 3) Insert new target row if none existed
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.IGNORE)
+    suspend fun insertPlayCountRow(row: PlayCountEntity): Long
+
+
+    @Query("DELETE FROM playCount WHERE song = :fromSongId")
+    suspend fun deletePlayCountsForSong(fromSongId: String): Int
+
+    @Transaction
+    suspend fun transferSongStats(fromSongId: String, toSongId: String) {
+        require(fromSongId != toSongId) { "fromSongId and toSongId must differ" }
+
+        // 1) move events (source loses them)
+        transferEvents(fromSongId, toSongId)
+
+        // 2) merge playCount rows into target and remove source rows
+        val rows = getPlayCountsForSong(fromSongId)
+        for (r in rows) {
+            val updated = addToPlayCountRow(toSongId, r.year, r.month, r.count)
+            if (updated == 0) {
+                // no target row existed -> create it
+                insertPlayCountRow(
+                    PlayCountEntity(
+                        song = toSongId,
+                        year = r.year,
+                        month = r.month,
+                        count = r.count,
+                    ),
+                )
+            }
+        }
+        deletePlayCountsForSong(fromSongId)
+    }
+    // Time Transfer
+
     @Transaction
     @RewriteQueriesToDropUnusedColumns
     @Query(

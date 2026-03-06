@@ -39,12 +39,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -81,6 +84,7 @@ import com.metrolist.music.ui.component.LocalArtistsGrid
 import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.LocalSongsGrid
 import com.metrolist.music.ui.component.NavigationTitle
+import com.metrolist.music.ui.component.TimeTransfer
 import com.metrolist.music.ui.menu.AlbumMenu
 import com.metrolist.music.ui.menu.ArtistMenu
 import com.metrolist.music.ui.menu.SongMenu
@@ -149,6 +153,21 @@ fun StatsScreen(
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     val selectedOption by viewModel.selectedOption.collectAsState()
+
+    var showTimeTransfer by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(showTimeTransfer) {
+        if (showTimeTransfer) {
+            viewModel.selectedOption.value = OptionStats.CONTINUOUS // "throughout time" in your VM
+            viewModel.indexChips.value = 5 // optional: ensure it’s actually “now -> throughout time”
+        }
+    }
+
+    if (showTimeTransfer) {
+        TimeTransfer(
+            onDismiss = { showTimeTransfer = false },
+        )
+    }
 
     val weeklyDates =
         if (currentDate != null && firstEvent != null) {
@@ -467,6 +486,7 @@ fun StatsScreen(
                 }
             }
             }
+            }
 
             Timber.d(isSearching.toString())
             if (isSearching) {
@@ -661,6 +681,15 @@ fun StatsScreen(
                     Icon(
                         painter = painterResource(R.drawable.search),
                         contentDescription = null
+                    )
+                }
+                IconButton(
+                    onClick = {showTimeTransfer = true},
+                    onLongClick = {showTimeTransfer = true},
+                ) {
+                    Icon(
+                        painterResource(R.drawable.sync),
+                        contentDescription = null,
                     )
                 }
             }
