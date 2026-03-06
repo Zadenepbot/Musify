@@ -346,4 +346,8 @@
     <string name="new_version_available">New version available</string>
     <string name="translation_models">Translation Models</string>
     <string name="clear_translation_models">Clear translation models</string>
+
+    <string name="android_auto">Android Auto</string>
+    <string name="android_auto_visible_sections">Visible sections</string>
+    <string name="android_auto_reorder_hint">Long press ≡ and drag to reorder</string>
 </resources>
