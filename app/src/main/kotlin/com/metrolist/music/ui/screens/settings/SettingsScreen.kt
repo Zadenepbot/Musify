@@ -101,7 +101,21 @@ fun SettingsScreen(
         )
         
         Spacer(modifier = Modifier.height(16.dp))
-        
+
+        // Android Auto Section
+        Material3SettingsGroup(
+            title = "Android Auto",
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.ic_android_auto),
+                    title = { Text("Android Auto") },
+                    onClick = { navController.navigate("settings/android_auto") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))       
+
         // Privacy & Security Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_privacy),
