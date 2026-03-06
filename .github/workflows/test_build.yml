@@ -2,7 +2,9 @@ name: Quick Test Build
 
 on:
   workflow_dispatch:
-
+  push:
+    branches: ["**"]
+    
 permissions:
   contents: write
 
