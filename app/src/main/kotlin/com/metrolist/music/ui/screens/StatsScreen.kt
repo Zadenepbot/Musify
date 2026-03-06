@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -465,113 +466,66 @@ fun StatsScreen(
                     }
                 }
             }
-        }
-                    if (mostPlayedAlbums.isNotEmpty()) {
-                        LazyRow(
-                            modifier = Modifier.animateItem(),
-                        ) {
-                            itemsIndexed(
-                                items = mostPlayedAlbums,
-                                key = { _, album -> album.id },
-                            ) { index, album ->
-                                LocalAlbumsGrid(
-                                    title = "${index + 1}. ${album.album.title}",
-                                    subtitle =
-                                        joinByBullet(
-                                            pluralStringResource(
-                                                R.plurals.n_time,
-                                                album.songCountListened!!,
-                                                album.songCountListened
-                                            ),
-                                            makeTimeString(album.timeListened?.toLong()),
-                                        ),
-                                    thumbnailUrl = album.album.thumbnailUrl,
-                                    isActive = album.id == mediaMetadata?.album?.id,
-                                    isPlaying = isPlaying,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .combinedClickable(
-                                                onClick = {
-                                                    navController.navigate("album/${album.id}")
-                                                },
-                                                onLongClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    menuState.show {
-                                                        AlbumMenu(
-                                                            originalAlbum = album,
-                                                            navController = navController,
-                                                            onDismiss = menuState::dismiss,
-                                                        )
-                                                    }
-                                                },
-                                            )
-                                            .animateItem(),
-                                )
+            }
+
+            Timber.d(isSearching.toString())
+            if (isSearching) {
+                items(
+                    items = allArtists.filter { artist ->
+                        artist.artist.name.contains(query.text, ignoreCase = true)
+                    },
+                    key = { it.id },
+                    contentType = { CONTENT_TYPE_ARTIST },
+                ) { artist ->
+                    Row( // Use a row to arrange the checkbox and ArtistListItem horizontally
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // Toggle the checkbox state by clicking anywhere in the row
+                                val b = Artist(name = artist.artist.name, id = artist.id)
+
+                                if (sArtists.contains(b)) {
+                                    sArtists.remove(b)
+                                } else {
+                                    sArtists.add(b)
+                                }
+
+                                Timber.d("All artists: $sArtists")
+                                val c = sArtists.isEmpty()
+                                Timber.d("No Artists: $c")
+                                viewModel.selectedArtists.clear()
+                                viewModel.selectedArtists.addAll(sArtists)
                             }
-                        }
+                            .padding(8.dp)
+                    ) {
+                        ArtistListItem(
+                            artist = artist,
+                            modifier = Modifier.weight(1f) // Allow ArtistListItem to take remaining space
+                        )
+
+                        Checkbox(
+
+                            checked = sArtists.contains(Artist(name = artist.artist.name, id = artist.id)), // Get the current checked state
+                            onCheckedChange = { isChecked ->
+                                val b = Artist(name = artist.artist.name, id = artist.id)
+
+                                if (sArtists.contains(b)) {
+                                    sArtists.remove(b)
+                                } else {
+                                    sArtists.add(b)
+                                }
+
+                                Timber.d("All artists: $sArtists")
+                                val c = sArtists.isEmpty()
+                                Timber.d("No Artists: $c")
+                                viewModel.selectedArtists.clear()
+                                viewModel.selectedArtists.addAll(sArtists)
+                            }
+                        )
                     }
                 }
             }
-
-            if (isSearching) {
-                    items(
-                        items = allArtists.filter { artist ->
-                            artist.artist.name.contains(query.text, ignoreCase = true)
-                        },
-                        key = { it.id },
-                        contentType = { CONTENT_TYPE_ARTIST },
-                    ) { artist ->
-                        Row( // Use a row to arrange the checkbox and ArtistListItem horizontally
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    // Toggle the checkbox state by clicking anywhere in the row
-                                    val b = Artist(name = artist.artist.name, id = artist.id)
-
-                                    if (sArtists.contains(b)) {
-                                        sArtists.remove(b)
-                                    } else {
-                                        sArtists.add(b)
-                                    }
-
-                                    Timber.d("All artists: $sArtists")
-                                    val c = sArtists.isEmpty()
-                                    Timber.d("No Artists: $c")
-                                    viewModel.selectedArtists.clear()
-                                    viewModel.selectedArtists.addAll(sArtists)
-                                }
-                                .padding(8.dp)
-                        ) {
-                            ArtistListItem(
-                                artist = artist,
-                                modifier = Modifier.weight(1f) // Allow ArtistListItem to take remaining space
-                            )
-
-                            Checkbox(
-
-                                checked = sArtists.contains(Artist(name = artist.artist.name, id = artist.id)), // Get the current checked state
-                                onCheckedChange = { isChecked ->
-                                    val b = Artist(name = artist.artist.name, id = artist.id)
-
-                                    if (sArtists.contains(b)) {
-                                        sArtists.remove(b)
-                                    } else {
-                                        sArtists.add(b)
-                                    }
-
-                                    Timber.d("All artists: $sArtists")
-                                    val c = sArtists.isEmpty()
-                                    Timber.d("No Artists: $c")
-                                    viewModel.selectedArtists.clear()
-                                    viewModel.selectedArtists.addAll(sArtists)
-                                }
-                            )
-                        }
-                    }
-            }
-
             if (query.text.isNotEmpty() && filteredArtists.isEmpty()) {
                 item(key = "no_result") {
                     EmptyPlaceholder(
@@ -581,7 +535,6 @@ fun StatsScreen(
                 }
             }
         }
-
         // FAB to shuffle most played songs
         if (mostPlayedSongsStats.isNotEmpty() && !isSearching) {
             HideOnScrollFAB(
@@ -599,121 +552,121 @@ fun StatsScreen(
                 }
             )
         }
+    }
 
-        TopAppBar(
-            title = {
-                if (inSelectMode) {
-                    Text(pluralStringResource(R.plurals.n_selected, selection.size, selection.size))
-                } else if (isSearching) {
-                    Row {
-                        TextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            placeholder = {
-                                Text(
-                                    text = stringResource(R.string.search),
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                            },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.titleLarge,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent,
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(focusRequester)
-                        )
 
-                        if (sArtists.isNotEmpty()) {
-                            androidx.compose.material3.IconButton(onClick = {
-                                viewModel.selectedArtists.clear()
-                                sArtists.clear()
-                            }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.close),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
 
-                } else {
-                    Text(stringResource(R.string.stats))
-                }
-            },
-            navigationIcon = {
-                if (inSelectMode) {
-                    androidx.compose.material3.IconButton(onClick = onExitSelectionMode) {
-                        Icon(
-                            painter = painterResource(R.drawable.close),
-                            contentDescription = null,
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = {
-                            if (isSearching) {
-                                isSearching = false
-                                query = TextFieldValue()
-                            } else {
-                                navController.navigateUp()
-                            }
+    TopAppBar(
+        title = {
+            if (inSelectMode) {
+                Text(pluralStringResource(R.plurals.n_selected, selection.size, selection.size))
+            } else if (isSearching) {
+                Row {
+                    TextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = {
+                            Text(
+                                text = stringResource(R.string.search),
+                                style = MaterialTheme.typography.titleLarge
+                            )
                         },
-                        onLongClick = {
-                            if (!isSearching) {
-                                navController.backToMain()
-                            }
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.titleLarge,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester)
+                    )
+
+                    if (sArtists.isNotEmpty()) {
+                        androidx.compose.material3.IconButton(onClick = {
+                            viewModel.selectedArtists.clear()
+                            sArtists.clear()
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.close),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back),
-                            contentDescription = null
-                        )
                     }
                 }
-            },
-            actions = {
-                if (inSelectMode) {
-                    Checkbox(
-                        checked = true,
-                        onCheckedChange = {
-                            Timber.d("Checked")
-                        }
+
+            } else {
+                Text(stringResource(R.string.stats))
+            }
+        },
+        navigationIcon = {
+            if (inSelectMode) {
+                androidx.compose.material3.IconButton(onClick = onExitSelectionMode) {
+                    Icon(
+                        painter = painterResource(R.drawable.close),
+                        contentDescription = null,
                     )
-                    androidx.compose.material3.IconButton(
-                        enabled = selection.isNotEmpty(),
-                        onClick = {
-                            Timber.d("Test")
+                }
+            } else {
+                IconButton(
+                    onClick = {
+                        if (isSearching) {
+                            isSearching = false
+                            query = TextFieldValue()
+                        } else {
+                            navController.navigateUp()
                         }
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.more_vert),
-                            contentDescription = null
-                        )
+                    },
+                    onLongClick = {
+                        if (!isSearching) {
+                            navController.backToMain()
+                        }
                     }
-                } else if (!isSearching) {
-                    androidx.compose.material3.IconButton(
-                        onClick = { isSearching = true }
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.search),
-                            contentDescription = null
-                        )
-                    }
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.arrow_back),
+                        contentDescription = null
+                    )
                 }
             }
-        )
-
+        },
+        actions = {
+            if (inSelectMode) {
+                Checkbox(
+                    checked = true,
+                    onCheckedChange = {
+                        Timber.d("Checked")
+                    }
+                )
+                androidx.compose.material3.IconButton(
+                    enabled = selection.isNotEmpty(),
+                    onClick = {
+                        Timber.d("Test")
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.more_vert),
+                        contentDescription = null
+                    )
+                }
+            } else if (!isSearching) {
+                androidx.compose.material3.IconButton(
+                    onClick = { isSearching = true }
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.search),
+                        contentDescription = null
+                    )
+                }
+            }
         }
-
-
+    )
 }
+
 
 enum class OptionStats { WEEKS, MONTHS, YEARS, CONTINUOUS }
