@@ -62,6 +62,7 @@ import com.metrolist.music.ui.screens.settings.integrations.ListenTogetherSettin
 import com.metrolist.music.ui.screens.wrapped.WrappedScreen
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
+import com.metrolist.music.ui.screens.settings.AndroidAutoSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavGraphBuilder.navigationBuilder(
@@ -435,5 +436,8 @@ fun NavGraphBuilder.navigationBuilder(
 
     composable("recognition_history") {
         RecognitionHistoryScreen(navController)
+    }
+    composable("settings/android_auto") {
+        AndroidAutoSettings(navController, scrollBehavior)
     }
 }
