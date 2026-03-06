@@ -66,5 +66,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Metrolist_andker
-          path: metrolist-andker.apk
+          name: app-universal-test
+          path: app-signed.apk
