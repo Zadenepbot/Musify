@@ -1,4 +1,4 @@
-name: andker Test Build
+name: Quick Test Build
 
 on:
   workflow_dispatch:
