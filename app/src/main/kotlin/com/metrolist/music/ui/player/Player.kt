@@ -620,19 +620,7 @@ fun BottomSheetPlayer(
                         steps = (120 - 5) / 5 - 1,
                     )
 
-
-
                     OutlinedIconButton(
-                        onClick = {
-                            showSleepTimerDialog = false
-                            playerConnection.service.sleepTimer.start(
-                                minute = -1,
-                            )
-                        },
-                    ) {
-                        Text(stringResource(R.string.end_of_song))
-                    }
-                    TextButton(
                         onClick = {
                             scope.launch {
                                 context.dataStore.edit { settings ->
@@ -648,6 +636,17 @@ fun BottomSheetPlayer(
                         },
                     ) {
                         Text(stringResource(R.string.set_as_default))
+                    }
+
+                    OutlinedIconButton(
+                        onClick = {
+                            showSleepTimerDialog = false
+                            playerConnection.service.sleepTimer.start(
+                                minute = -1,
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.end_of_song))
                     }
                 }
             },

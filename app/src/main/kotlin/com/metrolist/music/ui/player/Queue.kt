@@ -590,18 +590,6 @@ fun Queue(
 
                             OutlinedButton(
                                 onClick = {
-                                    showSleepTimerDialog = false
-                                    playerConnection.service.sleepTimer.start(
-                                        minute = -1,
-                                    )
-                                },
-                            ) {
-                                Text(stringResource(R.string.end_of_song))
-                            }
-                            Spacer(Modifier.height(8.dp))
-
-                            TextButton(
-                                onClick = {
                                     coroutineScope.launch {
                                         context.dataStore.edit { settings ->
                                             settings[SleepTimerDefaultKey] = sleepTimerValue
@@ -616,6 +604,19 @@ fun Queue(
                                 },
                             ) {
                                 Text(stringResource(R.string.set_as_default))
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = {
+                                    showSleepTimerDialog = false
+                                    playerConnection.service.sleepTimer.start(
+                                        minute = -1,
+                                    )
+                                },
+                            ) {
+                                Text(stringResource(R.string.end_of_song))
                             }
                         }
                     },
