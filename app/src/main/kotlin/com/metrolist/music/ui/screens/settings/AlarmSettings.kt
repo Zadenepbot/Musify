@@ -95,6 +95,41 @@ fun AlarmSettings(
     } else {
         true
     }
+    val systemItems = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !canScheduleExact) {
+            add(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.warning),
+                    title = { Text(stringResource(R.string.alarm_exact_permission_title)) },
+                    description = { Text(stringResource(R.string.alarm_exact_permission_desc)) },
+                    onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                .setData("package:${context.packageName}".toUri())
+                            context.startActivity(intent)
+                        } catch (_: ActivityNotFoundException) {
+                        }
+                    }
+                )
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !ignoringBatteryOptimization) {
+            add(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.warning),
+                    title = { Text(stringResource(R.string.alarm_battery_optimization_title)) },
+                    description = { Text(stringResource(R.string.alarm_battery_optimization_desc)) },
+                    onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            context.startActivity(intent)
+                        } catch (_: ActivityNotFoundException) {
+                        }
+                    }
+                )
+            )
+        }
+    }
 
     fun refreshAlarms() {
         alarms = MusicAlarmStore.load(context).sortedBy { it.hour * 60 + it.minute }
@@ -235,46 +270,14 @@ fun AlarmSettings(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (systemItems.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(24.dp))
 
-        Material3SettingsGroup(
-            title = stringResource(R.string.settings_section_system),
-            items = buildList {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !canScheduleExact) {
-                    add(
-                        Material3SettingsItem(
-                            icon = painterResource(R.drawable.warning),
-                            title = { Text(stringResource(R.string.alarm_exact_permission_title)) },
-                            description = { Text(stringResource(R.string.alarm_exact_permission_desc)) },
-                            onClick = {
-                                try {
-                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                                        .setData("package:${context.packageName}".toUri())
-                                    context.startActivity(intent)
-                                } catch (_: ActivityNotFoundException) {
-                                }
-                            }
-                        )
-                    )
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !ignoringBatteryOptimization) {
-                    add(
-                        Material3SettingsItem(
-                            icon = painterResource(R.drawable.warning),
-                            title = { Text(stringResource(R.string.alarm_battery_optimization_title)) },
-                            description = { Text(stringResource(R.string.alarm_battery_optimization_desc)) },
-                            onClick = {
-                                try {
-                                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                    context.startActivity(intent)
-                                } catch (_: ActivityNotFoundException) {
-                                }
-                            }
-                        )
-                    )
-                }
-            }
-        )
+            Material3SettingsGroup(
+                title = stringResource(R.string.settings_section_system),
+                items = systemItems
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
     }
