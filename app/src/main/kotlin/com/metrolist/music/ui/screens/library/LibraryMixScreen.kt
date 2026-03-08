@@ -59,6 +59,7 @@ import com.metrolist.music.constants.MixSortDescendingKey
 import com.metrolist.music.constants.MixSortType
 import com.metrolist.music.constants.MixSortTypeKey
 import com.metrolist.music.constants.MixSortTypeKey
+import com.metrolist.music.constants.ShowCachedPlaylistKey
 import com.metrolist.music.constants.ShowDownloadedPlaylistKey
 import com.metrolist.music.constants.ShowLikedPlaylistKey
 import com.metrolist.music.constants.ShowTopPlaylistKey
@@ -154,10 +155,21 @@ fun LibraryMixScreen(
             songThumbnails = emptyList(),
         )
 
+    val cachedPlaylist =
+        Playlist(
+            playlist = PlaylistEntity(
+                id = UUID.randomUUID().toString(),
+                name = stringResource(R.string.cached_playlist)
+            ),
+            songCount = 0,
+            songThumbnails = emptyList(),
+        )
+
     val (showLiked) = rememberPreference(ShowLikedPlaylistKey, true)
     val (showDownloaded) = rememberPreference(ShowDownloadedPlaylistKey, true)
     val (showTop) = rememberPreference(ShowTopPlaylistKey, true)
     val (showUploaded) = rememberPreference(ShowUploadedPlaylistKey, true)
+    val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
 
     val albums = viewModel.albums.collectAsState()
     val artist = viewModel.artists.collectAsState()
@@ -332,6 +344,25 @@ fun LibraryMixScreen(
                                     .fillMaxWidth()
                                     .clickable {
                                         navController.navigate("auto_playlist/downloaded")
+                                    }
+                                    .animateItem(),
+                            )
+                        }
+                    }
+
+                    if (showCached) {
+                        item(
+                            key = "cachedPlaylist",
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) {
+                            PlaylistListItem(
+                                playlist = cachedPlaylist,
+                                autoPlaylist = true,
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        navController.navigate("cache_playlist/cached")
                                     }
                                     .animateItem(),
                             )
@@ -583,6 +614,28 @@ fun LibraryMixScreen(
                                     .combinedClickable(
                                         onClick = {
                                             navController.navigate("auto_playlist/downloaded")
+                                        },
+                                    )
+                                    .animateItem(),
+                            )
+                        }
+                    }
+
+                    if (showCached) {
+                        item(
+                            key = "cachedPlaylist",
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) {
+                            PlaylistGridItem(
+                                playlist = cachedPlaylist,
+                                fillMaxWidth = true,
+                                autoPlaylist = true,
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = {
+                                            navController.navigate("cache_playlist/cached")
                                         },
                                     )
                                     .animateItem(),

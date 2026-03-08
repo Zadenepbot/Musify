@@ -84,6 +84,7 @@ import com.metrolist.music.constants.PlayerButtonsStyle
 import com.metrolist.music.constants.PlayerButtonsStyleKey
 import com.metrolist.music.constants.PureBlackMiniPlayerKey
 import com.metrolist.music.constants.SelectedThemeColorKey
+import com.metrolist.music.constants.ShowCachedPlaylistKey
 import com.metrolist.music.constants.ShowDownloadedPlaylistKey
 import com.metrolist.music.constants.ShowLikedPlaylistKey
 import com.metrolist.music.constants.ShowTopPlaylistKey
@@ -284,6 +285,10 @@ fun AppearanceSettings(
     )
     val (showUploadedPlaylist, onShowUploadedPlaylistChange) = rememberPreference(
         ShowUploadedPlaylistKey,
+        defaultValue = true
+    )
+    val (showCachedPlaylist, onShowCachedPlaylistChange) = rememberPreference(
+        ShowCachedPlaylistKey,
         defaultValue = true
     )
 
@@ -1575,6 +1580,26 @@ fun AppearanceSettings(
                         )
                     },
                     onClick = { onShowUploadedPlaylistChange(!showUploadedPlaylist) }
+                ),
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.cached),
+                    title = { Text(stringResource(R.string.show_cached_playlist)) },
+                    trailingContent = {
+                        Switch(
+                            checked = showCachedPlaylist,
+                            onCheckedChange = onShowCachedPlaylistChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (showCachedPlaylist) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onShowCachedPlaylistChange(!showCachedPlaylist) }
                 )
             )
         )

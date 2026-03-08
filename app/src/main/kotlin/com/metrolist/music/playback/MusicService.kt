@@ -2741,34 +2741,37 @@ class MusicService :
         }
     }
 
-    private fun createCacheDataSource(): CacheDataSource.Factory =
-        CacheDataSource
-            .Factory()
-            .setCache(downloadCache)
-            .setUpstreamDataSourceFactory(
-                CacheDataSource
-                    .Factory()
-                    .setCache(playerCache)
-                    .setUpstreamDataSourceFactory(
-                        DefaultDataSource.Factory(
-                            this,
-                            OkHttpDataSource.Factory(
-                                OkHttpClient
-                                    .Builder()
-                                    .proxy(YouTube.proxy)
-                                    .proxyAuthenticator { _, response ->
-                                        YouTube.proxyAuth?.let { auth ->
-                                            response.request.newBuilder()
-                                                .header("Proxy-Authorization", auth)
-                                                .build()
-                                        } ?: response.request
-                                    }
-                                    .build(),
-                            ),
-                        ),
-                    ),
-            ).setCacheWriteDataSinkFactory(null)
-            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
+    private fun createCacheDataSource(): DataSource.Factory {
+        val baseFactory = DefaultDataSource.Factory(
+            this,
+            OkHttpDataSource.Factory(
+                OkHttpClient
+                    .Builder()
+                    .proxy(YouTube.proxy)
+                    .proxyAuthenticator { _, response ->
+                        YouTube.proxyAuth?.let { auth ->
+                            response.request.newBuilder()
+                                .header("Proxy-Authorization", auth)
+                                .build()
+                        } ?: response.request
+                    }
+                    .build(),
+            ),
+        )
+
+        return DataSource.Factory {
+            val upstreamFactory = CacheDataSource.Factory()
+                .setCache(playerCache)
+                .setUpstreamDataSourceFactory(baseFactory)
+
+            CacheDataSource.Factory()
+                .setCache(downloadCache)
+                .setUpstreamDataSourceFactory(upstreamFactory)
+                .setCacheWriteDataSinkFactory(null)
+                .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
+                .createDataSource()
+        }
+    }
 
     // Flag to prevent queue saving during silence skip operations
     private var isSilenceSkipping = false
