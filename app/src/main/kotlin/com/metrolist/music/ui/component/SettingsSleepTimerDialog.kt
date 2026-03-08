@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +35,23 @@ import androidx.compose.ui.unit.dp
 import com.metrolist.music.R
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 
 fun decodeDayTimes(raw: String): MutableMap<Int, Pair<String, String>> {
     if (raw.isBlank()) return mutableMapOf()
@@ -61,7 +77,7 @@ private const val DEFAULT_END = "06:00"
 private val WEEKDAY_INDICES = 0..4 // Monday to Friday
 private val WEEKEND_INDICES = 5..6 // Saturday and Sunday
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SleepTimerDialog(
     isVisible: Boolean,
@@ -235,195 +251,291 @@ fun SleepTimerDialog(
         }
 
         item {
-            Text(
-                text = stringResource(R.string.sleep_timer_repeat),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedRepeat = "daily" }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                RadioButton(selected = selectedRepeat == "daily", onClick = null)
-                Text(stringResource(R.string.sleep_timer_daily), modifier = Modifier.padding(start = 16.dp))
-            }
-        }
-
-        if (selectedRepeat == "daily") {
-            item {
-                TimeRangeRow(
-                    startTime = selectedStartTime,
-                    endTime = selectedEndTime,
-                    onStartClick = { activeTimePicker = "global_start" },
-                    onEndClick = { activeTimePicker = "global_end" },
+                SegmentedButton(
+                    selected = selectedRepeat == "daily",
+                    onClick = { selectedRepeat = "daily" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                    label = { Text(stringResource(R.string.sleep_timer_daily)) },
+                )
+                SegmentedButton(
+                    selected = selectedRepeat == "weekdays_weekends",
+                    onClick = {
+                        selectedRepeat = "weekdays_weekends"
+                        if (!weekdaysEnabled && !weekendsEnabled) weekdaysEnabled = true
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                    label = { Text(stringResource(R.string.sleep_timer_weekdays_weekends)) },
+                )
+                SegmentedButton(
+                    selected = selectedRepeat == "custom",
+                    onClick = { selectedRepeat = "custom" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                    label = { Text(stringResource(R.string.sleep_timer_custom)) },
                 )
             }
         }
 
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            selectedRepeat = "weekdays_weekends"
-                            // Enable weekdays by default when the mode is first selected
-                            if (!weekdaysEnabled && !weekendsEnabled) weekdaysEnabled = true
-                        }.padding(horizontal = 16.dp, vertical = 12.dp),
+            AnimatedVisibility(
+                visible = selectedRepeat == "daily",
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeIn(),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeOut(),
             ) {
-                RadioButton(selected = selectedRepeat == "weekdays_weekends", onClick = null)
-                Text(
-                    stringResource(R.string.sleep_timer_weekdays_weekends),
-                    modifier = Modifier.padding(start = 16.dp),
-                )
-            }
-        }
-
-        if (selectedRepeat == "weekdays_weekends") {
-            item {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
+                    TimeRangeRow(
+                        startTime = selectedStartTime,
+                        endTime = selectedEndTime,
+                        onStartClick = { activeTimePicker = "global_start" },
+                        onEndClick = { activeTimePicker = "global_end" },
+                    )
+                }
+            }
+        }
+
+        item {
+            AnimatedVisibility(
+                visible = selectedRepeat == "weekdays_weekends",
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeIn(),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeOut(),
+            ) {
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { weekdaysEnabled = !weekdaysEnabled }
                                 .padding(vertical = 8.dp),
-                    ) {
-                        Text(text = stringResource(R.string.sleep_timer_weekdays), modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = weekdaysEnabled,
-                            onCheckedChange = { weekdaysEnabled = it },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(if (weekdaysEnabled) R.drawable.check else R.drawable.close),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            },
-                            modifier = Modifier.scale(0.85f)
-                        )
-                    }
-                    if (weekdaysEnabled) {
-                        TimeRangeRow(
-                            startTime = weekdaysStart,
-                            endTime = weekdaysEnd,
-                            onStartClick = { activeTimePicker = "weekdays_start" },
-                            onEndClick = { activeTimePicker = "weekdays_end" },
-                            modifier = Modifier.padding(start = 40.dp, bottom = 4.dp),
-                        )
-                    }
-                }
-            }
+                        ) {
+                            Text(
+                                text = stringResource(R.string.sleep_timer_weekdays),
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = weekdaysEnabled,
+                                onCheckedChange = { weekdaysEnabled = it },
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            if (weekdaysEnabled) R.drawable.check else R.drawable.close,
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize),
+                                    )
+                                },
+                                modifier = Modifier.scale(0.85f),
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = weekdaysEnabled,
+                            enter = expandVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + fadeIn(),
+                            exit = shrinkVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + fadeOut(),
+                        ) {
+                            TimeRangeRow(
+                                startTime = weekdaysStart,
+                                endTime = weekdaysEnd,
+                                onStartClick = { activeTimePicker = "weekdays_start" },
+                                onEndClick = { activeTimePicker = "weekdays_end" },
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
 
-            item {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { weekendsEnabled = !weekendsEnabled }
                                 .padding(vertical = 8.dp),
-                    ) {
-                        Text(text = stringResource(R.string.sleep_timer_weekends), modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = weekendsEnabled,
-                            onCheckedChange = { weekendsEnabled = it },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(if (weekendsEnabled) R.drawable.check else R.drawable.close),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            },
-                            modifier = Modifier.scale(0.85f)
-                        )
-                    }
-                    if (weekendsEnabled) {
-                        TimeRangeRow(
-                            startTime = weekendsStart,
-                            endTime = weekendsEnd,
-                            onStartClick = { activeTimePicker = "weekends_start" },
-                            onEndClick = { activeTimePicker = "weekends_end" },
-                            modifier = Modifier.padding(start = 40.dp, bottom = 4.dp),
-                        )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.sleep_timer_weekends),
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = weekendsEnabled,
+                                onCheckedChange = { weekendsEnabled = it },
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            if (weekendsEnabled) R.drawable.check else R.drawable.close,
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize),
+                                    )
+                                },
+                                modifier = Modifier.scale(0.85f),
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = weekendsEnabled,
+                            enter = expandVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + fadeIn(),
+                            exit = shrinkVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + fadeOut(),
+                        ) {
+                            TimeRangeRow(
+                                startTime = weekendsStart,
+                                endTime = weekendsEnd,
+                                onStartClick = { activeTimePicker = "weekends_start" },
+                                onEndClick = { activeTimePicker = "weekends_end" },
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
                     }
                 }
             }
         }
 
+
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedRepeat = "custom" }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+            AnimatedVisibility(
+                visible = selectedRepeat == "custom",
+                enter = expandVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeIn(),
+                exit = shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                ) + fadeOut(),
             ) {
-                RadioButton(selected = selectedRepeat == "custom", onClick = null)
-                Text(stringResource(R.string.sleep_timer_custom), modifier = Modifier.padding(start = 16.dp))
-            }
-        }
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        dayLabelRes.indices.forEach { index ->
+                            val isDaySelected = index in selectedDays
+                            val dayTimes = dayTimesMap[index] ?: (DEFAULT_START to DEFAULT_END)
 
-        if (selectedRepeat == "custom") {
-            items(dayLabelRes.size) { index ->
-                val isDaySelected = index in selectedDays
-                val dayTimes = dayTimesMap[index] ?: (DEFAULT_START to DEFAULT_END)
+                            if (index > 0) {
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            }
 
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedDays = if (index in selectedDays) selectedDays - index else selectedDays + index
-                                }.padding(vertical = 8.dp),
-                    ) {
-                        Text(text = stringResource(dayLabelRes[index]), modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = isDaySelected,
-                            onCheckedChange = {
-                                selectedDays = if (index in selectedDays) selectedDays - index else selectedDays + index
-                            },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(if (isDaySelected) R.drawable.check else R.drawable.close),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            },
-                            modifier = Modifier.scale(0.85f)
-                        )
-                    }
-                    if (isDaySelected) {
-                        TimeRangeRow(
-                            startTime = dayTimes.first,
-                            endTime = dayTimes.second,
-                            onStartClick = { activeTimePicker = "day_start_$index" },
-                            onEndClick = { activeTimePicker = "day_end_$index" },
-                            modifier = Modifier.padding(start = 40.dp, bottom = 4.dp),
-                        )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedDays =
+                                                if (index in selectedDays) selectedDays - index else selectedDays + index
+                                        }.padding(vertical = 6.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(dayLabelRes[index]),
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Switch(
+                                        checked = isDaySelected,
+                                        onCheckedChange = {
+                                            selectedDays =
+                                                if (index in selectedDays) selectedDays - index else selectedDays + index
+                                        },
+                                        thumbContent = {
+                                            Icon(
+                                                painter = painterResource(
+                                                    if (isDaySelected) R.drawable.check else R.drawable.close,
+                                                ),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(SwitchDefaults.IconSize),
+                                            )
+                                        },
+                                        modifier = Modifier.scale(0.85f),
+                                    )
+                                }
+                                AnimatedVisibility(
+                                    visible = isDaySelected,
+                                    enter = expandVertically(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium,
+                                        ),
+                                    ) + fadeIn(),
+                                    exit = shrinkVertically(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium,
+                                        ),
+                                    ) + fadeOut(),
+                                ) {
+                                    TimeRangeRow(
+                                        startTime = dayTimes.first,
+                                        endTime = dayTimes.second,
+                                        onStartClick = { activeTimePicker = "day_start_$index" },
+                                        onEndClick = { activeTimePicker = "day_end_$index" },
+                                        modifier = Modifier.padding(bottom = 4.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -437,44 +549,47 @@ fun SleepTimerDialog(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-                TextButton(
-                    onClick = {
-                        val (finalRepeat, finalDayTimes) =
-                            when (selectedRepeat) {
-                                "weekdays_weekends" -> {
-                                    // Collapse the two booleans back into a single string value
-                                    val repeat =
-                                        when {
-                                            weekdaysEnabled && weekendsEnabled -> "weekdays_weekends"
-                                            weekdaysEnabled -> "weekdays"
-                                            weekendsEnabled -> "weekends"
-                                            else -> "daily" // nothing checked, fall back
-                                        }
-                                    val times =
-                                        buildMap {
-                                            if (weekdaysEnabled) {
-                                                for (d in WEEKDAY_INDICES) put(d, weekdaysStart to weekdaysEnd)
+                ButtonGroup {
+                    TextButton(
+                        onClick = onDismiss,
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                    androidx.compose.material3.Button(
+                        shapes = ButtonDefaults.shapes(),
+                        onClick = {
+                            val (finalRepeat, finalDayTimes) =
+                                when (selectedRepeat) {
+                                    "weekdays_weekends" -> {
+                                        val repeat =
+                                            when {
+                                                weekdaysEnabled && weekendsEnabled -> "weekdays_weekends"
+                                                weekdaysEnabled -> "weekdays"
+                                                weekendsEnabled -> "weekends"
+                                                else -> "daily"
                                             }
-                                            if (weekendsEnabled) {
-                                                for (d in WEEKEND_INDICES) put(d, weekendsStart to weekendsEnd)
+                                        val times =
+                                            buildMap {
+                                                if (weekdaysEnabled) {
+                                                    for (d in WEEKDAY_INDICES) put(d, weekdaysStart to weekdaysEnd)
+                                                }
+                                                if (weekendsEnabled) {
+                                                    for (d in WEEKEND_INDICES) put(d, weekendsStart to weekendsEnd)
+                                                }
                                             }
-                                        }
-                                    repeat to times
+                                        repeat to times
+                                    }
+                                    else -> {
+                                        selectedRepeat to dayTimesMap.toMap()
+                                    }
                                 }
-
-                                else -> {
-                                    selectedRepeat to dayTimesMap.toMap()
-                                }
-                            }
-
-                        onConfirm(finalRepeat, selectedStartTime, selectedEndTime, selectedDays, finalDayTimes)
-                        onDismiss()
-                    },
-                ) {
-                    Text(stringResource(android.R.string.ok))
+                            onConfirm(finalRepeat, selectedStartTime, selectedEndTime, selectedDays, finalDayTimes)
+                            onDismiss()
+                        },
+                    ) {
+                        Text(stringResource(android.R.string.ok))
+                    }
                 }
             }
         }
@@ -493,13 +608,13 @@ private fun TimeRangeRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedButton(onClick = onStartClick, modifier = Modifier.weight(1f)) {
+        FilledTonalButton(onClick = onStartClick, modifier = Modifier.weight(1f)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(stringResource(R.string.sleep_timer_start_time), style = MaterialTheme.typography.labelSmall)
                 Text(startTime, style = MaterialTheme.typography.bodyLarge)
             }
         }
-        OutlinedButton(onClick = onEndClick, modifier = Modifier.weight(1f)) {
+        FilledTonalButton(onClick = onEndClick, modifier = Modifier.weight(1f)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(stringResource(R.string.sleep_timer_end_time), style = MaterialTheme.typography.labelSmall)
                 Text(endTime, style = MaterialTheme.typography.bodyLarge)
@@ -534,7 +649,7 @@ fun SleepTimerTimePickerDialog(
         onDismiss = onDismiss,
         buttons = {
             TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
-            TextButton(onClick = {
+            Button(onClick = {
                 val hour = timePickerState.hour.toString().padStart(2, '0')
                 val minute = timePickerState.minute.toString().padStart(2, '0')
                 onConfirm("$hour:$minute")
