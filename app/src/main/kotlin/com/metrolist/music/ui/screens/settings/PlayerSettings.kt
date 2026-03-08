@@ -602,7 +602,7 @@ fun PlayerSettings(
                             trailingContent = {
                                 Switch(
                                     checked = sleepTimerEnabled,
-                                    onCheckedChange = onSleepTimerEnabledChange,
+                                    onCheckedChange = {showSleepTimerDialog = true},
                                     thumbContent = {
                                         Icon(
                                             painter = painterResource(
