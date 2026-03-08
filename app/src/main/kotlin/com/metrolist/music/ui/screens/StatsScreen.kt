@@ -263,22 +263,28 @@ fun StatsScreen(
                                         if (song.id == mediaMetadata?.id) {
                                             playerConnection.togglePlayPause()
                                         } else {
-                                            playerConnection.playQueue(
-                                                YouTubeQueue(
-                                                    endpoint = WatchEndpoint(song.id),
-                                                    preloadItem = mostPlayedSongs[index].toMediaMetadata(),
-                                                ),
-                                            )
+                                            val targetSong = mostPlayedSongs.find { it.id == song.id }
+                                            if (targetSong != null) {
+                                                playerConnection.playQueue(
+                                                    YouTubeQueue(
+                                                        endpoint = WatchEndpoint(song.id),
+                                                        preloadItem = targetSong.toMediaMetadata(),
+                                                    ),
+                                                )
+                                            }
                                         }
                                     },
                                     onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        menuState.show {
-                                            SongMenu(
-                                                originalSong = mostPlayedSongs[index],
-                                                navController = navController,
-                                                onDismiss = menuState::dismiss,
-                                            )
+                                        val targetSong = mostPlayedSongs.find { it.id == song.id }
+                                        if (targetSong != null) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            menuState.show {
+                                                SongMenu(
+                                                    originalSong = targetSong,
+                                                    navController = navController,
+                                                    onDismiss = menuState::dismiss,
+                                                )
+                                            }
                                         }
                                     },
                                 )

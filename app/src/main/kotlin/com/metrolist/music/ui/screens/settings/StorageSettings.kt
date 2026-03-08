@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,6 +51,7 @@ import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.constants.EnableSongCacheKey
 import com.metrolist.music.constants.MaxImageCacheSizeKey
 import com.metrolist.music.constants.MaxSongCacheSizeKey
 import com.metrolist.music.extensions.tryOrNull
@@ -89,6 +93,10 @@ fun StorageSettings(
     val (maxSongCacheSize, onMaxSongCacheSizeChange) = rememberPreference(
         key = MaxSongCacheSizeKey,
         defaultValue = 1024
+    )
+    val (enableSongCache, onEnableSongCacheChange) = rememberPreference(
+        key = EnableSongCacheKey,
+        defaultValue = true
     )
 
     var clearDownloads by remember { mutableStateOf(false) }
@@ -313,7 +321,29 @@ fun StorageSettings(
             items = listOf(
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.cached),
+                    title = { Text(stringResource(R.string.enable_song_cache)) },
+                    description = { Text(stringResource(R.string.enable_song_cache_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = enableSongCache,
+                            onCheckedChange = onEnableSongCacheChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (enableSongCache) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onEnableSongCacheChange(!enableSongCache) }
+                ),
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.cached),
                     title = { Text(stringResource(R.string.max_song_cache_size)) },
+                    enabled = enableSongCache,
                     description = {
                         val songCacheValues =
                             remember { listOf(0, 128, 256, 512, 1024, 2048, 4096, 8192, -1) }
@@ -327,6 +357,7 @@ fun StorageSettings(
                             )
                             Slider(
                                 value = songCacheValues.indexOf(maxSongCacheSize).toFloat(),
+                                enabled = enableSongCache,
                                 onValueChange = {
                                     val newValue = songCacheValues[it.roundToInt()]
                                     val newLimitInBytes = if (newValue == -1) {
