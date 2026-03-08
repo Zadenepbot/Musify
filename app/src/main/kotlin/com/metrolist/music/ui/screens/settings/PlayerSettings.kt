@@ -590,7 +590,6 @@ fun PlayerSettings(
                     )
                 )
 
-                if (sleepTimerEnabled) {
                     add(
                         Material3SettingsItem(
                             icon = painterResource(R.drawable.baseline_event_repeat_24),
@@ -600,10 +599,25 @@ fun PlayerSettings(
                                     stringResource(R.string.sleep_timer_repeat_description)
                                 )
                             },
+                            trailingContent = {
+                                Switch(
+                                    checked = sleepTimerEnabled,
+                                    onCheckedChange = onSleepTimerEnabledChange,
+                                    thumbContent = {
+                                        Icon(
+                                            painter = painterResource(
+                                                id = if (sleepTimerEnabled) R.drawable.check else R.drawable.close
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(SwitchDefaults.IconSize)
+                                        )
+                                    }
+                                )
+                            },
                             onClick = { showSleepTimerDialog = true }
                         )
                     )
-                }
+
 
                 add(
                     Material3SettingsItem(
