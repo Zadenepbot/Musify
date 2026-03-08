@@ -565,6 +565,9 @@ fun BottomSheetPlayer(
     var sleepTimerValue by remember {
         mutableFloatStateOf(sleepTimerDefault)
     }
+    val isAtDefault by remember {
+        derivedStateOf { sleepTimerValue.roundToInt() == sleepTimerDefault.roundToInt() }
+    }
     val sleepTimerStopAfterCurrentSong by rememberPreference(SleepTimerStopAfterCurrentSongKey, false)
     val sleepTimerFadeOut by rememberPreference(SleepTimerFadeOutKey, false)
 
@@ -620,33 +623,58 @@ fun BottomSheetPlayer(
                         steps = (120 - 5) / 5 - 1,
                     )
 
-                    OutlinedIconButton(
-                        onClick = {
-                            scope.launch {
-                                context.dataStore.edit { settings ->
-                                    settings[SleepTimerDefaultKey] = sleepTimerValue
-                                }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isAtDefault) {
+                            FilledIconButton(
+                                onClick = {
+                                    scope.launch {
+                                        context.dataStore.edit { settings ->
+                                            settings[SleepTimerDefaultKey] = sleepTimerValue
+                                        }
+                                    }
+                                    Toast.makeText(
+                                        context,
+                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ),
+                            ) {
+                                Text(stringResource(R.string.set_as_default))
                             }
-                            Toast
-                                .makeText(
-                                    context,
-                                    String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        },
-                    ) {
-                        Text(stringResource(R.string.set_as_default))
-                    }
+                        } else {
+                            OutlinedIconButton(
+                                onClick = {
+                                    scope.launch {
+                                        context.dataStore.edit { settings ->
+                                            settings[SleepTimerDefaultKey] = sleepTimerValue
+                                        }
+                                    }
+                                    Toast.makeText(
+                                        context,
+                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                            ) {
+                                Text(stringResource(R.string.set_as_default))
+                            }
+                        }
 
-                    OutlinedIconButton(
-                        onClick = {
-                            showSleepTimerDialog = false
-                            playerConnection.service.sleepTimer.start(
-                                minute = -1,
-                            )
-                        },
-                    ) {
-                        Text(stringResource(R.string.end_of_song))
+                        OutlinedIconButton(
+                            onClick = {
+                                showSleepTimerDialog = false
+                                playerConnection.service.sleepTimer.start(minute = -1)
+                            },
+                        ) {
+                            Text(stringResource(R.string.end_of_song))
+                        }
                     }
                 }
             },
