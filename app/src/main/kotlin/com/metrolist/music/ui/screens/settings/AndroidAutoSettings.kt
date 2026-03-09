@@ -152,7 +152,7 @@ fun AndroidAutoSettings(
         state = lazyListState,
         modifier = Modifier.windowInsetsPadding(LocalPlayerAwareWindowInsets.current),
     ) {
-        // ── Section: visible sections ──────────────────────────────────────
+        // Section: visible sections
         item(key = "header_sections") {
             PreferenceGroupTitle(
                 title = stringResource(R.string.android_auto_visible_sections),
@@ -233,7 +233,7 @@ fun AndroidAutoSettings(
             }
         }
 
-        // ── Section: quick-add playlist ────────────────────────────────────
+        // Section: quick-add playlist
         item(key = "header_quickadd") {
             PreferenceGroupTitle(
                 title = stringResource(R.string.android_auto_target_playlist),
@@ -259,7 +259,7 @@ fun AndroidAutoSettings(
 
         
 
-        // ── Section: YouTube playlists ─────────────────────────────────────
+        // Section: YouTube playlists
         item(key = "header_youtube") {
             PreferenceGroupTitle(
                 title = stringResource(R.string.your_youtube_playlists),
