@@ -106,18 +106,6 @@ fun SettingsScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Android Auto Section
-        Material3SettingsGroup(
-            title = "Android Auto",
-            items = listOf(
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.ic_android_auto),
-                    title = { Text("Android Auto") },
-                    onClick = { navController.navigate("settings/android_auto") }
-                )
-            )
-        )
-
         // Android Auto Section — only shown if Android Auto is installed
         if (hasAndroidAuto) {
             Material3SettingsGroup(
