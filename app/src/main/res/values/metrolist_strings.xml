@@ -818,9 +818,9 @@
     <string name="android_auto_visible_sections">Visible sections</string>
     <string name="android_auto_reorder_hint">Long press ≡ and drag to reorder</string>
     <string name="android_auto_youtube_playlists">Show YouTube suggested playlists</string>
-    <string name="android_auto_youtube_playlists_desc">Show YouTube Music suggested playlists in the Playlists section</string>    
-    <string name="android_auto_target_playlist">Quick-add destination playlist</string>
-    <string name="android_auto_target_playlist_desc">Playlist where the ➕ button in Android Auto will save songs</string>
+    <string name="android_auto_youtube_playlists_desc">SDisplay YouTube Music recommended playlists inside the Playlists section when browsing with Android Auto</string>    
+    <string name="android_auto_target_playlist">Quick-add destination</string>
+    <string name="android_auto_target_playlist_desc">Select the playlist where songs will be saved when using the quick-add button in Android Auto</string>
     <string name="android_auto_target_playlist_auto">Driving Discoveries (auto-created)</string>
     <string name="added_to_playlist">Added to playlist</string>
     
