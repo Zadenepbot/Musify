@@ -157,11 +157,10 @@ constructor(
             LibraryResult.ofItemList(
                 when (parentId) {
                     MusicService.ROOT -> {
-                        val sectionsRaw = context.dataStore.data.map { prefs ->
-                            prefs[AndroidAutoSectionsOrderKey] ?: serializeSections(
-                                AndroidAutoSection.values().map { it to true }
-                            )
-                        }.first()
+                        val sectionsRaw = context.dataStore.get(
+                            AndroidAutoSectionsOrderKey,
+                            serializeSections(AndroidAutoSection.values().map { it to true })
+                        )
                         val sections = deserializeSections(sectionsRaw)
                         sections
                             .filter { (_, enabled) -> enabled }
