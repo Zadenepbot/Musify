@@ -5,16 +5,19 @@
 
 package com.metrolist.music.ui.screens.settings
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -47,9 +49,9 @@ import com.metrolist.music.constants.AndroidAutoYouTubePlaylistsKey
 import com.metrolist.music.constants.MediaSessionConstants
 import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.component.ListPreference
+import com.metrolist.music.ui.component.Material3SettingsGroup
+import com.metrolist.music.ui.component.Material3SettingsItem
 import com.metrolist.music.ui.component.PreferenceEntry
-import com.metrolist.music.ui.component.PreferenceGroupTitle
-import com.metrolist.music.ui.component.SwitchPreference
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.flow.map
@@ -97,7 +99,6 @@ fun AndroidAutoSettings(
     val haptic = LocalHapticFeedback.current
     val database = LocalDatabase.current
 
-    // Load user playlists for the selector
     val userPlaylists by remember {
         database.playlistsByCreateDateAsc().map { list -> list.map { it.playlist } }
     }.collectAsState(initial = emptyList())
@@ -123,9 +124,8 @@ fun AndroidAutoSettings(
 
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        val offset = 2
-        val fromReal = from.index - offset
-        val toReal = to.index - offset
+        val fromReal = from.index
+        val toReal = to.index
         if (fromReal >= 0 && toReal >= 0 && fromReal < sections.size && toReal < sections.size) {
             sections = sections.toMutableList().apply {
                 add(toReal, removeAt(fromReal))
@@ -135,8 +135,6 @@ fun AndroidAutoSettings(
         }
     }
 
-    // Build the list of options for the playlist selector:
-    // first entry = auto-created "Driving Discoveries", then user playlists
     val playlistOptions = listOf(MediaSessionConstants.TARGET_PLAYLIST_AUTO) +
             userPlaylists.map { it.id }
 
@@ -148,139 +146,144 @@ fun AndroidAutoSettings(
         }
     }
 
-    LazyColumn(
-        state = lazyListState,
-        modifier = Modifier.windowInsetsPadding(LocalPlayerAwareWindowInsets.current),
+    Column(
+        modifier = Modifier
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+            .verticalScroll(rememberScrollState())
     ) {
-        // Section: visible sections
-        item(key = "header_sections") {
-            PreferenceGroupTitle(
-                title = stringResource(R.string.android_auto_visible_sections),
-                modifier = Modifier.padding(top = 16.dp),
-            )
-        }
-
-        item(key = "header_hint") {
-            Text(
-                text = stringResource(R.string.android_auto_reorder_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
-        items(sections, key = { (section, _) -> section.id }) { (section, enabled) ->
-            ReorderableItem(reorderableState, key = section.id) { isDragging ->
-                PreferenceEntry(
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = {
-                        Icon(
-                            painter = painterResource(
-                                when (section) {
-                                    AndroidAutoSection.LIKED -> R.drawable.favorite
-                                    AndroidAutoSection.SONGS -> R.drawable.music_note
-                                    AndroidAutoSection.ARTISTS -> R.drawable.artist
-                                    AndroidAutoSection.ALBUMS -> R.drawable.album
-                                    AndroidAutoSection.PLAYLISTS -> R.drawable.queue_music
-                                }
-                            ),
-                            contentDescription = null,
-                        )
-                    },
-                    title = { Text(section.label()) },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                painter = painterResource(R.drawable.drag_handle),
-                                contentDescription = stringResource(R.string.android_auto_reorder_hint),
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .longPressDraggableHandle(
-                                        onDragStarted = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        }
-                                    ),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Switch(
-                                checked = enabled,
-                                onCheckedChange = { newValue ->
-                                    sections = sections.map { (s, e) ->
-                                        if (s == section) s to newValue else s to e
-                                    }
-                                    onSectionsChange(serializeSections(sections))
-                                },
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            if (enabled) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
-                            )
-                        }
-                    },
-                    onClick = {
-                        sections = sections.map { (s, e) ->
-                            if (s == section) s to !e else s to e
-                        }
-                        onSectionsChange(serializeSections(sections))
-                    },
+        // Visible sections
+        Material3SettingsGroup(
+            title = stringResource(R.string.android_auto_visible_sections),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.drag_handle),
+                    title = { Text(stringResource(R.string.android_auto_reorder_hint)) },
+                    onClick = {}
                 )
+            )
+        )
+
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height((sections.size * 64).dp),
+            userScrollEnabled = false,
+        ) {
+            items(sections, key = { (section, _) -> section.id }) { (section, enabled) ->
+                ReorderableItem(reorderableState, key = section.id) {
+                    PreferenceEntry(
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = {
+                            Icon(
+                                painter = painterResource(
+                                    when (section) {
+                                        AndroidAutoSection.LIKED -> R.drawable.favorite
+                                        AndroidAutoSection.SONGS -> R.drawable.music_note
+                                        AndroidAutoSection.ARTISTS -> R.drawable.artist
+                                        AndroidAutoSection.ALBUMS -> R.drawable.album
+                                        AndroidAutoSection.PLAYLISTS -> R.drawable.queue_music
+                                    }
+                                ),
+                                contentDescription = null,
+                            )
+                        },
+                        title = { Text(section.label()) },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(R.drawable.drag_handle),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .longPressDraggableHandle(
+                                            onDragStarted = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            }
+                                        ),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Switch(
+                                    checked = enabled,
+                                    onCheckedChange = { newValue ->
+                                        sections = sections.map { (s, e) ->
+                                            if (s == section) s to newValue else s to e
+                                        }
+                                        onSectionsChange(serializeSections(sections))
+                                    },
+                                    thumbContent = {
+                                        Icon(
+                                            painter = painterResource(
+                                                if (enabled) R.drawable.check else R.drawable.close
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                                        )
+                                    }
+                                )
+                            }
+                        },
+                        onClick = {
+                            sections = sections.map { (s, e) ->
+                                if (s == section) s to !e else s to e
+                            }
+                            onSectionsChange(serializeSections(sections))
+                        },
+                    )
+                }
             }
         }
 
-        // Section: quick-add playlist
-        item(key = "header_quickadd") {
-            PreferenceGroupTitle(
-                title = stringResource(R.string.android_auto_target_playlist),
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+        Spacer(Modifier.height(27.dp))
 
-        item(key = "target_playlist_selector") {
-            ListPreference(
-                title = { Text(stringResource(R.string.android_auto_target_playlist)) },
-                icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.playlist_add),
-                        contentDescription = null,
-                    )
-                },
-                selectedValue = targetPlaylist,
-                values = playlistOptions,
-                valueText = { playlistLabels(it) },
-                onValueSelected = onTargetPlaylistChange,
-            )
-        }
+        // Quick-add destination playlist
+        ListPreference(
+            title = { Text(stringResource(R.string.android_auto_target_playlist)) },
+            description = stringResource(R.string.android_auto_target_playlist_desc),
+            icon = {
+                Icon(
+                    painter = painterResource(R.drawable.playlist_add),
+                    contentDescription = null,
+                )
+            },
+            selectedValue = targetPlaylist,
+            values = playlistOptions,
+            valueText = { playlistLabels(it) },
+            onValueSelected = onTargetPlaylistChange,
+        )
 
-        
+        Spacer(Modifier.height(27.dp))
 
-        // Section: YouTube playlists
-        item(key = "header_youtube") {
-            PreferenceGroupTitle(
-                title = stringResource(R.string.your_youtube_playlists),
-                modifier = Modifier.padding(top = 8.dp),
+        // YouTube playlists
+        Material3SettingsGroup(
+            title = stringResource(R.string.your_youtube_playlists),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.queue_music),
+                    title = { Text(stringResource(R.string.android_auto_youtube_playlists)) },
+                    description = { Text(stringResource(R.string.android_auto_youtube_playlists_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = youtubePlaylistsEnabled,
+                            onCheckedChange = onYoutubePlaylistsChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        if (youtubePlaylistsEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onYoutubePlaylistsChange(!youtubePlaylistsEnabled) }
+                )
             )
-        }
+        )
 
-        item(key = "youtube_toggle") {
-            SwitchPreference(
-                title = { Text(stringResource(R.string.android_auto_youtube_playlists)) },
-                description = stringResource(R.string.android_auto_youtube_playlists_desc),
-                icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.queue_music),
-                        contentDescription = null,
-                    )
-                },
-                checked = youtubePlaylistsEnabled,
-                onCheckedChange = onYoutubePlaylistsChange,
-            )
-        }
+        Spacer(Modifier.height(27.dp))
     }
 
     TopAppBar(
