@@ -4,7 +4,7 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Triangolo esterno con angoli arrotondati - logo ufficiale Android Auto -->
+    <!-- Android Auto external arrow -->
     <path
         android:fillColor="@android:color/white"
         android:strokeColor="@android:color/white"
@@ -20,7 +20,7 @@
             C21.37,17.49 21.13,18.25 20.74,18.25
             L17.0,18.25" />
 
-    <!-- Freccia interna -->
+    <!-- Android Auto internal arrow -->
     <path
         android:fillColor="@android:color/white"
         android:pathData="
