@@ -240,7 +240,6 @@ fun AndroidAutoSettings(
         // Quick-add destination playlist
         ListPreference(
             title = { Text(stringResource(R.string.android_auto_target_playlist)) },
-            description = stringResource(R.string.android_auto_target_playlist_desc),
             icon = {
                 Icon(
                     painter = painterResource(R.drawable.playlist_add),
