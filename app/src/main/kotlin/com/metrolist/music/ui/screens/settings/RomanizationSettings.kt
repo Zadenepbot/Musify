@@ -6,7 +6,6 @@
 package com.metrolist.music.ui.screens.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,9 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -26,7 +23,6 @@ import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -99,6 +95,8 @@ fun RomanizationSettings(
         defaultValue = false
     )
 
+    val checkboxesList: MutableList<Material3SettingsItem> = mutableListOf()
+
     Column(
         Modifier
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
@@ -133,50 +131,43 @@ fun RomanizationSettings(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = stringResource(R.string.content_language),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
-        )
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Play all")
-            Spacer(Modifier.weight(1f, true))
-
-            TriStateCheckbox(
-                state = parentState,
-                onClick = {
-                    val newState = parentState != ToggleableState.On
-                    states.forEachIndexed { index, (language, _) ->
-                        states[index] = Pair(language, newState)
-                    }
-                    prefValue(states.joinToString(",") { (lang, c) -> "$lang:$c" })
-                }
-            )
-        }
-
-        HorizontalDivider()
-
-        states.forEachIndexed { index, (language, checked) ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(language)
-                Spacer(Modifier.weight(1f, true))
-
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = { isChecked ->
-                        states[index] = Pair(language, isChecked)
+        checkboxesList += Material3SettingsItem(
+            title = { Text("Play all") },
+            trailingContent = {
+                TriStateCheckbox(
+                    state = parentState,
+                    onClick = {
+                        val newState = parentState != ToggleableState.On
+                        states.forEachIndexed { index, (language, _) ->
+                            states[index] = Pair(language, newState)
+                        }
                         prefValue(states.joinToString(",") { (lang, c) -> "$lang:$c" })
                     }
                 )
-            }
-            HorizontalDivider()
+            },
+            icon = painterResource(R.drawable.info)
+        )
+
+        states.forEachIndexed { index, (language, checked) ->
+            checkboxesList += Material3SettingsItem(
+                title = { Text(language) },
+                trailingContent = {
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { isChecked ->
+                            states[index] = Pair(language, isChecked)
+                            prefValue(states.joinToString(",") { (lang, c) -> "$lang:$c" })
+                        }
+                    )
+                },
+                icon = painterResource(R.drawable.language)
+            )
         }
+
+        Material3SettingsGroup(
+            title = stringResource(R.string.content_language),
+            items = checkboxesList
+        )
     }
 
     TopAppBar(
