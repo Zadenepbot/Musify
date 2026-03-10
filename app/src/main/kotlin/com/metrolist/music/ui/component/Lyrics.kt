@@ -275,22 +275,20 @@ fun Lyrics(
                             var value: String? = ""
 
                             when {
-                                "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> value = romanizeJapanese(text)
-                                "Korean" in enabledLanguages && isKorean(text) -> value = romanizeKorean(text)
-                                "Chinese" in enabledLanguages && isChinese(text) -> value = romanizeChinese(text)
-                                "Hindi" in enabledLanguages && isHindi(text) -> value = romanizeHindi(text)
-                                "Ukrainian" in enabledLanguages && isUkrainian(text) -> value = romanizeCyrillic(text)
-                                "Russian" in enabledLanguages && isRussian(text) -> value = romanizeCyrillic(text)
-                                "Serbian" in enabledLanguages && isSerbian(text) -> value = romanizeCyrillic(text)
-                                "Bulgarian" in enabledLanguages && isBulgarian(text) -> value = romanizeCyrillic(text)
-                                "Belarusian" in enabledLanguages && isBelarusian(text) -> value = romanizeCyrillic(text)
-                                "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> value = romanizeCyrillic(text)
-                                "Macedonian" in enabledLanguages && isMacedonian(text) -> value = romanizeCyrillic(text)
+                                "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> value = romanizeJapanese(entry.text)
+                                "Korean" in enabledLanguages && isKorean(text) -> value = romanizeKorean(entry.text)
+                                "Chinese" in enabledLanguages && isChinese(text) -> value = romanizeChinese(entry.text)
+                                "Hindi" in enabledLanguages && isHindi(text) -> value = romanizeHindi(entry.text)
+                                "Ukrainian" in enabledLanguages && isUkrainian(text) -> value = romanizeCyrillic(entry.text)
+                                "Russian" in enabledLanguages && isRussian(text) -> value = romanizeCyrillic(entry.text)
+                                "Serbian" in enabledLanguages && isSerbian(text) -> value = romanizeCyrillic(entry.text)
+                                "Bulgarian" in enabledLanguages && isBulgarian(text) -> value = romanizeCyrillic(entry.text)
+                                "Belarusian" in enabledLanguages && isBelarusian(text) -> value = romanizeCyrillic(entry.text)
+                                "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> value = romanizeCyrillic(entry.text)
+                                "Macedonian" in enabledLanguages && isMacedonian(text) -> value = romanizeCyrillic(entry.text)
                             }
 
-                            if (value != "") {
-                                newEntry.romanizedTextFlow.value = value
-                            }
+                           newEntry.romanizedTextFlow.value = value
                         }
 
                         newEntry
@@ -306,22 +304,20 @@ fun Lyrics(
                         var value = newEntry.romanizedTextFlow.value
 
                         when {
-                            "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> value = romanizeJapanese(text)
-                            "Korean" in enabledLanguages && isKorean(text) -> value = romanizeKorean(text)
-                            "Chinese" in enabledLanguages && isChinese(text) -> value = romanizeChinese(text)
-                            "Hindi" in enabledLanguages && isHindi(text) -> value = romanizeHindi(text)
-                            "Ukrainian" in enabledLanguages && isUkrainian(text) -> value = romanizeCyrillic(text)
-                            "Russian" in enabledLanguages && isRussian(text) -> value = romanizeCyrillic(text)
-                            "Serbian" in enabledLanguages && isSerbian(text) -> value = romanizeCyrillic(text)
-                            "Bulgarian" in enabledLanguages && isBulgarian(text) -> value = romanizeCyrillic(text)
-                            "Belarusian" in enabledLanguages && isBelarusian(text) -> value = romanizeCyrillic(text)
-                            "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> value = romanizeCyrillic(text)
-                            "Macedonian" in enabledLanguages && isMacedonian(text) -> value = romanizeCyrillic(text)
+                            "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> value = romanizeJapanese(line)
+                            "Korean" in enabledLanguages && isKorean(text) -> value = romanizeKorean(line)
+                            "Chinese" in enabledLanguages && isChinese(text) -> value = romanizeChinese(line)
+                            "Hindi" in enabledLanguages && isHindi(text) -> value = romanizeHindi(line)
+                            "Ukrainian" in enabledLanguages && isUkrainian(text) -> value = romanizeCyrillic(line)
+                            "Russian" in enabledLanguages && isRussian(text) -> value = romanizeCyrillic(line)
+                            "Serbian" in enabledLanguages && isSerbian(text) -> value = romanizeCyrillic(line)
+                            "Bulgarian" in enabledLanguages && isBulgarian(text) -> value = romanizeCyrillic(line)
+                            "Belarusian" in enabledLanguages && isBelarusian(text) -> value = romanizeCyrillic(line)
+                            "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> value = romanizeCyrillic(line)
+                            "Macedonian" in enabledLanguages && isMacedonian(text) -> value = romanizeCyrillic(line)
                         }
 
-                        if (value != "") {
-                            newEntry.romanizedTextFlow.value = value
-                        }
+                        newEntry.romanizedTextFlow.value = value
                     }
 
                     newEntry
