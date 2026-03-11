@@ -203,7 +203,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        ArtistScreen(navController, scrollBehavior)
+        ArtistScreen(navController)
     }
 
     composable(
@@ -340,11 +340,11 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings") {
-        SettingsScreen(navController, scrollBehavior, latestVersionName)
+        SettingsScreen(navController, latestVersionName)
     }
 
     composable("settings/appearance") {
-        AppearanceSettings(navController, scrollBehavior, activity, snackbarHostState)
+        AppearanceSettings(navController, activity, snackbarHostState)
     }
 
     composable("settings/appearance/theme") {
@@ -352,7 +352,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/content") {
-        ContentSettings(navController, scrollBehavior)
+        ContentSettings(navController)
     }
 
     composable("settings/content/romanization") {
@@ -360,7 +360,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/ai") {
-        AiSettings(navController, scrollBehavior)
+        AiSettings(navController)
     }
 
     composable("settings/player") {
@@ -384,7 +384,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/integrations/discord") {
-        DiscordSettings(navController, scrollBehavior, snackbarHostState)
+        DiscordSettings(navController, snackbarHostState)
     }
 
     composable("settings/integrations/lastfm") {
@@ -392,7 +392,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable(route = "settings/integrations/listen_together") {
-        ListenTogetherSettings(navController, scrollBehavior)
+        ListenTogetherSettings(navController)
     }
 
     composable("settings/discord/login") {
@@ -400,7 +400,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/updater") {
-        UpdaterScreen(navController, scrollBehavior)
+        UpdaterScreen(navController)
     }
 
     composable("settings/about") {
