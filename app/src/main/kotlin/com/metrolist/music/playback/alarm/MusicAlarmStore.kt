@@ -10,7 +10,6 @@ import com.metrolist.music.constants.AlarmNextTriggerAtKey
 import com.metrolist.music.constants.AlarmPlaylistIdKey
 import com.metrolist.music.constants.AlarmRandomSongKey
 import com.metrolist.music.utils.dataStore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -28,25 +27,33 @@ data class MusicAlarmEntry(
 )
 
 object MusicAlarmStore {
-    fun load(context: Context): List<MusicAlarmEntry> {
-        return runBlocking(Dispatchers.IO) {
-            val prefs = context.dataStore.data.first()
-            val raw = prefs[AlarmEntriesKey].orEmpty()
-            if (raw.isNotBlank()) {
-                parse(raw)
-            } else {
-                migrateLegacy(prefs[AlarmEnabledKey] ?: false, prefs[AlarmHourKey] ?: 7, prefs[AlarmMinuteKey] ?: 0, prefs[AlarmPlaylistIdKey].orEmpty(), prefs[AlarmRandomSongKey] ?: false, prefs[AlarmNextTriggerAtKey] ?: -1L)
-            }
+    suspend fun load(context: Context): List<MusicAlarmEntry> {
+        val prefs = context.dataStore.data.first()
+        val raw = prefs[AlarmEntriesKey].orEmpty()
+        return if (raw.isNotBlank()) {
+            parse(raw)
+        } else {
+            migrateLegacy(prefs[AlarmEnabledKey] ?: false, prefs[AlarmHourKey] ?: 7, prefs[AlarmMinuteKey] ?: 0, prefs[AlarmPlaylistIdKey].orEmpty(), prefs[AlarmRandomSongKey] ?: false, prefs[AlarmNextTriggerAtKey] ?: -1L)
         }
     }
 
-    fun save(context: Context, entries: List<MusicAlarmEntry>) {
-        runBlocking(Dispatchers.IO) {
-            context.dataStore.edit { prefs ->
-                prefs[AlarmEntriesKey] = serialize(entries)
-                prefs[AlarmNextTriggerAtKey] = entries.filter { it.enabled }.minOfOrNull { it.nextTriggerAt.takeIf { time -> time > 0L } ?: Long.MAX_VALUE }
-                    ?.takeIf { it != Long.MAX_VALUE } ?: -1L
-            }
+    fun loadBlocking(context: Context): List<MusicAlarmEntry> {
+        return runBlocking {
+            load(context)
+        }
+    }
+
+    suspend fun save(context: Context, entries: List<MusicAlarmEntry>) {
+        context.dataStore.edit { prefs ->
+            prefs[AlarmEntriesKey] = serialize(entries)
+            prefs[AlarmNextTriggerAtKey] = entries.filter { it.enabled }.minOfOrNull { it.nextTriggerAt.takeIf { time -> time > 0L } ?: Long.MAX_VALUE }
+                ?.takeIf { it != Long.MAX_VALUE } ?: -1L
+        }
+    }
+
+    fun saveBlocking(context: Context, entries: List<MusicAlarmEntry>) {
+        runBlocking {
+            save(context, entries)
         }
     }
 

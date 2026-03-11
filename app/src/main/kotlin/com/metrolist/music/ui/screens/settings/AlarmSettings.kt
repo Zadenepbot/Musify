@@ -61,13 +61,14 @@ import com.metrolist.music.ui.component.Material3SettingsGroup
 import com.metrolist.music.ui.component.Material3SettingsItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AlarmSettingsSection() {
+fun AlarmSettingsSection(showTitle: Boolean = true) {
     val context = LocalContext.current
     val locale = LocalLocale.current.platformLocale
     val database = LocalDatabase.current
@@ -127,19 +128,23 @@ fun AlarmSettingsSection() {
         }
     }
 
-    fun refreshAlarms() {
-        alarms = MusicAlarmStore.load(context).sortedBy { it.hour * 60 + it.minute }
+    suspend fun loadAlarms(): List<MusicAlarmEntry> {
+        return withContext(Dispatchers.IO) {
+            MusicAlarmStore.load(context)
+        }.sortedBy { it.hour * 60 + it.minute }
     }
 
     fun persistAndSchedule(newList: List<MusicAlarmEntry>) {
-        scope.launch(Dispatchers.IO) {
-            MusicAlarmScheduler.scheduleAll(context, newList)
-            refreshAlarms()
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                MusicAlarmScheduler.scheduleAll(context, newList)
+            }
+            alarms = loadAlarms()
         }
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        refreshAlarms()
+        alarms = loadAlarms()
     }
 
     if (showEditor) {
@@ -161,7 +166,7 @@ fun AlarmSettingsSection() {
     }
 
     Material3SettingsGroup(
-        title = stringResource(R.string.alarm),
+        title = if (showTitle) stringResource(R.string.alarm) else null,
         items = buildList {
             add(
                 Material3SettingsItem(
@@ -441,7 +446,11 @@ private fun AlarmEditorDialog(
                 Text(stringResource(android.R.string.cancel))
             }
             TextButton(
+                enabled = !hasSameTimeAlarm,
                 onClick = {
+                    if (hasSameTimeAlarm) {
+                        return@TextButton
+                    }
                     if (playlistId.isBlank()) {
                         Toast.makeText(context, selectPlaylistText, Toast.LENGTH_SHORT).show()
                         return@TextButton

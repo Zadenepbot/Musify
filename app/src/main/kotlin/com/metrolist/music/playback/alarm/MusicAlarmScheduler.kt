@@ -10,14 +10,16 @@ import java.util.Calendar
 
 object MusicAlarmScheduler {
     fun scheduleFromPreferences(context: Context) {
-        val alarms = MusicAlarmStore.load(context)
+        val alarms = MusicAlarmStore.loadBlocking(context)
         scheduleAll(context, alarms)
     }
 
     fun scheduleAll(context: Context, alarms: List<MusicAlarmEntry>) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-        val updated = alarms.map { alarm ->
+        alarms.forEach { alarm ->
             cancel(context, alarm.id)
+        }
+        val updated = alarms.map { alarm ->
             if (!alarm.enabled || alarm.playlistId.isBlank()) {
                 alarm.copy(nextTriggerAt = -1L)
             } else {
@@ -32,7 +34,7 @@ object MusicAlarmScheduler {
                 alarm.copy(nextTriggerAt = triggerAtMillis)
             }
         }
-        MusicAlarmStore.save(context, updated)
+        MusicAlarmStore.saveBlocking(context, updated)
     }
 
     fun cancel(context: Context, alarmId: String) {
