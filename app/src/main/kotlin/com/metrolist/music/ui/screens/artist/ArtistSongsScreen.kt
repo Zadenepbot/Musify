@@ -63,7 +63,6 @@ import com.metrolist.music.viewmodels.ArtistSongsViewModel
 @Composable
 fun ArtistSongsScreen(
     navController: NavController,
-    scrollBehavior: TopAppBarScrollBehavior,
     viewModel: ArtistSongsViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
