@@ -18,7 +18,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -58,8 +57,7 @@ val defaultList = mutableListOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RomanizationSettings(
-    navController: NavController,
-    scrollBehavior: TopAppBarScrollBehavior,
+    navController: NavController
 ) {
     val (pref, prefValue) = rememberPreference(LyricsRomanizeList, "")
 

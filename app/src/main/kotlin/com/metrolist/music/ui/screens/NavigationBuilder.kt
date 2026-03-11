@@ -357,7 +357,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/content/romanization") {
-        RomanizationSettings(navController, scrollBehavior)
+        RomanizationSettings(navController)
     }
 
     composable("settings/ai") {
