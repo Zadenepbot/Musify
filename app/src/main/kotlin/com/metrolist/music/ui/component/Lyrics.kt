@@ -166,6 +166,7 @@ import com.metrolist.music.ui.component.shimmer.ShimmerHost
 import com.metrolist.music.ui.component.shimmer.TextPlaceholder
 import com.metrolist.music.ui.screens.settings.DarkMode
 import com.metrolist.music.ui.screens.settings.LyricsPosition
+import com.metrolist.music.ui.screens.settings.defaultList
 import com.metrolist.music.ui.utils.fadingEdge
 import com.metrolist.music.utils.ComposeToImage
 import com.metrolist.music.utils.rememberEnumPreference
@@ -236,20 +237,7 @@ fun Lyrics(
         }
 
     val decodedList = if (romanizeLyricsList.value.isEmpty()) {
-        mutableListOf(
-            "Japanese" to true,
-            "Korean" to true,
-            "Chinese" to true,
-            "Hindi" to true,
-            "Punjabi" to true,
-            "Russian" to true,
-            "Ukrainian" to true,
-            "Serbian" to true,
-            "Bulgarian" to true,
-            "Belarusian" to true,
-            "Kyrgyz" to true,
-            "Macedonian" to true,
-        )
+        defaultList
     } else {
         romanizeLyricsList.value.split(",").map { entry ->
             val (lang, checked) = entry.split(":")
