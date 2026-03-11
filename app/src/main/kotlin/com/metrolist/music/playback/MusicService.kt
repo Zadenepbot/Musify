@@ -514,6 +514,34 @@ class MusicService :
         playerInitialized.value = true
         Timber.tag(TAG).d("Player successfully initialized")
 
+        // Sync initial cache state
+        scope.launch(Dispatchers.IO) {
+            try {
+                val cachedIds = playerCache.keys.toList()
+                if (cachedIds.isNotEmpty()) {
+                    val fullyCachedIds = cachedIds.filter { mediaId ->
+                        val contentLength = playerCache.getContentMetadata(mediaId)
+                            .get(androidx.media3.datasource.cache.ContentMetadata.KEY_CONTENT_LENGTH, -1L)
+                        if (contentLength > 0) {
+                            val cachedBytes = playerCache.getCachedSpans(mediaId).sumOf { it.length }
+                            cachedBytes >= contentLength * 0.99
+                        } else {
+                            false
+                        }
+                    }
+                    if (fullyCachedIds.isNotEmpty()) {
+                        val chunkSize = 500
+                        for (i in fullyCachedIds.indices step chunkSize) {
+                            val chunk = fullyCachedIds.subList(i, minOf(i + chunkSize, fullyCachedIds.size))
+                            database.updateCachedInfoMany(chunk)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to sync initial cache state")
+            }
+        }
+
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         setupAudioFocusRequest()
 
