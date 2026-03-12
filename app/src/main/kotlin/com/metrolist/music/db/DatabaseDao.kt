@@ -382,6 +382,8 @@ interface DatabaseDao {
     suspend fun transferSongStats(fromSongId: String, toSongId: String) {
         require(fromSongId != toSongId) { "fromSongId and toSongId must differ" }
 
+        val movedPlayTime = getTotalPlayTimeForSong(fromSongId) ?: 0L
+
         // 1) move events (source loses them)
         transferEvents(fromSongId, toSongId)
 
@@ -402,6 +404,11 @@ interface DatabaseDao {
             }
         }
         deletePlayCountsForSong(fromSongId)
+
+        if (movedPlayTime != 0L) {
+            incrementTotalPlayTime(toSongId, movedPlayTime)
+            incrementTotalPlayTime(fromSongId, -movedPlayTime)
+        }
     }
     // Time Transfer
 
@@ -519,6 +526,9 @@ interface DatabaseDao {
 
     @Query("SELECT SUM(playTime) FROM event WHERE timestamp >= :fromTimeStamp AND timestamp <= :toTimeStamp")
     fun getTotalPlayTimeInRange(fromTimeStamp: Long, toTimeStamp: Long): Flow<Long?>
+
+    @Query("SELECT SUM(playTime) FROM event WHERE songId = :songId")
+    fun getTotalPlayTimeForSong(songId: String): Long?
 
     @Query("SELECT COUNT(DISTINCT songId) FROM event WHERE timestamp >= :fromTimeStamp AND timestamp <= :toTimeStamp")
     fun getUniqueSongCountInRange(fromTimeStamp: Long, toTimeStamp: Long): Flow<Int>

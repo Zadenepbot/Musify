@@ -5,9 +5,9 @@
 
 package com.metrolist.music.viewmodels
 
+import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshotFlow
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.metrolist.innertube.YouTube
@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -156,18 +155,12 @@ constructor(
     val filteredSongs = combine(
         mostPlayedSongsStats, // Unfiltered songs
         snapshotFlow { selectedArtists.toList() } // Selected artists
-    ) { songs, artists ->
-        val check = selectedArtists
-        Timber.d("Test")
-        Timber.d("$check")
-        if (check.isEmpty()) {
-            songs // No filtering, return all songs
+    ) { songs, selected ->
+        if (selected.isEmpty()) {
+            songs
         } else {
             songs.filter { song ->
-                song.artists.any {
-                    artist -> check.any { check -> artist.id == check.id } // Filter by artistId
-                }
-
+                song.artists.any { artist -> selected.any { it.id == artist.id } }
             }
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -176,12 +169,11 @@ constructor(
         mostPlayedArtists, // Unfiltered list of artists
         snapshotFlow { selectedArtists.toList() } // Selected artists
     ) { artists, selected ->
-        val check = selectedArtists
-        if (check.isEmpty()) {
-            artists // No filtering; return all artists
+        if (selected.isEmpty()) {
+            artists
         } else {
             artists.filter { artist ->
-                check.any { selectedArtist -> artist.artist.id == selectedArtist.id }
+                selected.any { it.id == artist.artist.id }
             }
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -190,13 +182,12 @@ constructor(
         mostPlayedAlbums, // Unfiltered list of albums
         snapshotFlow { selectedArtists.toList() } // Selected artists
     ) { albums, selected ->
-        val check = selectedArtists
-        if (check.isEmpty()) {
-            albums // No filtering; return all albums
+        if (selected.isEmpty()) {
+            albums
         } else {
             albums.filter { album ->
                 album.artists.any { artist ->
-                    check.any { selectedArtist -> artist.id == selectedArtist.id }
+                    selected.any { it.id == artist.id }
                 }
             }
         }

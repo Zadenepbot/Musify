@@ -26,8 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
+import com.metrolist.music.R
 import com.metrolist.music.db.entities.SongWithStats
 
 
@@ -119,7 +121,14 @@ fun SongSelectDropdown(
                     DropdownMenuItem(
                         onClick = { /* no-op */ },
                         enabled = false,
-                        text = { Text("Type more to narrow results ($remainingCount more)") },
+                        text = {
+                            Text(
+                                text = stringResource(
+                                    R.string.song_dropdown_more_results,
+                                    remainingCount,
+                                ),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

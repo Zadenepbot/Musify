@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,9 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.metrolist.music.R
 import com.metrolist.music.db.entities.SongWithStats
 import com.metrolist.music.viewmodels.StatsViewModel
 import java.util.concurrent.TimeUnit
@@ -32,15 +36,26 @@ fun TimeTransfer(
 
     DefaultDialog(
         onDismiss = onDismiss,
-        title = {Text("Time Transfer", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+        title = {
+            Text(
+                text = stringResource(R.string.time_transfer_title),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+        },
         content = {
-            Text("WARNING: It is not possible to revert this action once it is completed. A backup file should be created before proceeding.", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = androidx.compose.ui.graphics.Color.Red)
+            Text(
+                text = stringResource(R.string.time_transfer_warning),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                color = androidx.compose.ui.graphics.Color.Red,
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Column {
                 SongSelectDropdown(
-                    titleT = "Source Song",
+                    titleT = stringResource(R.string.time_transfer_source_song),
                     songs = mostPlayedSongsStats,
                     onSelectionChange = {},
                     selectedSong = sourceSong
@@ -49,9 +64,12 @@ fun TimeTransfer(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row {
-                    Text("Listen Time: ")
+                    Text(stringResource(R.string.time_transfer_listen_time_label))
                     if (sourceSong.value != null) {
-                        Text(formatMillis(sourceSong.value!!.timeListened), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            text = formatMillis(sourceSong.value!!.timeListened),
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        )
                     }
                 }
 
@@ -59,7 +77,7 @@ fun TimeTransfer(
 
 
                 SongSelectDropdown(
-                    titleT = "Target Song",
+                    titleT = stringResource(R.string.time_transfer_target_song),
                     songs = mostPlayedSongsStats,
                     onSelectionChange = {},
                     selectedSong = targetSong,
@@ -68,40 +86,39 @@ fun TimeTransfer(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row {
-                    Text("Listen Time: ")
+                    Text(stringResource(R.string.time_transfer_listen_time_label))
                     if (targetSong.value != null) {
-                        Text(formatMillis(targetSong.value!!.timeListened), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            text = formatMillis(targetSong.value!!.timeListened),
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                IconButton(
+                Button(
                     onClick = {
                         val from = sourceSong.value?.id
                         val to = targetSong.value?.id
                         if (from != null && to != null && from != to) {
                             viewModel.transferSongStats(from, to) {
-                                // optional: clear selection / close dialog
                                 sourceSong.value = null
                                 targetSong.value = null
                                 onDismiss()
                             }
                         }
                     },
-                    onLongClick = {},
                     modifier = Modifier.fillMaxWidth(),
                     enabled = sourceSong.value != null &&
                             targetSong.value != null &&
                             sourceSong.value!!.id != targetSong.value!!.id,
-                    content = {
-                        if (sourceSong.value != null && targetSong.value != null) {
-                            Text("Convert", color = androidx.compose.ui.graphics.Color.White)
-                        } else {
-                            Text("Convert", color = androidx.compose.ui.graphics.Color.Transparent)
-                        }
-                    }
-                )
+                ) {
+                    Text(
+                        text = stringResource(R.string.time_transfer_convert),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
         }
 
