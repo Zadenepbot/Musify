@@ -59,7 +59,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.metrolist.innertube.models.Artist
@@ -348,7 +347,7 @@ fun StatsScreen(
                 )
             }
 
-            if (visibleStatsPlaylists.isNotEmpty() && !isSearching) {
+            if (visibleStatsPlaylists.isNotEmpty() && !isSearching && sArtists.isEmpty()) {
                 item(key = "mostPeriodPlaylistsTitle") {
                     NavigationTitle(
                         title =
@@ -593,7 +592,6 @@ fun StatsScreen(
                                     sArtists.add(b)
                                 }
 
-                                val c = sArtists.isEmpty()
                                 viewModel.selectedArtists.clear()
                                 viewModel.selectedArtists.addAll(sArtists)
                             }
@@ -616,9 +614,6 @@ fun StatsScreen(
                                     sArtists.add(b)
                                 }
 
-                                Timber.d("All artists: $sArtists")
-                                val c = sArtists.isEmpty()
-                                Timber.d("No Artists: $c")
                                 viewModel.selectedArtists.clear()
                                 viewModel.selectedArtists.addAll(sArtists)
                             }
@@ -642,7 +637,6 @@ fun StatsScreen(
                 lazyListState = lazyListState,
                 icon = R.drawable.shuffle,
                 onClick = {
-                    val songIds = mostPlayedSongsStats.map { it.id }.toSet()
                     playerConnection.playQueue(
                         ListQueue(
                             title = context.getString(R.string.most_played_songs),

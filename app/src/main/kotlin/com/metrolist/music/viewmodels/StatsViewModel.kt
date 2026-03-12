@@ -55,6 +55,7 @@ constructor(
     @ApplicationContext private val context: Context,
     val database: MusicDatabase,
 ) : ViewModel() {
+    private val periodicMostPlaylistSyncMutex = Mutex()
     val selectedOption = MutableStateFlow(OptionStats.CONTINUOUS)
     val indexChips = MutableStateFlow(0)
 
