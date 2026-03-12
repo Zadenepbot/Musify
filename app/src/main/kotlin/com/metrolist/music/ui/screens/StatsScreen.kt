@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -146,6 +147,10 @@ fun StatsScreen(
     val allArtists by viewModel.mostPlayedArtists.collectAsState()
     val firstEvent by viewModel.firstEvent.collectAsState()
     val currentDate = LocalDateTime.now()
+    val orderedMostPlayedSongs = remember(mostPlayedSongsStats, mostPlayedSongs) {
+        val songsById = mostPlayedSongs.associateBy { it.song.id }
+        mostPlayedSongsStats.mapNotNull { statsSong -> songsById[statsSong.id] }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
@@ -197,7 +202,7 @@ fun StatsScreen(
     val monthlyDates =
         if (currentDate != null && firstEvent != null) {
             generateSequence(
-                currentDate.plusMonths(1).withDayOfMonth(1).minusDays(1)
+                currentDate.plusMonths(1).withDayOfMonth(1).minusDays(1),
             ) { it.minusMonths(1) }
                 .takeWhile {
                     it.isAfter(
@@ -245,12 +250,14 @@ fun StatsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = lazyListState,
-            contentPadding = LocalPlayerAwareWindowInsets.current
-                .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                .asPaddingValues(),
-            modifier = Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
+            contentPadding =
+                LocalPlayerAwareWindowInsets.current
+                    .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+                    .asPaddingValues(),
+            modifier =
+                Modifier.windowInsetsPadding(
+                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top),
+                ),
         ) {
             val filteredArtists = allArtists.map { artistWrapper ->
                 Artist(
@@ -321,6 +328,19 @@ fun StatsScreen(
                 item(key = "mostPlayedSongs") {
                     NavigationTitle(
                         title = "${mostPlayedSongsStats.size} ${stringResource(id = R.string.songs)}",
+                        onPlayAllClick =
+                            if (orderedMostPlayedSongs.isNotEmpty()) {
+                                {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = context.getString(R.string.most_played_songs),
+                                            items = orderedMostPlayedSongs.map { it.toMediaMetadata().toMediaItem() },
+                                        )
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         modifier = Modifier.animateItem(),
                     )
 
@@ -353,22 +373,25 @@ fun StatsScreen(
                                                 if (song.id == mediaMetadata?.id) {
                                                     playerConnection.togglePlayPause()
                                                 } else {
+                                                    val preloadSong = orderedMostPlayedSongs.getOrNull(index)
                                                     playerConnection.playQueue(
                                                         YouTubeQueue(
                                                             endpoint = WatchEndpoint(song.id),
-                                                            preloadItem = mostPlayedSongs[index].toMediaMetadata(),
+                                                            preloadItem = preloadSong?.toMediaMetadata(),
                                                         ),
                                                     )
                                                 }
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                menuState.show {
-                                                    SongMenu(
-                                                        originalSong = mostPlayedSongs[index],
-                                                        navController = navController,
-                                                        onDismiss = menuState::dismiss,
-                                                    )
+                                                orderedMostPlayedSongs.getOrNull(index)?.let { selectedSong ->
+                                                    menuState.show {
+                                                        SongMenu(
+                                                            originalSong = selectedSong,
+                                                            navController = navController,
+                                                            onDismiss = menuState::dismiss,
+                                                        )
+                                                    }
                                                 }
                                             },
                                         )
@@ -400,7 +423,7 @@ fun StatsScreen(
                                         pluralStringResource(
                                             R.plurals.n_time,
                                             artist.songCount,
-                                            artist.songCount
+                                            artist.songCount,
                                         ),
                                         makeTimeString(artist.timeListened?.toLong()),
                                     ),
@@ -421,8 +444,7 @@ fun StatsScreen(
                                                     )
                                                 }
                                             },
-                                        )
-                                        .animateItem(),
+                                        ).animateItem(),
                             )
                         }
                     }
@@ -447,36 +469,35 @@ fun StatsScreen(
                             LocalAlbumsGrid(
                                 title = "${index + 1}. ${album.album.title}",
                                 subtitle =
-                                joinByBullet(
-                                    pluralStringResource(
-                                        R.plurals.n_time,
-                                        album.songCountListened ?: 0,
-                                        album.songCountListened ?: 0
+                                    joinByBullet(
+                                        pluralStringResource(
+                                            R.plurals.n_time,
+                                            album.songCountListened ?: 0,
+                                            album.songCountListened ?: 0,
+                                        ),
+                                        makeTimeString(album.timeListened),
                                     ),
-                                    makeTimeString(album.timeListened),
-                                ),
                                 thumbnailUrl = album.album.thumbnailUrl,
                                 isActive = album.id == mediaMetadata?.album?.id,
                                 isPlaying = isPlaying,
                                 modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .combinedClickable(
-                                        onClick = {
-                                            navController.navigate("album/${album.id}")
-                                        },
-                                        onLongClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            menuState.show {
-                                                AlbumMenu(
-                                                    originalAlbum = album,
-                                                    navController = navController,
-                                                    onDismiss = menuState::dismiss,
-                                                )
-                                            }
-                                        },
-                                    )
-                                    .animateItem(),
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .combinedClickable(
+                                            onClick = {
+                                                navController.navigate("album/${album.id}")
+                                            },
+                                            onLongClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                menuState.show {
+                                                    AlbumMenu(
+                                                        originalAlbum = album,
+                                                        navController = navController,
+                                                        onDismiss = menuState::dismiss,
+                                                    )
+                                                }
+                                            },
+                                        ).animateItem(),
                             )
                         }
                     }
@@ -562,10 +583,10 @@ fun StatsScreen(
                     playerConnection.playQueue(
                         ListQueue(
                             title = context.getString(R.string.most_played_songs),
-                            items = mostPlayedSongs.filter{song -> song.id in songIds}.map { it.toMediaMetadata().toMediaItem() }.shuffled()
-                        )
+                            items = orderedMostPlayedSongs.map { it.toMediaMetadata().toMediaItem() }.shuffled(),
+                        ),
                     )
-                }
+                },
             )
         }
     }

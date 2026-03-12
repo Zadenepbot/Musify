@@ -47,7 +47,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -131,12 +130,15 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AutoPlaylistScreen(
     navController: NavController,
-    scrollBehavior: TopAppBarScrollBehavior,
     viewModel: AutoPlaylistViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
+    val uploadUnsupportedFormatStr = stringResource(R.string.upload_unsupported_format)
+    val uploadFileTooLargeStr = stringResource(R.string.upload_file_too_large)
+    val uploadFailedStr = stringResource(R.string.upload_failed)
+    val uploadCompleteStr = stringResource(R.string.upload_complete)
     val focusManager = LocalFocusManager.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
@@ -191,9 +193,11 @@ fun AutoPlaylistScreen(
                     restore = { it.toMutableStateList() },
                 ),
         ) { mutableStateListOf() }
+    var selectionAnchorSongId by rememberSaveable { mutableStateOf<String?>(null) }
     val onExitSelectionMode = {
         inSelectMode = false
         selection.clear()
+        selectionAnchorSongId = null
     }
 
     if (isSearching) {
@@ -254,7 +258,7 @@ fun AutoPlaylistScreen(
                                         Toast
                                             .makeText(
                                                 context,
-                                                context.getString(R.string.upload_unsupported_format),
+                                                uploadUnsupportedFormatStr,
                                                 Toast.LENGTH_SHORT,
                                             ).show()
                                     }
@@ -272,7 +276,7 @@ fun AutoPlaylistScreen(
                                         Toast
                                             .makeText(
                                                 context,
-                                                context.getString(R.string.upload_file_too_large),
+                                                uploadFileTooLargeStr,
                                                 Toast.LENGTH_SHORT,
                                             ).show()
                                     }
@@ -296,7 +300,7 @@ fun AutoPlaylistScreen(
                                     Toast
                                         .makeText(
                                             context,
-                                            context.getString(R.string.upload_failed) + ": ${e.message}",
+                                            uploadFailedStr + ": ${e.message}",
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                 }
@@ -308,7 +312,7 @@ fun AutoPlaylistScreen(
                         if (successCount > 0) {
                             // Show completion briefly
                             uploadProgress = 1f
-                            currentFileName = context.getString(R.string.upload_complete)
+                            currentFileName = uploadCompleteStr
                             kotlinx.coroutines.delay(1000)
 
                             // Show toast on main thread
@@ -316,7 +320,7 @@ fun AutoPlaylistScreen(
                                 Toast
                                     .makeText(
                                         context,
-                                        context.getString(R.string.upload_complete),
+                                        uploadCompleteStr,
                                         Toast.LENGTH_SHORT,
                                     ).show()
                             }
@@ -480,6 +484,10 @@ fun AutoPlaylistScreen(
                 selection.remove(songId)
             }
         }
+
+        if (selectionAnchorSongId != null && filteredSongs.none { it.id == selectionAnchorSongId }) {
+            selectionAnchorSongId = filteredSongs.firstOrNull { it.id in selection }?.id
+        }
     }
 
     val state = rememberLazyListState()
@@ -622,6 +630,25 @@ fun AutoPlaylistScreen(
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 inSelectMode = true
                                                 onCheckedChange(true)
+                                                selectionAnchorSongId = song.id
+                                            } else {
+                                                val anchorIndex =
+                                                    selectionAnchorSongId?.let { anchorSongId ->
+                                                        filteredSongs.indexOfFirst { it.id == anchorSongId }
+                                                    } ?: -1
+
+                                                if (anchorIndex == -1) {
+                                                    onCheckedChange(true)
+                                                    selectionAnchorSongId = song.id
+                                                } else {
+                                                    val range = if (anchorIndex <= index) anchorIndex..index else index..anchorIndex
+                                                    for (rangeIndex in range) {
+                                                        val rangeSongId = filteredSongs[rangeIndex].id
+                                                        if (rangeSongId !in selection) {
+                                                            selection.add(rangeSongId)
+                                                        }
+                                                    }
+                                                }
                                             }
                                         },
                                     ).animateItem(),
