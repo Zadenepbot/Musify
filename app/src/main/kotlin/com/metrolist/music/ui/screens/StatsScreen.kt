@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,14 +59,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.metrolist.innertube.models.Artist
 import com.metrolist.innertube.models.WatchEndpoint
+import com.metrolist.innertube.utils.parseCookieString
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.constants.CONTENT_TYPE_ARTIST
+import com.metrolist.music.constants.InnerTubeCookieKey
 import com.metrolist.music.constants.StatPeriod
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.models.toMediaMetadata
@@ -82,14 +86,15 @@ import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.LocalSongsGrid
 import com.metrolist.music.ui.component.NavigationTitle
 import com.metrolist.music.ui.component.TimeTransfer
+import com.metrolist.music.ui.component.PlaylistGridItem
 import com.metrolist.music.ui.menu.AlbumMenu
 import com.metrolist.music.ui.menu.ArtistMenu
 import com.metrolist.music.ui.menu.SongMenu
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.joinByBullet
 import com.metrolist.music.utils.makeTimeString
+import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.StatsViewModel
-import timber.log.Timber
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -145,11 +150,28 @@ fun StatsScreen(
     val mostPlayedAlbums by viewModel.filteredAlbums.collectAsState()
     val allArtists by viewModel.mostPlayedArtists.collectAsState()
     val firstEvent by viewModel.firstEvent.collectAsState()
+    val weeklyMostPlaylist by viewModel.weeklyMostPlaylist.collectAsState()
+    val monthlyMostPlaylist by viewModel.monthlyMostPlaylist.collectAsState()
+    val recapPlaylists by viewModel.recapPlaylists.collectAsState()
     val currentDate = LocalDateTime.now()
     val orderedMostPlayedSongs = remember(mostPlayedSongsStats, mostPlayedSongs) {
         val songsById = mostPlayedSongs.associateBy { it.song.id }
         mostPlayedSongsStats.mapNotNull { statsSong -> songsById[statsSong.id] }
     }
+    val mostPeriodPlaylists = listOfNotNull(weeklyMostPlaylist, monthlyMostPlaylist)
+    val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
+    val isLoggedIn =
+        remember(innerTubeCookie) {
+            "SAPISID" in parseCookieString(innerTubeCookie)
+        }
+    val visibleStatsPlaylists =
+        remember(mostPeriodPlaylists, recapPlaylists, isLoggedIn) {
+            if (isLoggedIn) {
+                (mostPeriodPlaylists + recapPlaylists).distinctBy { it.id }
+            } else {
+                mostPeriodPlaylists
+            }
+        }
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
@@ -168,6 +190,10 @@ fun StatsScreen(
         TimeTransfer(
             onDismiss = { showTimeTransfer = false },
         )
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.syncMostPlaylistsIfNeeded()
     }
 
     val weeklyDates =
@@ -322,6 +348,44 @@ fun StatsScreen(
                 )
             }
 
+            if (visibleStatsPlaylists.isNotEmpty() && !isSearching) {
+                item(key = "mostPeriodPlaylistsTitle") {
+                    NavigationTitle(
+                        title =
+                            pluralStringResource(
+                                R.plurals.n_playlist,
+                                visibleStatsPlaylists.size,
+                                visibleStatsPlaylists.size,
+                            ),
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                item(key = "mostPeriodPlaylists") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        itemsIndexed(
+                            items = visibleStatsPlaylists,
+                            key = { _, playlist -> playlist.id },
+                        ) { _, playlist ->
+                            PlaylistGridItem(
+                                playlist = playlist,
+                                autoPlaylist = true,
+                                modifier =
+                                    Modifier
+                                        .combinedClickable(
+                                            onClick = {
+                                                navController.navigate("local_playlist/${playlist.id}")
+                                            },
+                                        ).animateItem(),
+                            )
+                        }
+                    }
+                }
+            }
+
 
             if (!isSearching) {
                 item(key = "mostPlayedSongs") {
@@ -372,21 +436,24 @@ fun StatsScreen(
                                                 if (song.id == mediaMetadata?.id) {
                                                     playerConnection.togglePlayPause()
                                                 } else {
-                                                    val preloadSong = orderedMostPlayedSongs.getOrNull(index)
-                                                    playerConnection.playQueue(
-                                                        YouTubeQueue(
-                                                            endpoint = WatchEndpoint(song.id),
-                                                            preloadItem = preloadSong?.toMediaMetadata(),
-                                                        ),
-                                                    )
+                                                    val targetSong = mostPlayedSongs.find { it.id == song.id }
+                                                    if (targetSong != null) {
+                                                        playerConnection.playQueue(
+                                                            YouTubeQueue(
+                                                                endpoint = WatchEndpoint(song.id),
+                                                                preloadItem = targetSong.toMediaMetadata(),
+                                                            ),
+                                                        )
+                                                    }
                                                 }
                                             },
                                             onLongClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                orderedMostPlayedSongs.getOrNull(index)?.let { selectedSong ->
+                                                val targetSong = mostPlayedSongs.find { it.id == song.id }
+                                                if (targetSong != null) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     menuState.show {
                                                         SongMenu(
-                                                            originalSong = selectedSong,
+                                                            originalSong = targetSong,
                                                             navController = navController,
                                                             onDismiss = menuState::dismiss,
                                                         )
@@ -504,7 +571,6 @@ fun StatsScreen(
             }
             }
 
-            Timber.d(isSearching.toString())
             if (isSearching) {
                 items(
                     items = allArtists.filter { artist ->
@@ -527,9 +593,7 @@ fun StatsScreen(
                                     sArtists.add(b)
                                 }
 
-                                Timber.d("All artists: $sArtists")
                                 val c = sArtists.isEmpty()
-                                Timber.d("No Artists: $c")
                                 viewModel.selectedArtists.clear()
                                 viewModel.selectedArtists.addAll(sArtists)
                             }
@@ -676,13 +740,11 @@ fun StatsScreen(
                 Checkbox(
                     checked = true,
                     onCheckedChange = {
-                        Timber.d("Checked")
                     }
                 )
                 androidx.compose.material3.IconButton(
                     enabled = selection.isNotEmpty(),
                     onClick = {
-                        Timber.d("Test")
                     }
                 ) {
                     Icon(
