@@ -150,7 +150,6 @@ class MusicDatabase(
         AutoMigration(from = 31, to = 32),
         AutoMigration(from = 32, to = 33),
         AutoMigration(from = 33, to = 34),
-        AutoMigration(from = 34, to = 35, spec = Migration34To35::class),
         AutoMigration(from = 35, to = 36, spec = Migration35To36::class),
     ],
 )
@@ -169,6 +168,7 @@ abstract class InternalDatabase : RoomDatabase() {
                     MIGRATION_21_24,
                     MIGRATION_22_24,
                     MIGRATION_24_25,
+                    MIGRATION_34_35,
                 )
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
@@ -738,31 +738,74 @@ class Migration35To36 : AutoMigrationSpec {
     }
 }
 
-class Migration34To35 : AutoMigrationSpec {
-    override fun onPostMigrate(db: SupportSQLiteDatabase) {
-        // Add missing columns for video playback feature
-        var artworkUrlExists = false
-        var videoIdExists = false
-        var squareThumbExists = false
-        db.query("PRAGMA table_info('song')").use { cursor ->
-            val nameIndex = cursor.getColumnIndex("name")
-            if (nameIndex >= 0) {
-                while (cursor.moveToNext()) {
-                    val colName = cursor.getString(nameIndex)
-                    if (colName == "artworkUrl") artworkUrlExists = true
-                    if (colName == "videoId") videoIdExists = true
-                    if (colName == "squareThumbnailUrl") squareThumbExists = true
+/**
+ * Manual migration from version 34 to 35.
+ * This replaces the AutoMigration to handle cases where columns might already exist
+ * from previous development builds or partial migrations.
+ */
+val MIGRATION_34_35 =
+    object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Check existing columns in song table
+            val existingSongColumns = mutableSetOf<String>()
+            db.query("PRAGMA table_info('song')").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        existingSongColumns.add(cursor.getString(nameIndex))
+                    }
                 }
             }
+
+            // Check existing columns in artist table
+            val existingArtistColumns = mutableSetOf<String>()
+            db.query("PRAGMA table_info('artist')").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        existingArtistColumns.add(cursor.getString(nameIndex))
+                    }
+                }
+            }
+
+            // Recreate views (always safe to drop and recreate)
+            db.execSQL("DROP VIEW IF EXISTS sorted_song_artist_map")
+            db.execSQL("DROP VIEW IF EXISTS sorted_song_album_map")
+            db.execSQL("DROP VIEW IF EXISTS playlist_song_map_preview")
+
+            // Add columns to song table if they don't exist
+            if ("playbackPosition" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `playbackPosition` INTEGER DEFAULT NULL")
+            }
+            if ("uploadEntityId" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `uploadEntityId` TEXT DEFAULT NULL")
+            }
+            if ("videoId" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `videoId` TEXT DEFAULT NULL")
+            }
+            if ("artworkUrl" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `artworkUrl` TEXT DEFAULT NULL")
+            }
+            if ("squareThumbnailUrl" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `squareThumbnailUrl` TEXT DEFAULT NULL")
+            }
+
+            // Add columns to artist table if they don't exist
+            if ("isPodcastChannel" !in existingArtistColumns) {
+                db.execSQL("ALTER TABLE `artist` ADD COLUMN `isPodcastChannel` INTEGER NOT NULL DEFAULT 0")
+            }
+
+            // Recreate views
+            db.execSQL("CREATE VIEW `sorted_song_artist_map` AS SELECT * FROM song_artist_map ORDER BY position")
+            db.execSQL("CREATE VIEW `sorted_song_album_map` AS SELECT * FROM song_album_map ORDER BY `index`")
+            db.execSQL("CREATE VIEW `playlist_song_map_preview` AS SELECT * FROM playlist_song_map WHERE position <= 3 ORDER BY position")
         }
-        if (!artworkUrlExists) {
-            db.execSQL("ALTER TABLE `song` ADD COLUMN `artworkUrl` TEXT")
-        }
-        if (!videoIdExists) {
-            db.execSQL("ALTER TABLE `song` ADD COLUMN `videoId` TEXT")
-        }
-        if (!squareThumbExists) {
-            db.execSQL("ALTER TABLE `song` ADD COLUMN `squareThumbnailUrl` TEXT")
-        }
+    }
+
+@Suppress("unused") // Kept for reference, replaced by manual MIGRATION_34_35
+class Migration34To35 : AutoMigrationSpec {
+    override fun onPostMigrate(db: SupportSQLiteDatabase) {
+        // This class is no longer used, kept for schema compatibility
+        // All migration logic moved to MIGRATION_34_35
     }
 }
