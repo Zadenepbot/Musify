@@ -369,6 +369,7 @@ enum class QuickPicks {
 }
 
 enum class PreferredLyricsProvider {
+    YOUTUBE,
     LRCLIB,
     KUGOU,
     BETTER_LYRICS,

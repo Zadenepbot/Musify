@@ -36,13 +36,13 @@ constructor(
 ) {
     private var lyricsProviders =
         listOf(
+            YouTubeLyricsProvider,
             BetterLyricsProvider,
             SimpMusicLyricsProvider,
             LrcLibLyricsProvider,
             KuGouLyricsProvider,
             LyricsPlusProvider,
             YouTubeSubtitleLyricsProvider,
-            YouTubeLyricsProvider
         )
 
     val preferred =
@@ -55,43 +55,52 @@ constructor(
                 } else {
                     // Fall back to preferred provider logic for backward compatibility
                     val preferredProvider = preferences[PreferredLyricsProviderKey]
-                        .toEnum(PreferredLyricsProvider.LRCLIB)
+                        .toEnum(PreferredLyricsProvider.YOUTUBE)
                     when (preferredProvider) {
+                        PreferredLyricsProvider.YOUTUBE -> listOf(
+                            YouTubeLyricsProvider,
+                            BetterLyricsProvider,
+                            SimpMusicLyricsProvider,
+                            LrcLibLyricsProvider,
+                            KuGouLyricsProvider,
+                            LyricsPlusProvider,
+                            YouTubeSubtitleLyricsProvider,
+                        )
                         PreferredLyricsProvider.LRCLIB -> listOf(
                             LrcLibLyricsProvider,
+                            YouTubeLyricsProvider,
                             BetterLyricsProvider,
                             SimpMusicLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
                             YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
                         )
                         PreferredLyricsProvider.KUGOU -> listOf(
                             KuGouLyricsProvider,
+                            YouTubeLyricsProvider,
                             BetterLyricsProvider,
                             SimpMusicLyricsProvider,
                             LrcLibLyricsProvider,
                             LyricsPlusProvider,
                             YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
                         )
                         PreferredLyricsProvider.BETTER_LYRICS -> listOf(
                             BetterLyricsProvider,
+                            YouTubeLyricsProvider,
                             SimpMusicLyricsProvider,
                             LrcLibLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
                             YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
                         )
                         PreferredLyricsProvider.SIMPMUSIC -> listOf(
                             SimpMusicLyricsProvider,
+                            YouTubeLyricsProvider,
                             BetterLyricsProvider,
                             LrcLibLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
                             YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
                         )
                     }
                 }
