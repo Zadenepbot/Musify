@@ -276,7 +276,10 @@
     <string name="alarm_playlist">Playlist</string>
     <string name="alarm_select_playlist">Select playlist</string>
     <string name="alarm_no_playlists">No playlists found</string>
-    <string name="alarm_playlist_song_count">%d songs</string>
+    <plurals name="alarm_playlist_song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <string name="alarm_selected">Selected</string>
     <string name="alarm_playlist_helper">Choose which playlist the alarm should play.</string>
     <string name="alarm_add">Add alarm</string>

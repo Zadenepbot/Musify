@@ -7,6 +7,7 @@ import android.content.Intent
 class MusicAlarmRescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         when (intent?.action) {
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,

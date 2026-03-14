@@ -1,6 +1,7 @@
 package com.metrolist.music.playback.alarm
 
 import android.content.Context
+import android.os.Build
 import androidx.datastore.preferences.core.edit
 import com.metrolist.music.constants.AlarmEnabledKey
 import com.metrolist.music.constants.AlarmEntriesKey
@@ -27,13 +28,31 @@ data class MusicAlarmEntry(
 )
 
 object MusicAlarmStore {
+    private const val ALARM_PREFS = "alarm_store"
+    private const val ALARM_PREFS_ENTRIES = "alarm_entries"
+
     suspend fun load(context: Context): List<MusicAlarmEntry> {
-        val prefs = context.dataStore.data.first()
-        val raw = prefs[AlarmEntriesKey].orEmpty()
-        return if (raw.isNotBlank()) {
-            parse(raw)
-        } else {
-            migrateLegacy(prefs[AlarmEnabledKey] ?: false, prefs[AlarmHourKey] ?: 7, prefs[AlarmMinuteKey] ?: 0, prefs[AlarmPlaylistIdKey].orEmpty(), prefs[AlarmRandomSongKey] ?: false, prefs[AlarmNextTriggerAtKey] ?: -1L)
+        val protectedRaw = alarmPrefsContext(context).getSharedPreferences(ALARM_PREFS, Context.MODE_PRIVATE)
+            .getString(ALARM_PREFS_ENTRIES, null)
+            .orEmpty()
+        if (protectedRaw.isNotBlank()) {
+            return parse(protectedRaw)
+        }
+
+        return runCatching {
+            val prefs = context.dataStore.data.first()
+            val raw = prefs[AlarmEntriesKey].orEmpty()
+            if (raw.isNotBlank()) {
+                parse(raw)
+            } else {
+                migrateLegacy(prefs[AlarmEnabledKey] ?: false, prefs[AlarmHourKey] ?: 7, prefs[AlarmMinuteKey] ?: 0, prefs[AlarmPlaylistIdKey].orEmpty(), prefs[AlarmRandomSongKey] ?: false, prefs[AlarmNextTriggerAtKey] ?: -1L)
+            }
+        }.getOrElse {
+            emptyList()
+        }.also { entries ->
+            if (entries.isNotEmpty()) {
+                saveProtected(context, entries)
+            }
         }
     }
 
@@ -44,6 +63,7 @@ object MusicAlarmStore {
     }
 
     suspend fun save(context: Context, entries: List<MusicAlarmEntry>) {
+        saveProtected(context, entries)
         context.dataStore.edit { prefs ->
             prefs[AlarmEntriesKey] = serialize(entries)
             prefs[AlarmNextTriggerAtKey] = entries.filter { it.enabled }.minOfOrNull { it.nextTriggerAt.takeIf { time -> time > 0L } ?: Long.MAX_VALUE }
@@ -109,24 +129,38 @@ object MusicAlarmStore {
     }
 
     private fun parse(raw: String): List<MusicAlarmEntry> {
-        return runCatching {
-            val array = JSONArray(raw)
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.getJSONObject(index)
-                    add(
-                        MusicAlarmEntry(
-                            id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
-                            enabled = item.optBoolean("enabled", true),
-                            hour = item.optInt("hour", 7).coerceIn(0, 23),
-                            minute = item.optInt("minute", 0).coerceIn(0, 59),
-                            playlistId = item.optString("playlistId"),
-                            randomSong = item.optBoolean("randomSong", false),
-                            nextTriggerAt = item.optLong("nextTriggerAt", -1L)
-                        )
+        val array = runCatching { JSONArray(raw) }.getOrElse { return emptyList() }
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                runCatching {
+                    MusicAlarmEntry(
+                        id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
+                        enabled = item.optBoolean("enabled", true),
+                        hour = item.optInt("hour", 7).coerceIn(0, 23),
+                        minute = item.optInt("minute", 0).coerceIn(0, 59),
+                        playlistId = item.optString("playlistId"),
+                        randomSong = item.optBoolean("randomSong", false),
+                        nextTriggerAt = item.optLong("nextTriggerAt", -1L)
                     )
-                }
+                }.getOrNull()?.let(::add)
             }
-        }.getOrDefault(emptyList())
+        }
+    }
+
+    private fun saveProtected(context: Context, entries: List<MusicAlarmEntry>) {
+        alarmPrefsContext(context)
+            .getSharedPreferences(ALARM_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(ALARM_PREFS_ENTRIES, serialize(entries))
+            .apply()
+    }
+
+    private fun alarmPrefsContext(context: Context): Context {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            context.createDeviceProtectedStorageContext()
+        } else {
+            context
+        }
     }
 }

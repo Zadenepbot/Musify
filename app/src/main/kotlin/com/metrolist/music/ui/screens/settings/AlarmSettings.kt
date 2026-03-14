@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -61,6 +62,8 @@ import com.metrolist.music.ui.component.Material3SettingsGroup
 import com.metrolist.music.ui.component.Material3SettingsItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -74,6 +77,7 @@ fun AlarmSettingsSection(showTitle: Boolean = true) {
     val database = LocalDatabase.current
     val scope = rememberCoroutineScope()
     val playlists by database.playlistsByNameAsc().collectAsState(initial = emptyList())
+    val persistMutex = remember { Mutex() }
     val selectPlaylistText = stringResource(R.string.alarm_select_playlist)
     val randomEnabledText = stringResource(R.string.alarm_random_enabled)
     val randomDisabledText = stringResource(R.string.alarm_random_disabled)
@@ -136,10 +140,12 @@ fun AlarmSettingsSection(showTitle: Boolean = true) {
 
     fun persistAndSchedule(newList: List<MusicAlarmEntry>) {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                MusicAlarmScheduler.scheduleAll(context, newList)
+            persistMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    MusicAlarmScheduler.scheduleAll(context, newList)
+                }
+                alarms = loadAlarms()
             }
-            alarms = loadAlarms()
         }
     }
 
@@ -344,6 +350,7 @@ private fun AlarmEditorDialog(
         allAlarms.any { it.id != existing?.id && it.hour == hour && it.minute == minute }
     }
     val selectedPlaylist = playlists.firstOrNull { it.id == playlistId }
+    val hasValidPlaylist = selectedPlaylist != null
 
     if (showTimePickerDialog) {
         AlarmTimePickerDialog(
@@ -407,8 +414,9 @@ private fun AlarmEditorDialog(
                                         style = MaterialTheme.typography.titleSmall
                                     )
                                     Text(
-                                        text = stringResource(
-                                            R.string.alarm_playlist_song_count,
+                                        text = pluralStringResource(
+                                            R.plurals.alarm_playlist_song_count,
+                                            playlist.songCount,
                                             playlist.songCount
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
@@ -446,12 +454,12 @@ private fun AlarmEditorDialog(
                 Text(stringResource(android.R.string.cancel))
             }
             TextButton(
-                enabled = !hasSameTimeAlarm,
+                enabled = !hasSameTimeAlarm && hasValidPlaylist,
                 onClick = {
                     if (hasSameTimeAlarm) {
                         return@TextButton
                     }
-                    if (playlistId.isBlank()) {
+                    if (!hasValidPlaylist) {
                         Toast.makeText(context, selectPlaylistText, Toast.LENGTH_SHORT).show()
                         return@TextButton
                     }

@@ -3209,7 +3209,9 @@ class MusicService :
     }
 
     private fun handleAlarmTrigger(intent: Intent) {
-        MusicAlarmScheduler.scheduleFromPreferences(this)
+        scope.launch(Dispatchers.IO) {
+            MusicAlarmScheduler.scheduleFromPreferences(this@MusicService)
+        }
         val playlistId = intent.getStringExtra(EXTRA_ALARM_PLAYLIST_ID).orEmpty()
         if (playlistId.isBlank()) return
         val randomSong = intent.getBooleanExtra(EXTRA_ALARM_RANDOM_SONG, false)
