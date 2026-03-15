@@ -57,7 +57,8 @@ import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.flow.map
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
-
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 
 enum class AndroidAutoSection(val id: String) {
     LIKED("liked"),
@@ -150,15 +151,16 @@ fun AndroidAutoSettings(
         modifier = Modifier
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
             .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
     ) {
         // Visible sections
         Material3SettingsGroup(
             title = stringResource(R.string.android_auto_visible_sections),
             items = listOf(
                 Material3SettingsItem(
-                    icon = painterResource(R.drawable.drag_handle),
-                    title = { Text(stringResource(R.string.android_auto_reorder_hint)) },
-                    onClick = {}
+                    title = {},
+                    description = { Text(stringResource(R.string.android_auto_reorder_hint)) },
+                    onClick = null
                 )
             )
         )
@@ -167,7 +169,7 @@ fun AndroidAutoSettings(
             state = lazyListState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height((sections.size * 64).dp),
+                .height((sections.size * 80).dp),
             userScrollEnabled = false,
         ) {
             items(sections, key = { (section, _) -> section.id }) { (section, enabled) ->
@@ -238,18 +240,58 @@ fun AndroidAutoSettings(
         Spacer(Modifier.height(27.dp))
 
         // Quick-add destination playlist
-        ListPreference(
-            title = { Text(stringResource(R.string.android_auto_target_playlist)) },
-            icon = {
-                Icon(
-                    painter = painterResource(R.drawable.playlist_add),
-                    contentDescription = null,
+        var showTargetPlaylistDialog by remember { mutableStateOf(false) }
+
+        if (showTargetPlaylistDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showTargetPlaylistDialog = false },
+                title = { Text(stringResource(R.string.android_auto_target_playlist)) },
+                text = {
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        items(playlistOptions) { value ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showTargetPlaylistDialog = false
+                                        onTargetPlaylistChange(value)
+                                    }
+                                    .padding(vertical = 12.dp),
+                            ) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = value == targetPlaylist,
+                                    onClick = null,
+                                )
+                                Text(
+                                    text = playlistLabels(value),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(start = 16.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { showTargetPlaylistDialog = false }
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                }
+            )
+        }
+        
+        Material3SettingsGroup(
+            title = stringResource(R.string.android_auto_target_playlist),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.playlist_add),
+                    title = { Text(stringResource(R.string.android_auto_target_playlist)) },
+                    description = { Text(playlistLabels(targetPlaylist)) },
+                    onClick = { showTargetPlaylistDialog = true }
                 )
-            },
-            selectedValue = targetPlaylist,
-            values = playlistOptions,
-            valueText = { playlistLabels(it) },
-            onValueSelected = onTargetPlaylistChange,
+            )
         )
 
         Spacer(Modifier.height(27.dp))
