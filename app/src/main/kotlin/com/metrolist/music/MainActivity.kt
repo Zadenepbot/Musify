@@ -8,6 +8,7 @@ package com.metrolist.music
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.app.SearchManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -15,6 +16,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.MediaStore
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -122,6 +124,9 @@ import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.toBitmap
 import com.metrolist.innertube.YouTube
+import com.metrolist.innertube.models.AlbumItem
+import com.metrolist.innertube.models.ArtistItem
+import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
 import com.metrolist.music.constants.AppBarHeight
@@ -211,6 +216,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val ACTION_SEARCH = "com.metrolist.music.action.SEARCH"
         private const val ACTION_LIBRARY = "com.metrolist.music.action.LIBRARY"
+        private const val VOICE_SEARCH_TAG = "VoiceSearch"
         const val ACTION_RECOGNITION = "com.metrolist.music.action.RECOGNITION"
         const val EXTRA_AUTO_START_RECOGNITION = "auto_start_recognition"
     }
@@ -308,6 +314,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (::navController.isInitialized) {
+            handleVoiceSearchIntent(intent, navController)
             handleDeepLinkIntent(intent, navController)
         } else {
             pendingIntent = intent
@@ -783,10 +790,12 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     if (pendingIntent != null) {
+                        handleVoiceSearchIntent(pendingIntent!!, navController)
                         handleRecognitionIntent(pendingIntent!!, navController)
                         handleDeepLinkIntent(pendingIntent!!, navController)
                         pendingIntent = null
                     } else {
+                        handleVoiceSearchIntent(intent, navController)
                         handleRecognitionIntent(intent, navController)
                         handleDeepLinkIntent(intent, navController)
                     }
@@ -795,6 +804,7 @@ class MainActivity : ComponentActivity() {
                 DisposableEffect(Unit) {
                     val listener =
                         Consumer<Intent> { intent ->
+                            handleVoiceSearchIntent(intent, navController)
                             handleRecognitionIntent(intent, navController)
                             handleDeepLinkIntent(intent, navController)
                         }
@@ -1251,6 +1261,228 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(EXTRA_AUTO_START_RECOGNITION)
         navController.navigate(if (autoStart) "recognition?autoStart=true" else "recognition") {
             launchSingleTop = true
+        }
+    }
+
+    private fun handleVoiceSearchIntent(
+        intent: Intent,
+        navController: NavHostController,
+    ) {
+        if (intent.action != MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+
+        intent.action = null
+
+        val query = intent.getStringExtra(SearchManager.QUERY).orEmpty().trim()
+        val mediaFocus = intent.getStringExtra(MediaStore.EXTRA_MEDIA_FOCUS).orEmpty().trim()
+        val mediaArtist = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ARTIST).orEmpty().trim()
+        val mediaAlbum = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ALBUM).orEmpty().trim()
+        val mediaTitle = intent.getStringExtra(MediaStore.EXTRA_MEDIA_TITLE).orEmpty().trim()
+        val normalizedFocus = mediaFocus.lowercase(Locale.US)
+
+        Timber.tag(VOICE_SEARCH_TAG).d(
+            "Voice search intent received. focus=%s query=%s artist=%s album=%s title=%s route=%s",
+            mediaFocus,
+            query,
+            mediaArtist,
+            mediaAlbum,
+            mediaTitle,
+            navController.currentBackStackEntry?.destination?.route,
+        )
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                if (query.isBlank()) {
+                    val connection = playerConnection
+                    val hasQueue =
+                        connection != null &&
+                            runCatching { connection.player.mediaItemCount > 0 }
+                                .getOrElse { false }
+
+                    if (!hasQueue) {
+                        Timber.tag(VOICE_SEARCH_TAG).d("Blank query ignored because queue is empty")
+                        return@launch
+                    }
+
+                    connection.player.shuffleModeEnabled = true
+                    connection.play()
+                    Timber.tag(VOICE_SEARCH_TAG).d("Blank query handled by shuffling current queue")
+                    return@launch
+                }
+
+                when {
+                    normalizedFocus == MediaStore.Audio.Media.ENTRY_CONTENT_TYPE.lowercase(Locale.US) ||
+                        normalizedFocus.contains("track") ||
+                        normalizedFocus.contains("song") ||
+                        normalizedFocus.contains("media") -> {
+                            val trackQuery =
+                                listOf(mediaArtist, mediaTitle)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" ")
+                                    .ifBlank { query }
+                            Timber.tag(VOICE_SEARCH_TAG).d("Track focus resolved query=%s", trackQuery)
+                            playSong(trackQuery)
+                        }
+
+                    normalizedFocus == MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE.lowercase(Locale.US) ||
+                        normalizedFocus.contains("artist") -> {
+                            val artistName = mediaArtist.ifBlank { query }
+                            Timber.tag(VOICE_SEARCH_TAG).d("Artist focus query=%s", artistName)
+                            val artistItem =
+                                YouTube
+                                    .search(artistName, YouTube.SearchFilter.FILTER_ARTIST)
+                                    .getOrThrow()
+                                    .items
+                                    .filterIsInstance<ArtistItem>()
+                                    .firstOrNull()
+
+                            if (artistItem == null) {
+                                Timber.tag(VOICE_SEARCH_TAG).d("No artist match, falling back to song search")
+                                playSong(artistName)
+                                return@launch
+                            }
+
+                            val endpoint =
+                                YouTube
+                                    .artist(artistItem.id)
+                                    .getOrThrow()
+                                    .artist
+                                    .let { it.shuffleEndpoint ?: it.radioEndpoint ?: it.playEndpoint }
+
+                            if (endpoint != null) {
+                                withContext(Dispatchers.Main) {
+                                    playerConnection?.playQueue(YouTubeQueue(endpoint))
+                                }
+                                Timber.tag(VOICE_SEARCH_TAG).d("Queued artist endpoint for %s", artistItem.title)
+                            } else {
+                                Timber.tag(VOICE_SEARCH_TAG).d("Artist endpoint missing, falling back to song search")
+                                playSong(artistName)
+                            }
+                        }
+
+                    normalizedFocus == MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE.lowercase(Locale.US) ||
+                        normalizedFocus.contains("album") -> {
+                            val albumQuery = mediaAlbum.ifBlank { query }
+                            Timber.tag(VOICE_SEARCH_TAG).d("Album focus query=%s", albumQuery)
+                            val albumItem =
+                                YouTube
+                                    .search(albumQuery, YouTube.SearchFilter.FILTER_ALBUM)
+                                    .getOrThrow()
+                                    .items
+                                    .filterIsInstance<AlbumItem>()
+                                    .firstOrNull()
+
+                            if (albumItem != null) {
+                                withContext(Dispatchers.Main) {
+                                    playerConnection?.playQueue(
+                                        YouTubeQueue(
+                                            WatchEndpoint(playlistId = albumItem.playlistId),
+                                        ),
+                                    )
+                                }
+                                Timber.tag(VOICE_SEARCH_TAG).d("Queued album endpoint for %s", albumItem.title)
+                            } else {
+                                Timber.tag(VOICE_SEARCH_TAG).d("No album match, falling back to song search")
+                                playSong(albumQuery)
+                            }
+                        }
+
+                    normalizedFocus == MediaStore.Audio.Playlists.ENTRY_CONTENT_TYPE.lowercase(Locale.US) ||
+                        normalizedFocus.contains("playlist") -> {
+                            val playlistQuery = mediaTitle.ifBlank { query }
+                            Timber.tag(VOICE_SEARCH_TAG).d("Playlist focus query=%s", playlistQuery)
+                            val playlistItem = searchPlaylist(playlistQuery)
+
+                            if (playlistItem != null) {
+                                withContext(Dispatchers.Main) {
+                                    playerConnection?.playQueue(
+                                        YouTubeQueue(
+                                            WatchEndpoint(playlistId = playlistItem.id),
+                                        ),
+                                    )
+                                }
+                                Timber.tag(VOICE_SEARCH_TAG).d("Queued playlist endpoint for %s", playlistItem.title)
+                            } else {
+                                Timber.tag(VOICE_SEARCH_TAG).d("No playlist match, falling back to song search")
+                                playSong(playlistQuery)
+                            }
+                        }
+
+                    else -> {
+                        Timber.tag(VOICE_SEARCH_TAG).d("Generic focus, falling back to song search query=%s", query)
+                        playSong(query)
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.tag(VOICE_SEARCH_TAG).e(e, "Failed to handle voice search intent")
+                reportException(e)
+            }
+        }
+    }
+
+    private suspend fun playSong(query: String) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return
+
+        try {
+            val song =
+                withContext(Dispatchers.IO) {
+                    YouTube
+                        .search(normalizedQuery, YouTube.SearchFilter.FILTER_SONG)
+                        .getOrThrow()
+                        .items
+                        .filterIsInstance<SongItem>()
+                        .firstOrNull()
+                }
+
+            if (song == null) {
+                Timber.tag(VOICE_SEARCH_TAG).d("No song found for query=%s", normalizedQuery)
+                return
+            }
+
+            withContext(Dispatchers.Main) {
+                playerConnection?.playQueue(
+                    YouTubeQueue(
+                        WatchEndpoint(videoId = song.id),
+                        song.toMediaMetadata(),
+                    ),
+                )
+            }
+            Timber.tag(VOICE_SEARCH_TAG).d("Queued song for query=%s id=%s", normalizedQuery, song.id)
+        } catch (e: Exception) {
+            Timber.tag(VOICE_SEARCH_TAG).e(e, "Failed to play song query=%s", normalizedQuery)
+            reportException(e)
+        }
+    }
+
+    private suspend fun searchPlaylist(query: String): PlaylistItem? {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return null
+
+        return withContext(Dispatchers.IO) {
+            val featuredPlaylist =
+                YouTube
+                    .search(normalizedQuery, YouTube.SearchFilter.FILTER_FEATURED_PLAYLIST)
+                    .onFailure {
+                        Timber.tag(VOICE_SEARCH_TAG).e(it, "Featured playlist search failed for query=%s", normalizedQuery)
+                        reportException(it)
+                    }.getOrNull()
+                    ?.items
+                    ?.filterIsInstance<PlaylistItem>()
+                    ?.firstOrNull()
+
+            if (featuredPlaylist != null) {
+                return@withContext featuredPlaylist
+            }
+
+            YouTube
+                .search(normalizedQuery, YouTube.SearchFilter.FILTER_COMMUNITY_PLAYLIST)
+                .onFailure {
+                    Timber.tag(VOICE_SEARCH_TAG).e(it, "Community playlist search failed for query=%s", normalizedQuery)
+                    reportException(it)
+                }.getOrNull()
+                ?.items
+                ?.filterIsInstance<PlaylistItem>()
+                ?.firstOrNull()
         }
     }
 
