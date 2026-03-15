@@ -80,14 +80,18 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
     ): Result<PlaybackData> = runCatching {
-        Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
-        // Debug: Log ALL playback attempts
-        println("[PLAYBACK_DEBUG] playerResponseForPlayback called: videoId=$videoId, playlistId=$playlistId")
+        Timber.tag(TAG).d("=== PLAYER RESPONSE FOR PLAYBACK ===")
+        Timber.tag(TAG).d("videoId: $videoId")
+        Timber.tag(TAG).d("playlistId: $playlistId")
+        Timber.tag(TAG).d("audioQuality: $audioQuality")
+
         // Check if this is an uploaded/privately owned track
         val isUploadedTrack = playlistId == "MLPT" || playlistId?.contains("MLPT") == true
+        Timber.tag(TAG).d("Content type detection (preliminary):")
+        Timber.tag(TAG).d("  isUploadedTrack (from playlistId): $isUploadedTrack")
 
         val isLoggedIn = YouTube.cookie != null
-        Timber.tag(logTag).d("Session authentication status: ${if (isLoggedIn) "Logged in" else "Not logged in"}")
+        Timber.tag(TAG).d("Authentication status: ${if (isLoggedIn) "LOGGED_IN" else "ANONYMOUS"}")
 
         // Get signature timestamp (same as before for normal content)
         val signatureTimestamp = getSignatureTimestampOrNull(videoId)
@@ -142,9 +146,6 @@ object YTPlayerUtils {
         }
 
         // If we still don't have a valid response, throw
-        if (mainPlayerResponse == null) {
-            throw Exception("Failed to get player response")
-        }
 
         val audioConfig = mainPlayerResponse.playerConfig?.audioConfig
         val videoDetails = mainPlayerResponse.videoDetails
@@ -153,11 +154,11 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
-        var retryMainPlayerResponse: PlayerResponse? = if (usedAgeRestrictedClient != null) mainPlayerResponse else null
+        val retryMainPlayerResponse: PlayerResponse? = if (usedAgeRestrictedClient != null) mainPlayerResponse else null
 
         // Check current status
         val currentStatus = mainPlayerResponse.playabilityStatus.status
-        var isAgeRestricted = currentStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
+        val isAgeRestricted = currentStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
 
         if (isAgeRestricted) {
             Timber.tag(logTag).d("Content is still age-restricted (status: $currentStatus), will try fallback clients")
@@ -253,27 +254,61 @@ object YTPlayerUtils {
 
                 // Check if this is a privately owned track
                 val isPrivatelyOwnedTrack = streamPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
+                val musicVideoType = streamPlayerResponse.videoDetails?.musicVideoType
+
+                Timber.tag(TAG).d("=== N-TRANSFORM DECISION ===")
+                Timber.tag(TAG).d("Content type analysis:")
+                Timber.tag(TAG).d("  musicVideoType: $musicVideoType")
+                Timber.tag(TAG).d("  isPrivatelyOwnedTrack: $isPrivatelyOwnedTrack")
+                Timber.tag(TAG).d("  isUploadedTrack (from playlistId): $isUploadedTrack")
+                Timber.tag(TAG).d("  wasOriginallyAgeRestricted: $wasOriginallyAgeRestricted")
+                Timber.tag(TAG).d("Client analysis:")
+                Timber.tag(TAG).d("  currentClient: ${currentClient.clientName}")
+                Timber.tag(TAG).d("  useWebPoTokens: ${currentClient.useWebPoTokens}")
 
                 // Apply n-transform and PoToken for web clients OR for private tracks (including TVHTML5)
                 val needsNTransform = currentClient.useWebPoTokens ||
                     currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5") ||
                     isPrivatelyOwnedTrack
 
+                Timber.tag(TAG).d("N-transform decision:")
+                Timber.tag(TAG).d("  needsNTransform: $needsNTransform")
+                Timber.tag(TAG).d("  Reason: useWebPoTokens=${currentClient.useWebPoTokens}, " +
+                    "clientInList=${currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")}, " +
+                    "isPrivatelyOwnedTrack=$isPrivatelyOwnedTrack")
+
                 if (needsNTransform) {
                     try {
-                        Timber.tag(logTag).d("Applying n-transform to stream URL for ${currentClient.clientName}")
-                        streamUrl = EjsNTransformSolver.transformNParamInUrl(streamUrl!!)
+                        Timber.tag(TAG).d("Applying n-transform to stream URL...")
+                        Timber.tag(TAG).d("  Original URL length: ${streamUrl.length}")
+                        Timber.tag(TAG).d("  Original URL preview: ${streamUrl.take(100)}...")
+
+                        val originalUrl = streamUrl
+                        // Use CipherDeobfuscator for n-transform (fixed implementation)
+                        streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
+
+                        Timber.tag(TAG).d("  Transformed URL length: ${streamUrl.length}")
+                        Timber.tag(TAG).d("  URL changed: ${originalUrl != streamUrl}")
 
                         // Append pot= parameter with streaming data poToken
-                        if ((currentClient.useWebPoTokens || isPrivatelyOwnedTrack) && poToken?.streamingDataPoToken != null) {
-                            Timber.tag(logTag).d("Appending pot= parameter to stream URL")
-                            val separator = if ("?" in streamUrl!!) "&" else "?"
-                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken.streamingDataPoToken)}"
+                        val needsPoToken = (currentClient.useWebPoTokens || isPrivatelyOwnedTrack) && poToken?.streamingDataPoToken != null
+                        Timber.tag(TAG).d("PoToken decision:")
+                        Timber.tag(TAG).d("  needsPoToken: $needsPoToken")
+                        Timber.tag(TAG).d("  hasStreamingDataPoToken: ${poToken?.streamingDataPoToken != null}")
+
+                        if (needsPoToken) {
+                            Timber.tag(TAG).d("Appending pot= parameter to stream URL")
+                            val separator = if ("?" in streamUrl) "&" else "?"
+                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken!!.streamingDataPoToken)}"
+                            Timber.tag(TAG).d("  Final URL length (with pot): ${streamUrl.length}")
                         }
                     } catch (e: Exception) {
-                        Timber.tag(logTag).e(e, "N-transform or pot append failed: ${e.message}")
+                        Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
+                        Timber.tag(TAG).e("Stack trace: ${e.stackTraceToString().take(500)}")
                         // Continue with original URL
                     }
+                } else {
+                    Timber.tag(TAG).d("Skipping n-transform (not required for this client/content)")
                 }
 
                 streamExpiresInSeconds = streamPlayerResponse.streamingData?.expiresInSeconds
@@ -300,7 +335,7 @@ object YTPlayerUtils {
                     break
                 }
 
-                if (validateStatus(streamUrl!!)) {
+                if (validateStatus(streamUrl)) {
                     // working stream found
                     Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
                     // Log for release builds
@@ -352,7 +387,7 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).d("Successfully obtained playback data with format: ${format.mimeType}, bitrate: ${format.bitrate}")
         if (isUploadedTrack) {
-            println("[PLAYBACK_DEBUG] SUCCESS: Got playback data for uploaded track - format=${format.mimeType}, streamUrl=${streamUrl?.take(100)}...")
+            println("[PLAYBACK_DEBUG] SUCCESS: Got playback data for uploaded track - format=${format.mimeType}, streamUrl=${streamUrl.take(100)}...")
         }
         PlaybackData(
             audioConfig,

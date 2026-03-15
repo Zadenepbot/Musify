@@ -80,6 +80,8 @@ jobs:
             variantName: Foss
           - variant: gms
             variantName: Gms
+          - variant: izzy
+            variantName: Izzy
 
     steps:
       - uses: actions/checkout@v6
@@ -107,6 +109,8 @@ jobs:
       - name: Build and Lint Release APK
         run: ./gradlew --no-configuration-cache --console=plain clean assemble${{ matrix.variantName }}Release :app:lint${{ matrix.variantName }}Release --warning-mode summary
         env:
+          METROLIST_APPLICATION_ID: com.metrolist.music
+          METROLIST_APP_NAME: Metrolist
           PULL_REQUEST: "false"
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
@@ -137,6 +141,8 @@ jobs:
 
           if [ "${{ matrix.variant }}" = "gms" ]; then
             TARGET_NAME="Metrolist-with-Google-Cast.apk"
+          elif [ "${{ matrix.variant }}" = "izzy" ]; then
+            TARGET_NAME="Metrolist-izzy.apk"
           else
             TARGET_NAME="Metrolist.apk"
           fi
@@ -149,7 +155,7 @@ jobs:
       - name: Upload Signed APKs
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.variant == 'gms' && 'Metrolist-with-Google-Cast' || 'Metrolist' }}
+          name: ${{ matrix.variant == 'gms' && 'Metrolist-with-Google-Cast' || matrix.variant == 'izzy' && 'Metrolist-izzy' || 'Metrolist' }}
           path: app/build/outputs/apk/${{ matrix.variant }}/release/out/*.apk
 
   create-release:
@@ -176,18 +182,26 @@ jobs:
           echo "APKs ready for release:"
           ls -la release_files/
 
-      - name: Generate release notes
+      - name: Parse release notes from changelog
         run: |
-          echo "Generating release notes..."
+          VERSION="${{ needs.check-version.outputs.new_version }}"
+          chmod +x .github/scripts/parse_changelog.sh
 
-          cat > release_notes.md << EOF
-          Release of version ${{ needs.check-version.outputs.new_version }}
-
-          $(git log $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD --pretty=format:"- %s" --no-merges | head -10 || echo "- Initial release")
-          EOF
-
-          echo "Release notes preview:"
-          cat release_notes.md
+          if bash .github/scripts/parse_changelog.sh "$VERSION" changelog.md > release_notes.md; then
+            echo "Release notes sourced from changelog.md for v$VERSION"
+            echo "--- Preview (first 20 lines) ---"
+            head -20 release_notes.md
+          else
+            echo "::warning::v$VERSION not found in changelog.md — falling back to git log"
+            {
+              echo "Release of version $VERSION"
+              echo ""
+              git log "$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD" \
+                --pretty=format:"- %s" --no-merges | head -10 || echo "- Initial release"
+            } > release_notes.md
+            echo "--- Fallback notes ---"
+            cat release_notes.md
+          fi
 
       - name: Create Release
         env:
@@ -199,7 +213,6 @@ jobs:
             --title "${{ needs.check-version.outputs.new_version }}" \
             --notes-file release_notes.md \
             --latest \
-            --draft \
             release_files/*.apk
 
           echo "Release created successfully!"
