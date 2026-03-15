@@ -18,6 +18,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -375,13 +378,17 @@ fun UpdaterScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                InstallerType.entries.forEach { type ->
-                    val info = availableInstallers.find { it.type == type }!!
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
+                Column(modifier = Modifier.selectableGroup()) {
+                    InstallerType.entries.forEach { type ->
+                        val info = availableInstallers.find { it.type == type }!!
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .selectable(
+                                    selected = installerType == type,
+                                    role = Role.RadioButton
+                                ) {
                                 when (type) {
                                     InstallerType.ROOT -> {
                                         coroutineScope.launch {
@@ -463,6 +470,7 @@ fun UpdaterScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
                     }
                 }
 
