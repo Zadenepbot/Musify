@@ -68,7 +68,7 @@ class DownloadExportHelper @Inject constructor(
             val firstArtist = song.artists.firstOrNull()?.name ?: "Unknown Artist"
             val allArtists = song.artists.joinToString(", ") { it.name }
                 .ifEmpty { "Unknown Artist" }
-            val albumName = song.album?.title ?: song.song.albumName ?: "Unknown Album"
+            val albumName = song.album?.title ?: song.song.albumName ?: "Singles"
             val title = song.song.title
             val sanitizedArtistFolder = sanitizeFilename(firstArtist)
             val sanitizedAlbumFolder = sanitizeFilename(albumName)
