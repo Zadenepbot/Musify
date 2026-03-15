@@ -47,7 +47,7 @@ object AppInstaller {
     private const val TAG = "AppInstaller"
     private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
     private const val DHIZUKU_PACKAGE = "com.rosan.dhizuku"
-    private const val PLAY_PACKAGE_NAME = "com.android.vending"
+    // Removed PLAY_PACKAGE_NAME - use context.packageName instead
 
     // Extension functions for Shizuku binder wrapping
     private fun IBinder.wrap() = ShizukuBinderWrapper(this)
@@ -178,7 +178,7 @@ object AppInstaller {
 
             // Create install session via pm
             val createResult = Shell.cmd(
-                "pm install-create -i $PLAY_PACKAGE_NAME --user 0 -r -S $totalSize"
+                "pm install-create -i ${context.packageName} --user 0 -r -S $totalSize"
             ).exec()
 
             if (!createResult.isSuccess) {
@@ -246,11 +246,11 @@ object AppInstaller {
             // Create PackageInstaller instance
             val packageInstaller = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Refine.unsafeCast<PackageInstaller>(
-                    PackageInstallerHidden(iPackageInstaller, PLAY_PACKAGE_NAME, null, 0)
+                    PackageInstallerHidden(iPackageInstaller, context.packageName, null, 0)
                 )
             } else {
                 Refine.unsafeCast<PackageInstaller>(
-                    PackageInstallerHidden(iPackageInstaller, PLAY_PACKAGE_NAME, 0)
+                    PackageInstallerHidden(iPackageInstaller, context.packageName, 0)
                 )
             }
 
