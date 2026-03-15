@@ -179,6 +179,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * A composable function that displays lyrics for the currently playing song.
+ *
+ * @param sliderPositionProvider Provides the current playback position in milliseconds.
+ * @param modifier Modifier to be applied to the layout.
+ * @param showLyrics Whether lyrics should be displayed.
+ */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedBoxWithConstraintsScope", "StringFormatInvalid")
 @Composable
@@ -536,6 +543,12 @@ fun Lyrics(
         }
     }
 
+    /**
+     * Smoothly scrolls the lyrics list to center the item at [targetIndex].
+     *
+     * @param targetIndex The index of the lyrics line to scroll to.
+     * @param duration The duration of the scroll animation in milliseconds.
+     */
     suspend fun performSmoothPageScroll(
         targetIndex: Int,
         duration: Int = 1500,
