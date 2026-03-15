@@ -117,15 +117,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("mood_and_genres") {
-        MoodAndGenresScreen(navController, scrollBehavior)
+        MoodAndGenresScreen(navController)
     }
 
     composable("account") {
-        AccountScreen(navController, scrollBehavior)
+        AccountScreen(navController)
     }
 
     composable("new_release") {
-        NewReleaseScreen(navController, scrollBehavior)
+        NewReleaseScreen(navController)
     }
 
     composable("charts_screen") {
@@ -143,7 +143,6 @@ fun NavGraphBuilder.navigationBuilder(
     ) {
         BrowseScreen(
             navController,
-            scrollBehavior,
             it.arguments?.getString("browseId"),
         )
     }
@@ -189,7 +188,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        AlbumScreen(navController, scrollBehavior)
+        AlbumScreen(navController)
     }
 
     composable(
@@ -205,7 +204,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        ArtistScreen(navController, scrollBehavior)
+        ArtistScreen(navController)
     }
 
     composable(
@@ -217,7 +216,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        ArtistSongsScreen(navController, scrollBehavior)
+        ArtistSongsScreen(navController)
     }
 
     composable(
@@ -249,7 +248,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        ArtistItemsScreen(navController, scrollBehavior)
+        ArtistItemsScreen(navController)
     }
 
     composable(
@@ -261,7 +260,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        OnlinePlaylistScreen(navController, scrollBehavior)
+        OnlinePlaylistScreen(navController)
     }
 
     composable(
@@ -285,7 +284,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        LocalPlaylistScreen(navController, scrollBehavior)
+        LocalPlaylistScreen(navController)
     }
 
     composable(
@@ -297,7 +296,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        AutoPlaylistScreen(navController, scrollBehavior)
+        AutoPlaylistScreen(navController)
     }
 
     composable(
@@ -309,7 +308,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        CachePlaylistScreen(navController, scrollBehavior)
+        CachePlaylistScreen(navController)
     }
 
     composable(
@@ -321,7 +320,7 @@ fun NavGraphBuilder.navigationBuilder(
                 },
             ),
     ) {
-        TopPlaylistScreen(navController, scrollBehavior)
+        TopPlaylistScreen(navController)
     }
 
     composable(
@@ -342,11 +341,11 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings") {
-        SettingsScreen(navController, scrollBehavior, latestVersionName)
+        SettingsScreen(navController, latestVersionName)
     }
 
     composable("settings/appearance") {
-        AppearanceSettings(navController, scrollBehavior, activity, snackbarHostState)
+        AppearanceSettings(navController, activity, snackbarHostState)
     }
 
     composable("settings/appearance/theme") {
@@ -354,47 +353,47 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/content") {
-        ContentSettings(navController, scrollBehavior)
+        ContentSettings(navController)
     }
 
     composable("settings/content/romanization") {
-        RomanizationSettings(navController, scrollBehavior)
+        RomanizationSettings(navController)
     }
 
     composable("settings/ai") {
-        AiSettings(navController, scrollBehavior)
+        AiSettings(navController)
     }
 
     composable("settings/player") {
-        PlayerSettings(navController, scrollBehavior)
+        PlayerSettings(navController)
     }
 
     composable("settings/storage") {
-        StorageSettings(navController, scrollBehavior)
+        StorageSettings(navController)
     }
 
     composable("settings/privacy") {
-        PrivacySettings(navController, scrollBehavior)
+        PrivacySettings(navController)
     }
 
     composable("settings/backup_restore") {
-        BackupAndRestore(navController, scrollBehavior)
+        BackupAndRestore(navController)
     }
 
     composable("settings/integrations") {
-        IntegrationScreen(navController, scrollBehavior)
+        IntegrationScreen(navController)
     }
 
     composable("settings/integrations/discord") {
-        DiscordSettings(navController, scrollBehavior, snackbarHostState)
+        DiscordSettings(navController, snackbarHostState)
     }
 
     composable("settings/integrations/lastfm") {
-        LastFMSettings(navController, scrollBehavior)
+        LastFMSettings(navController)
     }
 
     composable(route = "settings/integrations/listen_together") {
-        ListenTogetherSettings(navController, scrollBehavior)
+        ListenTogetherSettings(navController)
     }
 
     composable("settings/discord/login") {
@@ -402,7 +401,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("settings/updater") {
-        UpdaterScreen(navController, scrollBehavior)
+        UpdaterScreen(navController)
     }
 
     composable("settings/about") {
