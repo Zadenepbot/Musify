@@ -67,8 +67,12 @@ class App :
         CrashHandler.install(this)
 
         // Bypass hidden API restrictions for Shizuku installer (Android 9+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            HiddenApiBypass.addHiddenApiExemptions("I", "L")
+        if (BuildConfig.UPDATER_AVAILABLE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching {
+                HiddenApiBypass.addHiddenApiExemptions("I", "L")
+            }.onFailure {
+                Timber.w(it, "Hidden API bypass unavailable; privileged installers will be disabled")
+            }
         }
 
         // Initialize cipher deobfuscator for WEB_REMIX streaming
