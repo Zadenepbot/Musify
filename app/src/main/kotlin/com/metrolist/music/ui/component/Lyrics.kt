@@ -8,6 +8,7 @@ package com.metrolist.music.ui.component
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.content.ClipData
 import android.content.res.Configuration
 import android.text.Layout
 import android.view.WindowManager
@@ -1566,6 +1567,34 @@ fun Lyrics(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = stringResource(R.string.auto_scroll))
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !isSelectionModeActive && lines.isNotEmpty(),
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut()
+        ) {
+            FilledTonalButton(onClick = {
+                val lyricsToCopy = if (isSynced) lines.drop(1) else lines
+                val allLyricsText = lyricsToCopy
+                    .mapNotNull { it.text }
+                    .joinToString("\n")
+
+                if (allLyricsText.isNotBlank()) {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val clip = android.content.ClipData.newPlainText("Lyrics", allLyricsText)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+                }
+            }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.content_copy),
+                    contentDescription = stringResource(R.string.copy_all_lyrics),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = stringResource(R.string.copy_all_lyrics))
             }
         }
 
