@@ -270,6 +270,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private fun safeUnbindService(source: String) {
+        if (!isServiceBound) return
+        try {
+            unbindService(serviceConnection)
+        } catch (e: IllegalArgumentException) {
+            Timber.tag("MainActivity").w(e, "Service was not bound when attempting to unbind in $source")
+        } finally {
+            isServiceBound = false
+            listenTogetherManager.setPlayerConnection(null)
+            playerConnection?.dispose()
+            playerConnection = null
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         // Request notification permission on Android 13+
@@ -291,14 +305,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        if (isServiceBound) {
-            try {
-                unbindService(serviceConnection)
-            } catch (e: IllegalArgumentException) {
-                Timber.tag("MainActivity").w(e, "Service was not bound when attempting to unbind in onStop()")
-            }
-            isServiceBound = false
-        }
+        safeUnbindService("onStop()")
         super.onStop()
     }
 
@@ -310,15 +317,7 @@ class MainActivity : ComponentActivity() {
         ) {
             stopService(Intent(this, MusicService::class.java))
         }
-        if (isServiceBound) {
-            try {
-                unbindService(serviceConnection)
-            } catch (e: IllegalArgumentException) {
-                Timber.tag("MainActivity").w(e, "Service was not bound when attempting to unbind in onDestroy()")
-            }
-            isServiceBound = false
-        }
-        playerConnection = null
+        safeUnbindService("onDestroy()")
     }
 
     override fun onNewIntent(intent: Intent) {
