@@ -8,7 +8,6 @@ package com.metrolist.music.ui.component
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
-import android.content.res.Configuration
 import android.text.Layout
 import android.view.WindowManager
 import android.widget.Toast
