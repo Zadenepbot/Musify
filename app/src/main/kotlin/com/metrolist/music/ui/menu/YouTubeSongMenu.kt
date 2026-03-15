@@ -154,11 +154,7 @@ fun YouTubeSongMenu(
             onFormatSelected = { format ->
                 Timber.tag("YouTubeSongMenu").d("Format selected: ${format.displayName} (itag=${format.itag})")
                 showDownloadFormatDialog = false
-                // Insert song to database first
-                database.transaction {
-                    insert(song.toMediaMetadata())
-                }
-                // Set target itag and start download
+                // Set target itag and start download (song already inserted when formats were fetched)
                 downloadUtil.setTargetItag(song.id, format.itag)
                 val downloadRequest = DownloadRequest
                     .Builder(song.id, song.id.toUri())
@@ -700,6 +696,10 @@ fun YouTubeSongMenu(
 
                                     coroutineScope.launch(Dispatchers.IO) {
                                         try {
+                                            // Insert song to database first (needed for metadata embedding)
+                                            database.transaction {
+                                                insert(song.toMediaMetadata())
+                                            }
                                             val formats = com.metrolist.music.utils.YTPlayerUtils.getAllAvailableAudioFormats(song.id).getOrNull() ?: emptyList()
                                             availableFormats = formats
                                         } catch (e: Exception) {

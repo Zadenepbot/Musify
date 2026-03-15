@@ -183,24 +183,42 @@ class DownloadExportHelper @Inject constructor(
                     var albumArtist: String? = null
                     var trackNumber = 0
                     var totalTracks = 0
+                    var fetchedAlbumId: String? = song.song.albumId
 
-                    // If missing album or year info and we have albumId, try fetching from YouTube
-                    if ((albumName == null || year == null) && song.song.albumId != null) {
-                        Timber.tag(TAG).d("Album/year info incomplete (album=$albumName, year=$year), fetching from YouTube...")
+                    // If no album info at all, fetch from YouTube using next()
+                    if (albumName == null && fetchedAlbumId == null) {
+                        Timber.tag(TAG).d("No album info, fetching song metadata from YouTube...")
                         try {
-                            val albumPage = com.metrolist.innertube.YouTube.album(song.song.albumId).getOrNull()
+                            val nextResult = com.metrolist.innertube.YouTube.next(
+                                com.metrolist.innertube.models.WatchEndpoint(videoId = songId)
+                            ).getOrNull()
+                            val currentSong = nextResult?.items?.getOrNull(nextResult.currentIndex ?: 0)
+                            val songAlbum = currentSong?.album
+                            if (songAlbum != null) {
+                                albumName = songAlbum.name
+                                fetchedAlbumId = songAlbum.id
+                                Timber.tag(TAG).d("Fetched album from next(): $albumName (id=$fetchedAlbumId)")
+                            }
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).w(e, "Failed to fetch song metadata from YouTube")
+                        }
+                    }
+
+                    // If we have albumId (original or fetched), get full album details
+                    if ((albumName == null || year == null) && fetchedAlbumId != null) {
+                        Timber.tag(TAG).d("Fetching album details for: $fetchedAlbumId")
+                        try {
+                            val albumPage = com.metrolist.innertube.YouTube.album(fetchedAlbumId).getOrNull()
                             if (albumPage != null) {
                                 if (albumName == null) albumName = albumPage.album.title
                                 if (year == null) year = albumPage.album.year?.toString()
-                                // Get album artist (first artist of album)
                                 albumArtist = albumPage.album.artists?.firstOrNull()?.name
-                                // Find track position in album
                                 totalTracks = albumPage.songs.size
                                 val trackIndex = albumPage.songs.indexOfFirst { it.id == songId }
                                 if (trackIndex >= 0) {
                                     trackNumber = trackIndex + 1
                                 }
-                                Timber.tag(TAG).d("Fetched from YouTube - album: $albumName, year: $year, albumArtist: $albumArtist, track: $trackNumber/$totalTracks")
+                                Timber.tag(TAG).d("Fetched album details - album: $albumName, year: $year, albumArtist: $albumArtist, track: $trackNumber/$totalTracks")
                             }
                         } catch (e: Exception) {
                             Timber.tag(TAG).w(e, "Failed to fetch album info from YouTube")
