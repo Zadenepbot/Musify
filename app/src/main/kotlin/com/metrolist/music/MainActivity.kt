@@ -207,7 +207,9 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.util.ArrayDeque
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedDeque
 import javax.inject.Inject
 
 @Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -234,7 +236,9 @@ class MainActivity : ComponentActivity() {
     lateinit var listenTogetherManager: com.metrolist.music.listentogether.ListenTogetherManager
 
     private lateinit var navController: NavHostController
-    private var pendingIntent: Intent? = null
+    private val pendingIntents = ArrayDeque<Intent>()
+    private val deferredIntents = ConcurrentLinkedDeque<Intent>()
+    private var isOnNewIntentListenerRegistered = false
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
 
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
@@ -313,11 +317,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (isOnNewIntentListenerRegistered) return
+
         if (::navController.isInitialized) {
-            handleVoiceSearchIntent(intent, navController)
-            handleDeepLinkIntent(intent, navController)
+            enqueueOrHandleIntent(intent, navController)
+            drainDeferredIntents(navController)
         } else {
-            pendingIntent = intent
+            pendingIntents.addLast(Intent(intent))
         }
     }
 
@@ -546,7 +552,7 @@ class MainActivity : ComponentActivity() {
                 val bottomInset = with(density) { windowsInsets.getBottom(density).toDp() }
                 val bottomInsetDp = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
-                val navController = rememberNavController()
+                val navController = rememberNavController().also { this@MainActivity.navController = it }
 
                 LaunchedEffect(Unit) {
                     val lastSeenVersion = dataStore.data.first()[LastSeenVersionKey] ?: ""
@@ -789,28 +795,34 @@ class MainActivity : ComponentActivity() {
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 LaunchedEffect(Unit) {
-                    if (pendingIntent != null) {
-                        handleVoiceSearchIntent(pendingIntent!!, navController)
-                        handleRecognitionIntent(pendingIntent!!, navController)
-                        handleDeepLinkIntent(pendingIntent!!, navController)
-                        pendingIntent = null
+                    if (pendingIntents.isNotEmpty()) {
+                        while (pendingIntents.isNotEmpty()) {
+                            enqueueOrHandleIntent(pendingIntents.removeFirst(), navController)
+                        }
                     } else {
-                        handleVoiceSearchIntent(intent, navController)
-                        handleRecognitionIntent(intent, navController)
-                        handleDeepLinkIntent(intent, navController)
+                        enqueueOrHandleIntent(intent, navController)
                     }
+
+                    drainDeferredIntents(navController)
+                }
+
+                LaunchedEffect(playerConnection) {
+                    drainDeferredIntents(navController)
                 }
 
                 DisposableEffect(Unit) {
                     val listener =
                         Consumer<Intent> { intent ->
-                            handleVoiceSearchIntent(intent, navController)
-                            handleRecognitionIntent(intent, navController)
-                            handleDeepLinkIntent(intent, navController)
+                            enqueueOrHandleIntent(intent, navController)
+                            drainDeferredIntents(navController)
                         }
 
+                    isOnNewIntentListenerRegistered = true
                     addOnNewIntentListener(listener)
-                    onDispose { removeOnNewIntentListener(listener) }
+                    onDispose {
+                        isOnNewIntentListenerRegistered = false
+                        removeOnNewIntentListener(listener)
+                    }
                 }
 
                 val currentTitleRes =
@@ -1247,6 +1259,62 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun enqueueOrHandleIntent(
+        intent: Intent,
+        navController: NavHostController,
+    ) {
+        val intentToHandle = Intent(intent)
+        if (shouldDeferIntentUntilPlayerReady(intentToHandle)) {
+            deferredIntents.addLast(intentToHandle)
+            return
+        }
+
+        dispatchIntent(intentToHandle, navController)
+    }
+
+    private fun drainDeferredIntents(navController: NavHostController) {
+        if (deferredIntents.isEmpty()) return
+        if (playerConnection == null) return
+
+        val intentsToHandle = mutableListOf<Intent>()
+        while (true) {
+            val deferredIntent = deferredIntents.pollFirst() ?: break
+            intentsToHandle.add(deferredIntent)
+        }
+
+        intentsToHandle.forEach { dispatchIntent(it, navController) }
+    }
+
+    private fun dispatchIntent(
+        intent: Intent,
+        navController: NavHostController,
+    ) {
+        if (handleVoiceSearchIntent(intent, navController)) return
+        if (handleRecognitionIntent(intent, navController)) return
+        handleDeepLinkIntent(intent, navController)
+    }
+
+    private fun shouldDeferIntentUntilPlayerReady(intent: Intent): Boolean {
+        if (playerConnection != null) return false
+        if (intent.action == MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return true
+
+        val uri = intent.data ?: intent.extras?.getString(Intent.EXTRA_TEXT)?.toUri() ?: return false
+        val path = uri.pathSegments.firstOrNull()
+        if (path in setOf("listen", "playlist", "browse", "channel", "c", "search")) {
+            return false
+        }
+
+        val hasVideo =
+            when {
+                path == "watch" -> !uri.getQueryParameter("v").isNullOrBlank()
+                uri.host == "youtu.be" -> !uri.pathSegments.firstOrNull().isNullOrBlank()
+                else -> false
+            }
+        val hasPlaylist = !uri.getQueryParameter("list").isNullOrBlank()
+
+        return hasVideo || hasPlaylist
+    }
+
     /**
      * Handles the ACTION_RECOGNITION intent sent from the Music Recognizer Widget.
      * Always navigates to the recognition screen to show the result.
@@ -1254,21 +1322,22 @@ class MainActivity : ComponentActivity() {
     private fun handleRecognitionIntent(
         intent: Intent,
         navController: NavHostController,
-    ) {
-        if (intent.action != ACTION_RECOGNITION) return
+    ): Boolean {
+        if (intent.action != ACTION_RECOGNITION) return false
         val autoStart = intent.getBooleanExtra(EXTRA_AUTO_START_RECOGNITION, false)
         intent.action = null
         intent.removeExtra(EXTRA_AUTO_START_RECOGNITION)
         navController.navigate(if (autoStart) "recognition?autoStart=true" else "recognition") {
             launchSingleTop = true
         }
+        return true
     }
 
     private fun handleVoiceSearchIntent(
         intent: Intent,
         navController: NavHostController,
-    ) {
-        if (intent.action != MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+    ): Boolean {
+        if (intent.action != MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return false
 
         intent.action = null
 
@@ -1279,6 +1348,11 @@ class MainActivity : ComponentActivity() {
         val mediaTitle = intent.getStringExtra(MediaStore.EXTRA_MEDIA_TITLE).orEmpty().trim()
         val mediaPlaylist = intent.getStringExtra("android.intent.extra.playlist").orEmpty().trim()
         val normalizedFocus = mediaFocus.lowercase(Locale.US)
+        val hasStructuredMediaExtras =
+            mediaArtist.isNotBlank() ||
+                mediaAlbum.isNotBlank() ||
+                mediaTitle.isNotBlank() ||
+                mediaPlaylist.isNotBlank()
 
         Timber.tag(VOICE_SEARCH_TAG).d(
             "Voice search intent received. focus=%s query=%s artist=%s album=%s title=%s playlist=%s route=%s",
@@ -1293,7 +1367,7 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                if (query.isBlank()) {
+                if (query.isBlank() && !hasStructuredMediaExtras) {
                     val connection = playerConnection
                     if (connection == null) {
                         Timber.tag(VOICE_SEARCH_TAG).d("Blank query ignored because queue is empty")
@@ -1427,6 +1501,8 @@ class MainActivity : ComponentActivity() {
                 reportException(e)
             }
         }
+
+        return true
     }
 
     private suspend fun playSong(query: String) {
