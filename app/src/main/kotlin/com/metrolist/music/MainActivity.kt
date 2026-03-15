@@ -1277,15 +1277,17 @@ class MainActivity : ComponentActivity() {
         val mediaArtist = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ARTIST).orEmpty().trim()
         val mediaAlbum = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ALBUM).orEmpty().trim()
         val mediaTitle = intent.getStringExtra(MediaStore.EXTRA_MEDIA_TITLE).orEmpty().trim()
+        val mediaPlaylist = intent.getStringExtra("android.intent.extra.playlist").orEmpty().trim()
         val normalizedFocus = mediaFocus.lowercase(Locale.US)
 
         Timber.tag(VOICE_SEARCH_TAG).d(
-            "Voice search intent received. focus=%s query=%s artist=%s album=%s title=%s route=%s",
+            "Voice search intent received. focus=%s query=%s artist=%s album=%s title=%s playlist=%s route=%s",
             mediaFocus,
             query,
             mediaArtist,
             mediaAlbum,
             mediaTitle,
+            mediaPlaylist,
             navController.currentBackStackEntry?.destination?.route,
         )
 
@@ -1388,7 +1390,7 @@ class MainActivity : ComponentActivity() {
 
                     normalizedFocus == MediaStore.Audio.Playlists.ENTRY_CONTENT_TYPE.lowercase(Locale.US) ||
                         normalizedFocus.contains("playlist") -> {
-                            val playlistQuery = mediaTitle.ifBlank { query }
+                            val playlistQuery = mediaPlaylist.ifBlank { mediaTitle.ifBlank { query } }
                             Timber.tag(VOICE_SEARCH_TAG).d("Playlist focus query=%s", playlistQuery)
                             val playlistItem = searchPlaylist(playlistQuery)
 
