@@ -224,7 +224,7 @@ fun MarkdownText(text: String) {
                     i++
                 }
                 // Render admonition
-                AdmonitionBlock(type = currentAdmonition, content = admonitionContent.joinToString(" "))
+                AdmonitionBlock(type = currentAdmonition, content = admonitionContent.joinToString("\n"))
                 currentAdmonition = null
                 continue
             }
