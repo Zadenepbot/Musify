@@ -189,17 +189,18 @@ fun UpdaterScreen(
         coroutineScope.launch {
             isChecking = true
             checkError = null
-            withContext(Dispatchers.IO) {
-                Updater.checkForUpdate(forceRefresh = true).onSuccess { (info, hasUpdate) ->
-                    if (info != null) {
-                        latestVersion = info.versionName
-                        updateAvailable = hasUpdate
-                        changelogContent = info.description
-                        releaseInfo = info
-                    }
-                }.onFailure {
-                    checkError = context.getString(R.string.failed_to_check_updates, it.message ?: "Unknown error")
+            val result = withContext(Dispatchers.IO) {
+                Updater.checkForUpdate(forceRefresh = true)
+            }
+            result.onSuccess { (info, hasUpdate) ->
+                if (info != null) {
+                    latestVersion = info.versionName
+                    updateAvailable = hasUpdate
+                    changelogContent = info.description
+                    releaseInfo = info
                 }
+            }.onFailure {
+                checkError = context.getString(R.string.failed_to_check_updates, it.message ?: "Unknown error")
             }
             isChecking = false
         }
