@@ -71,8 +71,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.FilterChip
 import androidx.compose.ui.graphics.graphicsLayer
-
+import androidx.compose.material3.FilterChipDefaults
 
 @Composable
 fun AddToPlaylistDialog(
@@ -114,15 +115,17 @@ fun AddToPlaylistDialog(
     var duplicates by remember {
         mutableStateOf(emptyList<String>())
     }
-    var preloadedSongIds by remember {
-        mutableStateOf<List<String>?>(null)
-    }
     var playlistsContainingSong by remember {
         mutableStateOf<Set<String>>(emptySet())
     }
 
-    LaunchedEffect(isVisible) {
-        if (isVisible && playlists.isNotEmpty() && songIds == null) {
+    LaunchedEffect(isVisible, playlists) {
+        if (!isVisible) {
+            songIds = null
+            playlistsContainingSong = emptySet()
+            return@LaunchedEffect
+            }
+               if (playlists.isNotEmpty() && songIds == null) {
             withContext(Dispatchers.IO) {
                 val ids = onGetSong(playlists.first())
                 songIds = ids
@@ -163,6 +166,7 @@ fun AddToPlaylistDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.add),
@@ -195,33 +199,33 @@ fun AddToPlaylistDialog(
                         ) {
                             PlaylistSortType.entries.forEach { type ->
                                 val selected = sortType == type
-                                val chipBg by animateColorAsState(
-                                    targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                    label = "chipBg"
-                                )
-                                val chipFg by animateColorAsState(
-                                    targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                    label = "chipFg"
-                                )
-                                Text(
-                                    text = stringResource(when (type) {
-                                        PlaylistSortType.CREATE_DATE  -> R.string.sort_by_create_date
-                                        PlaylistSortType.NAME         -> R.string.sort_by_name
-                                        PlaylistSortType.SONG_COUNT   -> R.string.sort_by_song_count
-                                        PlaylistSortType.LAST_UPDATED -> R.string.sort_by_last_updated
-                                    }),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = chipFg,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(chipBg)
-                                        .clickable { onSortTypeChange(type) }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onSortTypeChange(type) },
+                                    shape = RoundedCornerShape(50),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = selected,
+                                        borderWidth = 0.dp,
+                                        selectedBorderWidth = 0.dp,
+                                    ),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                                    label = {
+                                        Text(
+                                            text = stringResource(when (type) {
+                                                PlaylistSortType.CREATE_DATE  -> R.string.sort_by_create_date
+                                                PlaylistSortType.NAME         -> R.string.sort_by_name
+                                                PlaylistSortType.SONG_COUNT   -> R.string.sort_by_song_count
+                                                PlaylistSortType.LAST_UPDATED -> R.string.sort_by_last_updated
+                                            }),
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -250,7 +254,9 @@ fun AddToPlaylistDialog(
                                 painter = painterResource(
                                     if (sortDescending) R.drawable.arrow_downward else R.drawable.arrow_upward
                                 ),
-                                contentDescription = null,
+                                contentDescription = stringResource(
+                                    if (sortDescending) R.string.sort_descending else R.string.sort_ascending
+                                ),
                                 tint = arrowFg,
                                 modifier = Modifier.size(18.dp)
                             )

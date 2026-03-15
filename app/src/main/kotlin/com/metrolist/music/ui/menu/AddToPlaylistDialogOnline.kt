@@ -85,7 +85,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import com.metrolist.music.ui.component.PlaylistListItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 
 @Composable
 fun AddToPlaylistDialogOnline(
@@ -203,33 +204,33 @@ fun AddToPlaylistDialogOnline(
                         ) {
                             PlaylistSortType.entries.forEach { type ->
                                 val selected = sortType == type
-                                val chipBg by animateColorAsState(
-                                    targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                    label = "chipBg"
-                                )
-                                val chipFg by animateColorAsState(
-                                    targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                    label = "chipFg"
-                                )
-                                Text(
-                                    text = stringResource(when (type) {
-                                        PlaylistSortType.CREATE_DATE  -> R.string.sort_by_create_date
-                                        PlaylistSortType.NAME         -> R.string.sort_by_name
-                                        PlaylistSortType.SONG_COUNT   -> R.string.sort_by_song_count
-                                        PlaylistSortType.LAST_UPDATED -> R.string.sort_by_last_updated
-                                    }),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = chipFg,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(chipBg)
-                                        .clickable { onSortTypeChange(type) }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onSortTypeChange(type) },
+                                    shape = RoundedCornerShape(50),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = selected,
+                                        borderWidth = 0.dp,
+                                        selectedBorderWidth = 0.dp,
+                                    ),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                                    label = {
+                                        Text(
+                                            text = stringResource(when (type) {
+                                                PlaylistSortType.CREATE_DATE  -> R.string.sort_by_create_date
+                                                PlaylistSortType.NAME         -> R.string.sort_by_name
+                                                PlaylistSortType.SONG_COUNT   -> R.string.sort_by_song_count
+                                                PlaylistSortType.LAST_UPDATED -> R.string.sort_by_last_updated
+                                            }),
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -257,7 +258,9 @@ fun AddToPlaylistDialogOnline(
                                 painter = painterResource(
                                     if (sortDescending) R.drawable.arrow_downward else R.drawable.arrow_upward
                                 ),
-                                contentDescription = null,
+                                contentDescription = stringResource(
+                                    if (sortDescending) R.string.sort_descending else R.string.sort_ascending
+                                ),
                                 tint = arrowFg,
                                 modifier = Modifier.size(18.dp)
                             )
