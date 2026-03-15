@@ -1295,18 +1295,26 @@ class MainActivity : ComponentActivity() {
             try {
                 if (query.isBlank()) {
                     val connection = playerConnection
+                    if (connection == null) {
+                        Timber.tag(VOICE_SEARCH_TAG).d("Blank query ignored because queue is empty")
+                        return@launch
+                    }
+
                     val hasQueue =
-                        connection != null &&
+                        withContext(Dispatchers.Main) {
                             runCatching { connection.player.mediaItemCount > 0 }
                                 .getOrElse { false }
+                        }
 
                     if (!hasQueue) {
                         Timber.tag(VOICE_SEARCH_TAG).d("Blank query ignored because queue is empty")
                         return@launch
                     }
 
-                    connection.player.shuffleModeEnabled = true
-                    connection.play()
+                    withContext(Dispatchers.Main) {
+                        connection.player.shuffleModeEnabled = true
+                        connection.play()
+                    }
                     Timber.tag(VOICE_SEARCH_TAG).d("Blank query handled by shuffling current queue")
                     return@launch
                 }
