@@ -210,6 +210,7 @@ constructor(
         viewModelScope.launch {
             try {
                 database.transferSongStats(fromSongId, toSongId)
+                syncMostPlaylistsIfNeeded(force = true)
                 onDone?.invoke()
             } catch (t: Throwable) {
                 reportException(t)
@@ -238,7 +239,7 @@ constructor(
             }.distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    fun syncMostPlaylistsIfNeeded() {
+    fun syncMostPlaylistsIfNeeded(force: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             periodicMostPlaylistSyncMutex.withLock {
                 val now = LocalDateTime.now(ZoneOffset.UTC)
@@ -252,12 +253,12 @@ constructor(
                     database.playlist(PlaylistEntity.MONTHLY_MOST_PLAYLIST_ID).first() != null
 
                 val shouldSyncWeekly =
-                    !weeklyPlaylistExists || isWeeklySyncDue(
+                    force || !weeklyPlaylistExists || isWeeklySyncDue(
                         lastSyncMillis = preferences[LastWeeklyMostPlaylistSyncKey],
                         now = now,
                     )
                 val shouldSyncMonthly =
-                    !monthlyPlaylistExists || isMonthlySyncDue(
+                    force || !monthlyPlaylistExists || isMonthlySyncDue(
                         lastSyncMillis = preferences[LastMonthlyMostPlaylistSyncKey],
                         now = now,
                     )
@@ -286,12 +287,11 @@ constructor(
                     )
                 }
 
-                context.dataStore.edit { settings ->
-                    if (shouldSyncWeekly) {
-                        settings[LastWeeklyMostPlaylistSyncKey] = nowEpochMillis
-                    }
-                    if (shouldSyncMonthly) {
-                        settings[LastMonthlyMostPlaylistSyncKey] = nowEpochMillis
+                // Only write "last sync" when it was a scheduled sync, not a forced rebuild
+                if (!force) {
+                    context.dataStore.edit { settings ->
+                        if (shouldSyncWeekly) settings[LastWeeklyMostPlaylistSyncKey] = nowEpochMillis
+                        if (shouldSyncMonthly) settings[LastMonthlyMostPlaylistSyncKey] = nowEpochMillis
                     }
                 }
             }

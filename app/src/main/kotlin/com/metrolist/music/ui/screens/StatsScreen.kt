@@ -103,7 +103,20 @@ fun StatsScreen(
     navController: NavController,
     viewModel: StatsViewModel = hiltViewModel(),
 ) {
-    val sArtists = remember { mutableListOf<Artist>() }
+    val sArtists = viewModel.selectedArtists // SnapshotStateList<Artist>
+
+// Helper actions:
+    val toggleArtistSelection: (Artist) -> Unit = { artist ->
+        if (sArtists.any { it.id == artist.id }) {
+            sArtists.removeAll { it.id == artist.id }
+        } else {
+            sArtists.add(artist)
+        }
+    }
+
+    val clearArtistSelection: () -> Unit = {
+        sArtists.clear()
+    }
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -177,17 +190,29 @@ fun StatsScreen(
     val selectedOption by viewModel.selectedOption.collectAsState()
 
     var showTimeTransfer by rememberSaveable { mutableStateOf(false) }
+    var prevOptionOrdinal by rememberSaveable { mutableStateOf<OptionStats?>(null) }
+    var prevIndexChips by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(showTimeTransfer) {
         if (showTimeTransfer) {
+            if (prevOptionOrdinal == null) prevOptionOrdinal = selectedOption
+            if (prevIndexChips == null) prevIndexChips = indexChips
             viewModel.selectedOption.value = OptionStats.CONTINUOUS // "throughout time" in your VM
-            viewModel.indexChips.value = 5 // optional: ensure it’s actually “now -> throughout time”
+            viewModel.indexChips.value = StatPeriod.ALL.ordinal // optional: ensure it’s actually “now -> throughout time”
         }
     }
 
     if (showTimeTransfer) {
         TimeTransfer(
-            onDismiss = { showTimeTransfer = false },
+            onDismiss = {
+                            showTimeTransfer = false
+                            prevOptionOrdinal?.let { viewModel.selectedOption.value = it }
+                            prevIndexChips?.let { viewModel.indexChips.value = it }
+
+                            // Clear snapshots for the next open
+                            prevOptionOrdinal = null
+                            prevIndexChips = null
+                        },
         )
     }
 
@@ -578,22 +603,14 @@ fun StatsScreen(
                     key = { it.id },
                     contentType = { CONTENT_TYPE_ARTIST },
                 ) { artist ->
+                    val uiArtist = Artist(name = artist.artist.name, id = artist.id)
+                    val isChecked = sArtists.any { it.id == uiArtist.id }
                     Row( // Use a row to arrange the checkbox and ArtistListItem horizontally
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                // Toggle the checkbox state by clicking anywhere in the row
-                                val b = Artist(name = artist.artist.name, id = artist.id)
-
-                                if (sArtists.contains(b)) {
-                                    sArtists.remove(b)
-                                } else {
-                                    sArtists.add(b)
-                                }
-
-                                viewModel.selectedArtists.clear()
-                                viewModel.selectedArtists.addAll(sArtists)
+                                toggleArtistSelection(uiArtist)
                             }
                             .padding(8.dp)
                     ) {
@@ -605,17 +622,8 @@ fun StatsScreen(
                         Checkbox(
 
                             checked = sArtists.contains(Artist(name = artist.artist.name, id = artist.id)), // Get the current checked state
-                            onCheckedChange = { isChecked ->
-                                val b = Artist(name = artist.artist.name, id = artist.id)
-
-                                if (sArtists.contains(b)) {
-                                    sArtists.remove(b)
-                                } else {
-                                    sArtists.add(b)
-                                }
-
-                                viewModel.selectedArtists.clear()
-                                viewModel.selectedArtists.addAll(sArtists)
+                            onCheckedChange = {
+                                toggleArtistSelection(uiArtist)
                             }
                         )
                     }
@@ -681,10 +689,7 @@ fun StatsScreen(
                     )
 
                     if (sArtists.isNotEmpty()) {
-                        androidx.compose.material3.IconButton(onClick = {
-                            viewModel.selectedArtists.clear()
-                            sArtists.clear()
-                        }) {
+                        androidx.compose.material3.IconButton(onClick = clearArtistSelection) {
                             Icon(
                                 painter = painterResource(R.drawable.close),
                                 contentDescription = null,

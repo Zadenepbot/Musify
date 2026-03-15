@@ -821,7 +821,7 @@
 
     <!-- Stats time transfer -->
     <string name="time_transfer_title">Time Transfer</string>
-    <string name="time_transfer_warning">WARNING: It is not possible to revert this action once it is completed. A backup file should be created before proceeding.</string>
+    <string name="time_transfer_warning">WARNING: It is not possible to revert this action once it is completed. A backup file should be created before proceeding. You can only target songs with at least one registered event/play.</string>
     <string name="time_transfer_source_song">Source song</string>
     <string name="time_transfer_target_song">Target song</string>
     <string name="time_transfer_listen_time_label">Listen time: </string>

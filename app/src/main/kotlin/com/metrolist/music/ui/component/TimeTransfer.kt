@@ -1,6 +1,5 @@
 package com.metrolist.music.ui.component
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +21,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.metrolist.music.R
 import com.metrolist.music.db.entities.SongWithStats
 import com.metrolist.music.viewmodels.StatsViewModel
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @Composable
@@ -125,7 +125,6 @@ fun TimeTransfer(
     )
 }
 
-@SuppressLint("DefaultLocale")
 fun formatMillis(ms: Long?): String {
     if (ms == null) {
         return "00:00:00"
@@ -134,5 +133,5 @@ fun formatMillis(ms: Long?): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
 
-    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    return String.format(Locale.US,"%02d:%02d:%02d", hours, minutes, seconds)
 }

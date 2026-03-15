@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import com.metrolist.music.R
@@ -64,9 +64,6 @@ fun SongSelectDropdown(
                     selectedSong.value = null
                 },
                 label = { Text(titleT) },
-                trailingIcon = {
-                    IconButton(onClick = { expanded = !expanded }) { }
-                },
                 modifier = Modifier
                     .weight(1f)
                     .onGloballyPositioned { coordinates ->
@@ -104,11 +101,13 @@ fun SongSelectDropdown(
                                     maxLines = 1,
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                song.artistName?.let {
+                                val displayArtists = song.artists.joinToString(", ") { it.name }.ifBlank { song.artistName }
+                                displayArtists?.let {
                                     Text(
                                         text = it,
                                         maxLines = 1,
                                         color = androidx.compose.ui.graphics.Color.Gray,
+                                        overflow = TextOverflow.Ellipsis // Highly recommended for multi-artist names
                                     )
                                 }
                             }
