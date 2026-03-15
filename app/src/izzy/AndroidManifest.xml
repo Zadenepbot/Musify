@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Remove testOnly flag in Izzy build since Dhizuku is not available and builds must be distributable -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:remove="android:testOnly">
+
+    <!-- Remove updater permission in Izzy build since updater is not available -->
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
 
     <application>
         <!-- Remove Cast provider in Izzy build since GMS is not available -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            tools:node="remove" />
+
+        <!-- Remove updater components in Izzy build since updater is not available -->
+        <receiver
+            android:name=".utils.updater.InstallReceiver"
+            tools:node="remove" />
+
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
             tools:node="remove" />
     </application>
 </manifest>
