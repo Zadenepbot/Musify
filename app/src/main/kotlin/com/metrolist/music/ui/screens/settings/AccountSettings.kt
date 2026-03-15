@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -324,9 +325,19 @@ fun AccountSettings(
                             onCheckedChange = {
                                 YouTube.useLoginForBrowse = it
                                 onUseLoginForBrowseChange(it)
+                            },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (useLoginForBrowse) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
                             }
                         )
                     },
+                    enabled = isLoggedIn
                 ),
                 Material3SettingsItem(
                     title = { Text(stringResource(R.string.yt_sync)) },
@@ -335,7 +346,16 @@ fun AccountSettings(
                         Switch(
                             enabled = isLoggedIn,
                             checked = ytmSync,
-                            onCheckedChange = onYtmSyncChange
+                            onCheckedChange = onYtmSyncChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (ytmSync) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
                         )
                     },
                     enabled = isLoggedIn
