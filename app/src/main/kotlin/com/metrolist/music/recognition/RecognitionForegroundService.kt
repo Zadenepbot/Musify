@@ -87,6 +87,17 @@ class RecognitionForegroundService : Service() {
             Log.w(TAG, "Unable to start microphone foreground service", foregroundTypeException)
             stopSelf()
             return false
+        } catch (runtimeException: RuntimeException) {
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    runtimeException::class.java.name ==
+                    "android.app.ForegroundServiceStartNotAllowedException"
+            ) {
+                Log.w(TAG, "Unable to start microphone foreground service", runtimeException)
+                stopSelf()
+                return false
+            }
+            throw runtimeException
         }
     }
 
