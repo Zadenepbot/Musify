@@ -119,7 +119,7 @@ fun SettingsScreen(
                 items = listOf(
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.ic_android_auto),
-                        title = { Text("Android Auto") },
+                        title = { Text(stringResource(R.string.android_auto)) },
                         onClick = { navController.navigate("settings/android_auto") }
                     )
                 )
