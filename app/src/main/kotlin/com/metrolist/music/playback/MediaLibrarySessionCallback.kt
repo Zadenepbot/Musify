@@ -164,6 +164,7 @@ constructor(
                         val sections = deserializeSections(sectionsRaw)
                         sections
                             .filter { (_, enabled) -> enabled }
+                            .ifEmpty { listOf(AndroidAutoSection.LIKED to true) }
                             .map { (section, _) ->
                                 when (section) {
                                     AndroidAutoSection.LIKED -> browsableMediaItem(
