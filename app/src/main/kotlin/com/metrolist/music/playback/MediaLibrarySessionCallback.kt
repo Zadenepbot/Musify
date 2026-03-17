@@ -240,9 +240,39 @@ constructor(
                     MusicService.PLAYLIST -> {
                         val likedSongCount = database.likedSongsCount().first()
                         val downloadedSongCount = downloadUtil.downloads.value.size
-                        val showYoutubePlaylists = context.dataStore.data.map { it[AndroidAutoYouTubePlaylistsKey] ?: false }.first()
-                        val youtubePlaylists = if (showYoutubePlaylists) {
-                            try {
+                        val showYoutubePlaylists = context.dataStore.get(AndroidAutoYouTubePlaylistsKey, false)
+
+                        // Build local playlists immediately
+                        val localItems = listOf(
+                            browsableMediaItem(
+                                "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
+                                context.getString(R.string.liked_songs),
+                                context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
+                                drawableUri(R.drawable.favorite),
+                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                            ),
+                            browsableMediaItem(
+                                "${MusicService.PLAYLIST}/${PlaylistEntity.DOWNLOADED_PLAYLIST_ID}",
+                                context.getString(R.string.downloaded_songs),
+                                context.resources.getQuantityString(R.plurals.n_song, downloadedSongCount, downloadedSongCount),
+                                drawableUri(R.drawable.download),
+                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                            ),
+                        ) + database.playlistsByCreateDateAsc().first().map { playlist ->
+                            browsableMediaItem(
+                                "${MusicService.PLAYLIST}/${playlist.id}",
+                                playlist.playlist.name,
+                                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                playlist.thumbnails.firstOrNull()?.toUri(),
+                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                            )
+                        }
+
+                        // Fetch YouTube playlists only if enabled, without blocking local results
+                        if (!showYoutubePlaylists) {
+                            localItems
+                        } else {
+                            val youtubePlaylists = try {
                                 YouTube.home().getOrNull()?.sections
                                     ?.flatMap { it.items }
                                     ?.filterIsInstance<PlaylistItem>()
@@ -252,53 +282,15 @@ constructor(
                                 reportException(e)
                                 emptyList()
                             }
-                        } else emptyList()
-                        
-                        listOf(
-                            browsableMediaItem(
-                                "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
-                                context.getString(R.string.liked_songs),
-                                context.resources.getQuantityString(
-                                    R.plurals.n_song,
-                                    likedSongCount,
-                                    likedSongCount
-                                ),
-                                drawableUri(R.drawable.favorite),
-                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                            ),
-                            browsableMediaItem(
-                                "${MusicService.PLAYLIST}/${PlaylistEntity.DOWNLOADED_PLAYLIST_ID}",
-                                context.getString(R.string.downloaded_songs),
-                                context.resources.getQuantityString(
-                                    R.plurals.n_song,
-                                    downloadedSongCount,
-                                    downloadedSongCount
-                                ),
-                                drawableUri(R.drawable.download),
-                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                            ),
-                        ) +
-                        database.playlistsByCreateDateAsc().first().map { playlist ->
-                            browsableMediaItem(
-                                "${MusicService.PLAYLIST}/${playlist.id}",
-                                playlist.playlist.name,
-                                context.resources.getQuantityString(
-                                    R.plurals.n_song,
-                                    playlist.songCount,
-                                    playlist.songCount
-                                ),
-                                playlist.thumbnails.firstOrNull()?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                            )
-                        } +
-                        youtubePlaylists.map { ytPlaylist ->
-                            browsableMediaItem(
-                                "${MusicService.YOUTUBE_PLAYLIST}/${ytPlaylist.id}",
-                                ytPlaylist.title,
-                                ytPlaylist.author?.name ?: "YouTube Music",
-                                ytPlaylist.thumbnail?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                            )
+                            localItems + youtubePlaylists.map { ytPlaylist ->
+                                browsableMediaItem(
+                                    "${MusicService.YOUTUBE_PLAYLIST}/${ytPlaylist.id}",
+                                    ytPlaylist.title,
+                                    ytPlaylist.author?.name ?: "YouTube Music",
+                                    ytPlaylist.thumbnail?.toUri(),
+                                    MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                                )
+                            }
                         }
                     }
 
