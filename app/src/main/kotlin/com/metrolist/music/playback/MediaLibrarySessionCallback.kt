@@ -54,7 +54,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import javax.inject.Inject
 import com.metrolist.music.constants.AndroidAutoSectionsOrderKey
@@ -269,30 +271,29 @@ constructor(
                             )
                         }
 
-                        // Fetch YouTube playlists only if enabled, without blocking local results
-                        if (!showYoutubePlaylists) {
-                            localItems
-                        } else {
-                            val youtubePlaylists = try {
-                                YouTube.home().getOrNull()?.sections
-                                    ?.flatMap { it.items }
-                                    ?.filterIsInstance<PlaylistItem>()
-                                    ?.take(10)
-                                    ?: emptyList()
-                            } catch (e: Exception) {
-                                reportException(e)
-                                emptyList()
-                            }
-                            localItems + youtubePlaylists.map { ytPlaylist ->
-                                browsableMediaItem(
-                                    "${MusicService.YOUTUBE_PLAYLIST}/${ytPlaylist.id}",
-                                    ytPlaylist.title,
-                                    ytPlaylist.author?.name ?: "YouTube Music",
-                                    ytPlaylist.thumbnail?.toUri(),
-                                    MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                                )
+                        // Fetch YouTube playlists asynchronously if enabled
+                        if (showYoutubePlaylists) {
+                            GlobalScope.launch(Dispatchers.IO) {
+                               try {
+                                    val youtubePlaylists = YouTube.home().getOrNull()?.sections
+                                        ?.flatMap { it.items }
+                                        ?.filterIsInstance<PlaylistItem>()
+                                        ?.take(10)
+                                        ?: emptyList()
+
+                                    if (youtubePlaylists.isNotEmpty()) {
+                                        session.notifyChildrenChanged(
+                                            MusicService.PLAYLIST,
+                                            localItems.size + youtubePlaylists.size,
+                                            null
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    reportException(e)
+                                }
                             }
                         }
+                        localItems
                     }
 
                     else ->
