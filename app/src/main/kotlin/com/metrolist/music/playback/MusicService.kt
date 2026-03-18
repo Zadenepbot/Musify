@@ -72,6 +72,7 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.metrolist.innertube.YouTube
@@ -222,7 +223,8 @@ private const val INSTANT_SILENCE_SKIP_SETTLE_MS = 350L
 class MusicService :
     MediaLibraryService(),
     Player.Listener,
-    PlaybackStatsListener.Callback {
+    PlaybackStatsListener.Callback,
+    MediaSessionService.Listener {
     @Inject
     lateinit var database: MusicDatabase
 
@@ -355,6 +357,9 @@ class MusicService :
     private val playerInitialized = MutableStateFlow(false)
     val isPlayerReady: kotlinx.coroutines.flow.StateFlow<Boolean> = playerInitialized.asStateFlow()
 
+    // Tracks if startup was aborted due to foreground service restrictions
+    private var startupAborted = false
+
     // Expose active player flow for UI/Connection updates
     private val _playerFlow = MutableStateFlow<ExoPlayer?>(null)
     val playerFlow = _playerFlow.asStateFlow()
@@ -448,6 +453,9 @@ class MusicService :
         super.onCreate()
         isRunning = true
 
+        // Register MediaSessionService.Listener early to catch foreground-service blocked callbacks
+        setListener(this@MusicService)
+
         // Player rediness reset to false
         playerInitialized.value = false
 
@@ -489,7 +497,10 @@ class MusicService :
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 e is ForegroundServiceStartNotAllowedException
             ) {
-                Timber.tag(TAG).w("Foreground service start not allowed (likely app in background)")
+                Timber.tag(TAG).w("Foreground service start not allowed (app in background), stopping service cleanly")
+                startupAborted = true
+                stopSelf()
+                return
             } else {
                 Timber.tag(TAG).e(e, "Failed to create foreground notification")
                 reportException(e)
@@ -3131,6 +3142,11 @@ class MusicService :
     override fun onDestroy() {
         isRunning = false
 
+        if (startupAborted) {
+            super.onDestroy()
+            return
+        }
+
         // Save episode position before destroying
         val currentMetadata = player.currentMediaItem?.metadata
         if (currentMetadata?.isEpisode == true && player.currentPosition > 0) {
@@ -3168,7 +3184,7 @@ class MusicService :
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
+    override fun onBind(intent: Intent?) = if (startupAborted) super.onBind(intent) else super.onBind(intent) ?: binder
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
@@ -3176,7 +3192,17 @@ class MusicService :
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
+    override fun onForegroundServiceStartNotAllowedException() {
+        Timber.tag(TAG).w("Foreground service start not allowed via MediaSessionService callback, stopping service cleanly")
+        startupAborted = true
+        stopSelf()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (startupAborted) {
+            return START_NOT_STICKY
+        }
+
         when (intent?.action) {
             ACTION_ALARM_TRIGGER -> {
                 handleAlarmTrigger(intent)
