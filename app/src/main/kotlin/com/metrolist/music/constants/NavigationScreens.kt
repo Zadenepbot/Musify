@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.metrolist.music.R
-import com.metrolist.music.ui.screens.Screens
 import com.metrolist.music.utils.rememberEnumPreference
 import kotlin.enums.enumEntries
 
@@ -31,10 +30,10 @@ enum class NavigationItemType {
 }
 
 enum class NavigationPreferences(
-    @StringRes val title: Int,
-    @DrawableRes val iconInactive: Int,
-    @DrawableRes val iconActive: Int,
-    val baseRoute: String,
+    @StringRes val titleId: Int,
+    @DrawableRes val iconIdInactive: Int,
+    @DrawableRes val iconIdActive: Int,
+    val route: String,
     val key: Preferences.Key<String>,
     val type: NavigationItemType,
     val default_position: NavigationItemPosition
@@ -99,36 +98,34 @@ enum class NavigationPreferences(
         return rememberEnumPreference(this.key, this.default_position).value
     }
 
-    @Composable
-    fun shouldShowInNavbar(): Boolean {
-        val position = this.position()
+    companion object {
+        @Composable
+        fun getNavbarItems(): List<NavigationPreferences> {
+            // Get count of items manually pinned to the navigation bar
+            val manualCount = enumEntries<NavigationPreferences>().count {
+                it.position() == NavigationItemPosition.NAV_BAR
+            }
 
-        // True if manually pinned
-        if(position == NavigationItemPosition.NAV_BAR) return true;
+            // Calculate count of AUTO items that should be shown too
+            var autoCount = maxOf(0, MAX_ITEMS_IN_NAV_BAR - manualCount)
 
-        // False if TOP_BAR or HIDDEN
-        if(position != NavigationItemPosition.AUTO) return false;
+            // Build list
+            val list = buildList {
+                for(item in NavigationPreferences.entries) {
+                    // Show manually pinned items
+                    if(item.position() == NavigationItemPosition.NAV_BAR) {
+                        add(item)
+                    }
 
-        // From here on, we can assume we're using "AUTO" position
-        val manualCount = enumEntries<NavigationPreferences>().count {
-            it.position() == NavigationItemPosition.NAV_BAR
+                    // Show AUTO items up to MAX_ITEMS_IN_NAV_BAR
+                    if(item.position() == NavigationItemPosition.AUTO && autoCount > 0) {
+                        add(item)
+                        autoCount++
+                    }
+                }
+            }
+
+            return list
         }
-
-        // More than MAX_ITEMS_IN_NAV_BAR items are manually pinned, don't add to navigation bar
-        if(manualCount >= MAX_ITEMS_IN_NAV_BAR) return false
-
-        // Else, show AUTO items up to MAX_ITEMS_IN_NAV_BAR being visible in navigation bar
-        var count = manualCount
-
-        for(item in NavigationPreferences.entries) {
-            // If we reach ourselves before returning, show
-            if(item == this)                                    return true
-            // An AUTO item before this one is visible
-            if(item.position() == NavigationItemPosition.AUTO)  count++
-            // If > MAX_ITEMS_IN_NAV_BAR before reaching ourselves, don't show
-            if(count >= MAX_ITEMS_IN_NAV_BAR)                   return false
-        }
-
-        throw Exception("Error when evaluating shouldShowInNavbar for item ${this.name}")
     }
 }
