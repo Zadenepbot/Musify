@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
@@ -25,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -57,32 +55,27 @@ fun LibraryScreen(navController: NavController, scrollBehavior: TopAppBarScrollB
             Tab(
                 selected = true,
                 onClick = { filterType = LibraryFilter.SONGS },
-                text = { Text(text = stringResource(R.string.filter_songs)) },
-                icon = { Icon(painter = painterResource(R.drawable.music_note), contentDescription = stringResource(R.string.filter_songs)) }
+                text = { Text(text = stringResource(R.string.filter_songs)) }
             )
             Tab(
                 selected = false,
                 onClick = { filterType = LibraryFilter.ARTISTS },
-                text = { Text(text = stringResource(R.string.filter_artists)) },
-                icon = { Icon(painter = painterResource(R.drawable.person), contentDescription = stringResource(R.string.filter_artists)) }
+                text = { Text(text = stringResource(R.string.filter_artists)) }
             )
             Tab(
                 selected = false,
                 onClick = { filterType = LibraryFilter.ALBUMS },
-                text = { Text(text = stringResource(R.string.filter_albums)) },
-                icon = { Icon(painter = painterResource(R.drawable.album), contentDescription = stringResource(R.string.filter_albums)) }
+                text = { Text(text = stringResource(R.string.filter_albums)) }
             )
             Tab(
                 selected = false,
                 onClick = { filterType = LibraryFilter.PLAYLISTS },
-                text = { Text(text = stringResource(R.string.filter_playlists)) },
-                icon = { Icon(painter = painterResource(R.drawable.library_music_outlined), contentDescription = stringResource(R.string.filter_playlists)) }
+                text = { Text(text = stringResource(R.string.filter_playlists)) }
             )
             Tab(
                 selected = false,
                 onClick = { filterType = LibraryFilter.PODCASTS },
-                text = { Text(text = stringResource(R.string.filter_podcasts)) },
-                icon = { Icon(painter = painterResource(R.drawable.radio), contentDescription = stringResource(R.string.filter_podcasts)) }
+                text = { Text(text = stringResource(R.string.filter_podcasts)) }
             )
         }
 
