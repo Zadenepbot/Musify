@@ -87,7 +87,6 @@ import java.util.UUID
 @Composable
 fun LibraryPlaylistsScreen(
     navController: NavController,
-    filterContent: @Composable () -> Unit,
     viewModel: LibraryPlaylistsViewModel = hiltViewModel(),
     initialTextFieldValue: String? = null,
     allowSyncing: Boolean = true,
@@ -277,13 +276,6 @@ fun LibraryPlaylistsScreen(
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
                     item(
-                        key = "filter",
-                        contentType = CONTENT_TYPE_HEADER,
-                    ) {
-                        filterContent()
-                    }
-
-                    item(
                         key = "header",
                         contentType = CONTENT_TYPE_HEADER,
                     ) {
@@ -426,14 +418,6 @@ fun LibraryPlaylistsScreen(
                     ),
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
-                    item(
-                        key = "filter",
-                        span = { GridItemSpan(maxLineSpan) },
-                        contentType = CONTENT_TYPE_HEADER,
-                    ) {
-                        filterContent()
-                    }
-
                     item(
                         key = "header",
                         span = { GridItemSpan(maxLineSpan) },

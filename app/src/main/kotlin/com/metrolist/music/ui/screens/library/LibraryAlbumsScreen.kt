@@ -78,7 +78,6 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibraryAlbumsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
     viewModel: LibraryAlbumsViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
@@ -102,17 +101,6 @@ fun LibraryAlbumsScreen(
 
     val filterContent = @Composable {
         Row {
-            Spacer(Modifier.width(12.dp))
-            FilterChip(
-                label = { Text(stringResource(R.string.albums)) },
-                selected = true,
-                colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
-                onClick = onDeselect,
-                shape = RoundedCornerShape(16.dp),
-                leadingIcon = {
-                    Icon(painter = painterResource(R.drawable.close), contentDescription = "")
-                },
-            )
             ChipsRow(
                 chips =
                 listOf(

@@ -41,25 +41,6 @@ fun LibraryScreen(navController: NavController, scrollBehavior: TopAppBarScrollB
     var filterType by rememberEnumPreference(ChipSortTypeKey, LibraryFilter.SONGS)
     val statusBarHeight = WindowInsets.statusBars.getTop(LocalDensity.current)
 
-    val filterContent = @Composable {
-        Row {
-            ChipsRow(
-                chips = listOf(
-                    LibraryFilter.PLAYLISTS to stringResource(R.string.filter_playlists),
-                    LibraryFilter.SONGS to stringResource(R.string.filter_songs),
-                    LibraryFilter.ALBUMS to stringResource(R.string.filter_albums),
-                    LibraryFilter.ARTISTS to stringResource(R.string.filter_artists),
-                    LibraryFilter.PODCASTS to stringResource(R.string.filter_podcasts),
-                ),
-                currentValue = filterType,
-                onValueUpdate = {
-                    filterType = if (filterType == it) LibraryFilter.LIBRARY else it
-                },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-
     Column {
         PrimaryScrollableTabRow(
             selectedTabIndex = filterType.ordinal,
@@ -100,27 +81,12 @@ fun LibraryScreen(navController: NavController, scrollBehavior: TopAppBarScrollB
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (filterType) {
-                LibraryFilter.LIBRARY -> LibraryMixScreen(navController, filterContent)
-                LibraryFilter.PLAYLISTS -> LibraryPlaylistsScreen(navController, filterContent)
-                LibraryFilter.SONGS -> LibrarySongsScreen(
-                    navController,
-                    { filterType = LibraryFilter.LIBRARY },
-                )
-
-                LibraryFilter.ALBUMS -> LibraryAlbumsScreen(
-                    navController,
-                    { filterType = LibraryFilter.LIBRARY },
-                )
-
-                LibraryFilter.ARTISTS -> LibraryArtistsScreen(
-                    navController,
-                    { filterType = LibraryFilter.LIBRARY },
-                )
-
-                LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
-                    navController,
-                    { filterType = LibraryFilter.LIBRARY },
-                )
+                LibraryFilter.LIBRARY -> LibraryMixScreen(navController)
+                LibraryFilter.PLAYLISTS -> LibraryPlaylistsScreen(navController)
+                LibraryFilter.SONGS -> LibrarySongsScreen(navController)
+                LibraryFilter.ALBUMS -> LibraryAlbumsScreen(navController)
+                LibraryFilter.ARTISTS -> LibraryArtistsScreen(navController)
+                LibraryFilter.PODCASTS -> LibraryPodcastsScreen(navController)
             }
         }
     }

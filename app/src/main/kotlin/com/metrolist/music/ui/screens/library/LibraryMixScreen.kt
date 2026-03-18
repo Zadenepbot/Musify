@@ -96,7 +96,6 @@ import androidx.compose.ui.platform.LocalLocale
 @Composable
 fun LibraryMixScreen(
     navController: NavController,
-    filterContent: @Composable () -> Unit,
     viewModel: LibraryMixViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
@@ -299,13 +298,6 @@ fun LibraryMixScreen(
                     state = lazyListState,
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
-                    item(
-                        key = "filter",
-                        contentType = CONTENT_TYPE_HEADER,
-                    ) {
-                        filterContent()
-                    }
-
                     item(
                         key = "header",
                         contentType = CONTENT_TYPE_HEADER,
@@ -562,14 +554,6 @@ fun LibraryMixScreen(
                     ),
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
-                    item(
-                        key = "filter",
-                        span = { GridItemSpan(maxLineSpan) },
-                        contentType = CONTENT_TYPE_HEADER,
-                    ) {
-                        filterContent()
-                    }
-
                     item(
                         key = "header",
                         span = { GridItemSpan(maxLineSpan) },
