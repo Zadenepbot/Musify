@@ -3194,8 +3194,12 @@ class MusicService :
 
     override fun onForegroundServiceStartNotAllowedException() {
         Timber.tag(TAG).w("Foreground service start not allowed via MediaSessionService callback, stopping service cleanly")
-        startupAborted = true
-        stopSelf()
+        if (::player.isInitialized || ::mediaSession.isInitialized) {
+            stopSelf()
+        } else {
+            startupAborted = true
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
