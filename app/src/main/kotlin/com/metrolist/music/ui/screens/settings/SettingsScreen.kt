@@ -85,9 +85,9 @@ fun SettingsScreen(
                 )
             )
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Player & Content Section (moved up and combined with content)
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_player_content),
@@ -109,7 +109,7 @@ fun SettingsScreen(
                 )
             )
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Android Auto Section — only shown if Android Auto is installed
@@ -139,9 +139,9 @@ fun SettingsScreen(
                 )
             )
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Storage & Data Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_storage),
@@ -158,9 +158,9 @@ fun SettingsScreen(
                 )
             )
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // System & About Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_system),
@@ -236,7 +236,7 @@ fun SettingsScreen(
                 if (BuildConfig.UPDATER_AVAILABLE && latestVersionName != BuildConfig.VERSION_NAME) {
                     val releaseInfo = Updater.getCachedLatestRelease()
                     val downloadUrl = releaseInfo?.let { Updater.getDownloadUrlForCurrentVariant(it) }
-                    
+
                     if (downloadUrl != null) {
                         add(
                             Material3SettingsItem(
@@ -261,12 +261,11 @@ fun SettingsScreen(
                 }
             }
         )
-        
-        if (BuildConfig.UPDATER_AVAILABLE && latestVersionName != BuildConfig.VERSION_NAME) {
+    if (BuildConfig.UPDATER_AVAILABLE && latestVersionName != BuildConfig.VERSION_NAME) {
             Spacer(modifier = Modifier.height(16.dp))
             ReleaseNotesCard()
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 
