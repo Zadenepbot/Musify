@@ -89,12 +89,11 @@ import com.metrolist.music.LocalListenTogetherManager
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 import com.metrolist.music.constants.AppBarHeight
-import com.metrolist.music.constants.ListenTogetherInTopBarKey
 import com.metrolist.music.constants.ListenTogetherUsernameKey
+import com.metrolist.music.constants.NavigationScreens
 import com.metrolist.music.listentogether.ConnectionState
 import com.metrolist.music.listentogether.JoinRequestPayload
 import com.metrolist.music.listentogether.ListenTogetherEvent
-import com.metrolist.music.listentogether.RoomRole
 import com.metrolist.music.listentogether.SuggestionReceivedPayload
 import com.metrolist.music.listentogether.UserInfo
 import com.metrolist.music.ui.component.DefaultDialog
@@ -126,7 +125,8 @@ fun ListenTogetherScreen(
     val pendingJoinRequests by listenTogetherManager.pendingJoinRequests.collectAsState()
     val pendingSuggestions by listenTogetherManager.pendingSuggestions.collectAsState()
 
-    val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
+    // Compare to getNavbarItems to reflect actual visibility even if using AUTOMATIC position
+    val listenTogetherInTopBar = NavigationScreens.LISTEN_TOGETHER !in NavigationScreens.getNavbarItems()
     val shouldShowTopBar = showTopBar || listenTogetherInTopBar
 
     var savedUsername by rememberPreference(ListenTogetherUsernameKey, "")

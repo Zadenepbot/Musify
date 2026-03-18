@@ -13,13 +13,13 @@ import com.metrolist.music.R
 import com.metrolist.music.utils.rememberEnumPreference
 import kotlin.enums.enumEntries
 
-// Max items pinned in navigation bar before items set to "auto" are moved to the top bar
-const val MAX_ITEMS_IN_NAV_BAR = 6
+// Max items pinned in navigation bar before items set to AUTOMATIC position are moved to the top bar
+const val MAX_ITEMS_IN_NAV_BAR = 5
 
 enum class NavigationItemPosition {
     NAV_BAR,
     TOP_BAR,
-    AUTO,
+    AUTOMATIC,
     HIDDEN
 }
 
@@ -54,7 +54,7 @@ enum class NavigationScreens(
         "search_input",
         stringPreferencesKey("nav_home_position"),
         NavigationItemType.OTHER,
-        NavigationItemPosition.AUTO
+        NavigationItemPosition.AUTOMATIC
     ),
     HISTORY(
         R.string.history,
@@ -106,7 +106,7 @@ enum class NavigationScreens(
                 it.position() == NavigationItemPosition.NAV_BAR
             }
 
-            // Calculate count of AUTO items that appear in the navigation bar
+            // Calculate count of AUTOMATIC items that appear in the navigation bar
             var autoCount = maxOf(0, MAX_ITEMS_IN_NAV_BAR - manualCount)
 
             // Build list
@@ -117,8 +117,8 @@ enum class NavigationScreens(
                         add(item)
                     }
 
-                    // Show AUTO items up to MAX_ITEMS_IN_NAV_BAR
-                    if(item.position() == NavigationItemPosition.AUTO && autoCount > 0) {
+                    // Show AUTOMATIC items up to MAX_ITEMS_IN_NAV_BAR
+                    if(item.position() == NavigationItemPosition.AUTOMATIC && autoCount > 0) {
                         add(item)
                         autoCount--
                     }
@@ -135,7 +135,7 @@ enum class NavigationScreens(
                 it.position() == NavigationItemPosition.NAV_BAR
             }
 
-            // Calculate count of AUTO items that appear in the navigation bar (they won't show in top bar)
+            // Calculate count of AUTOMATIC items that appear in the navigation bar (they won't show in top bar)
             var autoCount = maxOf(0, MAX_ITEMS_IN_NAV_BAR - manualCount)
 
             // Build list
@@ -156,8 +156,8 @@ enum class NavigationScreens(
                         add(item)
                     }
 
-                    // Show AUTO items above MAX_ITEMS_IN_NAV_BAR
-                    if(item.position() == NavigationItemPosition.AUTO) {
+                    // Show AUTOMATIC items above MAX_ITEMS_IN_NAV_BAR
+                    if(item.position() == NavigationItemPosition.AUTOMATIC) {
                         if(autoCount > 0)   autoCount--
                         else                add(item)
                     }

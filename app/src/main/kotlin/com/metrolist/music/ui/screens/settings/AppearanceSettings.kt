@@ -68,7 +68,6 @@ import com.metrolist.music.constants.GridItemSize
 import com.metrolist.music.constants.GridItemsSizeKey
 import com.metrolist.music.constants.HidePlayerThumbnailKey
 import com.metrolist.music.constants.LibraryFilter
-import com.metrolist.music.constants.ListenTogetherInTopBarKey
 import com.metrolist.music.constants.LyricsAnimationStyle
 import com.metrolist.music.constants.LyricsAnimationStyleKey
 import com.metrolist.music.constants.LyricsClickKey
@@ -77,6 +76,8 @@ import com.metrolist.music.constants.LyricsLineSpacingKey
 import com.metrolist.music.constants.LyricsScrollKey
 import com.metrolist.music.constants.LyricsTextPositionKey
 import com.metrolist.music.constants.LyricsTextSizeKey
+import com.metrolist.music.constants.NavigationItemPosition
+import com.metrolist.music.constants.NavigationScreens
 import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.constants.PlayerBackgroundStyleKey
 import com.metrolist.music.constants.PlayerButtonsStyle
@@ -254,10 +255,13 @@ fun AppearanceSettings(
         showRestartDialog = true
     }
 
-    val (listenTogetherInTopBar, onListenTogetherInTopBarChange) = rememberPreference(
-        ListenTogetherInTopBarKey,
-        defaultValue = true
+    val (listenTogetherPosition, onListenTogetherPositionChange) = rememberEnumPreference(
+        NavigationScreens.LISTEN_TOGETHER.key,
+        defaultValue = NavigationScreens.LISTEN_TOGETHER.default_position
     )
+
+    // Compare to getNavbarItems to reflect actual visibility even if using AUTOMATIC position
+    val listenTogetherInTopBar = NavigationScreens.LISTEN_TOGETHER !in NavigationScreens.getNavbarItems()
 
     val (swipeToSong, onSwipeToSongChange) = rememberPreference(
         SwipeToSongKey,
@@ -1456,7 +1460,7 @@ fun AppearanceSettings(
                     trailingContent = {
                         Switch(
                             checked = listenTogetherInTopBar,
-                            onCheckedChange = onListenTogetherInTopBarChange,
+                            onCheckedChange = { checked -> if(checked) NavigationItemPosition.NAV_BAR else NavigationItemPosition.TOP_BAR },
                             thumbContent = {
                                 Icon(
                                     painter = painterResource(
@@ -1468,7 +1472,7 @@ fun AppearanceSettings(
                             }
                         )
                     },
-                    onClick = { onListenTogetherInTopBarChange(!listenTogetherInTopBar) }
+                    onClick = { onListenTogetherPositionChange(if(listenTogetherInTopBar) NavigationItemPosition.NAV_BAR else NavigationItemPosition.TOP_BAR) }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.grid_view),
