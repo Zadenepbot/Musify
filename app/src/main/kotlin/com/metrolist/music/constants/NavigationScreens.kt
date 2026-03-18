@@ -103,7 +103,7 @@ enum class NavigationScreens(
         fun getNavbarItems(): List<NavigationScreens> {
             // Get count of items manually pinned to the navigation bar
             val manualCount = enumEntries<NavigationScreens>().count {
-                it.position() == NavigationItemPosition.NAV_BAR
+                it.type == NavigationItemType.CORE || it.position() == NavigationItemPosition.NAV_BAR
             }
 
             // Calculate count of AUTOMATIC items that appear in the navigation bar
@@ -113,7 +113,7 @@ enum class NavigationScreens(
             val list = buildList {
                 for(item in NavigationScreens.entries) {
                     // Show manually pinned items
-                    if(item.position() == NavigationItemPosition.NAV_BAR) {
+                    if(item.type == NavigationItemType.CORE || item.position() == NavigationItemPosition.NAV_BAR) {
                         add(item)
                     }
 
