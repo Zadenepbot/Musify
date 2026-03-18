@@ -3184,13 +3184,15 @@ class MusicService :
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?) = if (startupAborted) super.onBind(intent) else super.onBind(intent) ?: binder
+    override fun onBind(intent: Intent?) = if (startupAborted) null else super.onBind(intent) ?: binder
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
+        return if (startupAborted || !::mediaSession.isInitialized) null else mediaSession
+    }
 
     override fun onForegroundServiceStartNotAllowedException() {
         Timber.tag(TAG).w("Foreground service start not allowed via MediaSessionService callback, stopping service cleanly")
