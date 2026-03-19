@@ -65,6 +65,17 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
 
+/**
+ * Helloo! Note from a dev:
+ * SQL Injection Prevention:
+ * - All queries use Room's parameterized query syntax with :paramName placeholders
+ * - Query parameters are automatically sanitized by Room's SQLite implementation
+ * - NEVER concatenate user input directly into queries (e.g., "WHERE id = " + userInput)
+ * - Room automatically handles escaping and prevents SQL injection attacks
+ *
+ * Safe pattern: @Query("SELECT * FROM song WHERE id = :songId")
+ * Unsafe pattern: @Query("SELECT * FROM song WHERE id = " + userInput) // DO NOT USE
+ */
 @Dao
 interface DatabaseDao {
     @Transaction
