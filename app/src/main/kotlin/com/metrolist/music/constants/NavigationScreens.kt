@@ -54,7 +54,7 @@ enum class NavigationScreens(
         R.drawable.search,
         R.drawable.search,
         "search_input",
-        stringPreferencesKey("nav_home_position"),
+        stringPreferencesKey("nav_search_position"),
         NavigationItemType.OTHER,
         NavigationItemPosition.AUTOMATIC
     ),
@@ -125,7 +125,7 @@ enum class NavigationScreens(
         R.string.filter_playlists,
         R.drawable.playlist_play,
         R.drawable.playlist_play,
-        "library_PLAYLISTS",
+        "library_playlists",
         stringPreferencesKey("nav_library_playlists_position"),
         NavigationItemType.LIBRARY,
         NavigationItemPosition.HIDDEN
