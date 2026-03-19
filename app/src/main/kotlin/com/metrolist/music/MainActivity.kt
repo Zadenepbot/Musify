@@ -596,16 +596,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                val topLevelScreens =
-                    remember {
-                        listOf(
-                            Screens.Home.route,
-                            Screens.Library.route,
-                            Screens.ListenTogether.route,
-                            "settings",
-                        )
-                    }
-
                 val (query, onQueryChange) =
                     rememberSaveable(stateSaver = TextFieldValue.Saver) {
                         mutableStateOf(TextFieldValue())
@@ -785,8 +775,9 @@ class MainActivity : ComponentActivity() {
                     val isListenTogetherScreen =
                         currentRoute == Screens.ListenTogether.route ||
                             currentRoute == "listen_together_from_topbar"
-                    shouldShowTopBar = currentRoute in topLevelScreens &&
+                    shouldShowTopBar = navigationItemRoutes.contains(currentRoute) &&
                         currentRoute != "settings" &&
+                        currentRoute != "search_input" &&
                         !(isListenTogetherScreen && listenTogetherInTopBar)
                 }
 
@@ -867,7 +858,7 @@ class MainActivity : ComponentActivity() {
                                     TopAppBar(
                                         title = {
                                             Text(
-                                                text = currentTitleRes?.let { stringResource(it) } ?: "",
+                                                text = NavigationScreens.getNavbarItems().firstOrNull({ it.route == currentRoute })?.let { stringResource(it.titleId) } ?: currentTitleRes?.let { stringResource(it) } ?: "",
                                                 style = MaterialTheme.typography.titleLarge,
                                             )
                                         },

@@ -99,7 +99,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LibraryPodcastsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
+    onDeselect: (() -> Unit)? = null,
     viewModel: LibraryPodcastsViewModel = hiltViewModel(),
 ) {
     val downloadedEpisodesStr = stringResource(R.string.downloaded_episodes)
@@ -178,24 +178,26 @@ fun LibraryPodcastsScreen(
         // Chip row header — same pattern as LibrarySongsScreen
         val chipsHeader = @Composable {
             Row {
-                Spacer(Modifier.width(12.dp))
-                FilterChip(
-                    label = { Text(stringResource(R.string.filter_podcasts)) },
-                    selected = true,
-                    colors =
-                        FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
-                    onClick = onDeselect,
-                    shape = RoundedCornerShape(16.dp),
-                    border = null,
-                    leadingIcon = {
-                        Icon(
-                            painter = painterResource(R.drawable.close),
-                            contentDescription = null,
-                        )
-                    },
-                )
+                if(onDeselect != null) {
+                    Spacer(Modifier.width(12.dp))
+                    FilterChip(
+                        label = { Text(stringResource(R.string.filter_podcasts)) },
+                        selected = true,
+                        colors =
+                            FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                        onClick = onDeselect,
+                        shape = RoundedCornerShape(16.dp),
+                        border = null,
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(R.drawable.close),
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                }
                 ChipsRow(
                     chips =
                         listOf(

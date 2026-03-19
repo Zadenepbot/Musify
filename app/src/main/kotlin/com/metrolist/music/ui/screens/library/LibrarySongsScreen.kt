@@ -92,7 +92,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibrarySongsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
+    onDeselect: (() -> Unit)? = null,
     viewModel: LibrarySongsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -326,20 +326,22 @@ fun LibrarySongsScreen(
                 contentType = CONTENT_TYPE_HEADER,
             ) {
                 Row {
-                    Spacer(Modifier.width(12.dp))
-                    FilterChip(
-                        label = { Text(stringResource(R.string.songs)) },
-                        selected = true,
-                        colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
-                        onClick = onDeselect,
-                        shape = RoundedCornerShape(16.dp),
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.close),
-                                contentDescription = "",
-                            )
-                        },
-                    )
+                    if(onDeselect != null) {
+                        Spacer(Modifier.width(12.dp))
+                        FilterChip(
+                            label = { Text(stringResource(R.string.songs)) },
+                            selected = true,
+                            colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
+                            onClick = onDeselect,
+                            shape = RoundedCornerShape(16.dp),
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.close),
+                                    contentDescription = "",
+                                )
+                            },
+                        )
+                    }
                     ChipsRow(
                         chips =
                             listOf(

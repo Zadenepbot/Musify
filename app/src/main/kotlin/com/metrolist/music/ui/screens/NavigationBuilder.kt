@@ -24,13 +24,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
 import androidx.navigation.navArgument
 import com.metrolist.music.constants.DarkModeKey
+import com.metrolist.music.constants.NavigationScreens
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.ui.screens.artist.ArtistAlbumsScreen
 import com.metrolist.music.ui.screens.artist.ArtistItemsScreen
 import com.metrolist.music.ui.screens.artist.ArtistScreen
 import com.metrolist.music.ui.screens.artist.ArtistSongsScreen
 import com.metrolist.music.ui.screens.equalizer.EqScreen
+import com.metrolist.music.ui.screens.library.LibraryAlbumsScreen
+import com.metrolist.music.ui.screens.library.LibraryArtistsScreen
+import com.metrolist.music.ui.screens.library.LibraryPlaylistsScreen
+import com.metrolist.music.ui.screens.library.LibraryPodcastsScreen
 import com.metrolist.music.ui.screens.library.LibraryScreen
+import com.metrolist.music.ui.screens.library.LibrarySongsScreen
 import com.metrolist.music.ui.screens.playlist.AutoPlaylistScreen
 import com.metrolist.music.ui.screens.playlist.CachePlaylistScreen
 import com.metrolist.music.ui.screens.playlist.LocalPlaylistScreen
@@ -93,6 +99,21 @@ fun NavGraphBuilder.navigationBuilder(
         )
     }
 
+    composable(NavigationScreens.LIBRARY_SONGS.route) {
+        LibrarySongsScreen(navController)
+    }
+    composable(NavigationScreens.LIBRARY_ARTISTS.route) {
+        LibraryArtistsScreen(navController)
+    }
+    composable(NavigationScreens.LIBRARY_ALBUMS.route) {
+        LibraryAlbumsScreen(navController)
+    }
+    composable(NavigationScreens.LIBRARY_PODCASTS.route) {
+        LibraryPodcastsScreen(navController)
+    }
+    composable(NavigationScreens.LIBRARY_PLAYLISTS.route) {
+        LibraryPlaylistsScreen(navController, {})
+    }
     composable(Screens.Library.route) {
         LibraryScreen(navController)
     }
