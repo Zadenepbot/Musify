@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -364,7 +365,7 @@ fun LibraryPlaylistsScreen(
 
             IconButton(
                 onClick = { isSearchActive = true },
-                modifier = Modifier.padding(start = 6.dp),
+                modifier = Modifier.padding(start = 8.dp).size(40.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.search),
@@ -376,7 +377,7 @@ fun LibraryPlaylistsScreen(
                 onClick = {
                     viewType = viewType.toggle()
                 },
-                modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                modifier = Modifier.padding(end = 8.dp).size(40.dp),
             ) {
                 Icon(
                     painter =

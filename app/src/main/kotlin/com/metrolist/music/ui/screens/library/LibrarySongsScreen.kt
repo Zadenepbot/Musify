@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -383,7 +384,7 @@ fun LibrarySongsScreen(
                         viewModel.updateSearchQuery("")
                     },
                     keyboardController = keyboardController,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(start = 16.dp),
                 ) {
                     SortHeader(
                         sortType = sortType,
@@ -415,6 +416,7 @@ fun LibrarySongsScreen(
 
                     IconButton(
                         onClick = { isSearchActive = true },
+                        modifier = Modifier.padding(start = 8.dp, end = 8.dp).size(40.dp),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.search),
