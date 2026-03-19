@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -29,18 +31,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -62,6 +72,8 @@ import com.metrolist.music.constants.GridThumbnailHeight
 import com.metrolist.music.constants.HideExplicitKey
 import com.metrolist.music.constants.LibraryViewType
 import com.metrolist.music.constants.YtmSyncKey
+import com.metrolist.music.extensions.matchesNormalizedQuery
+import com.metrolist.music.extensions.normalizeForSearch
 import com.metrolist.music.ui.component.ChipsRow
 import com.metrolist.music.ui.component.EmptyPlaceholder
 import com.metrolist.music.ui.component.LibraryAlbumGridItem
@@ -83,6 +95,7 @@ fun LibraryAlbumsScreen(
 ) {
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
@@ -139,6 +152,17 @@ fun LibraryAlbumsScreen(
     }
 
     val albums by viewModel.allAlbums.collectAsState()
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val normalizedQuery = remember(searchQuery) { searchQuery.normalizeForSearch() }
+
+    val filteredAlbums = remember(albums, hideExplicit, normalizedQuery) {
+        val visibleAlbums = if (hideExplicit) albums.filter { !it.album.explicit } else albums
+        visibleAlbums.filter { album ->
+            val artistNames = album.artists.map { it.name }.toTypedArray()
+            matchesNormalizedQuery(normalizedQuery, album.album.title, *artistNames)
+        }
+    }
 
     val lazyListState = rememberLazyListState()
     val lazyGridState = rememberLazyGridState()
@@ -157,52 +181,113 @@ fun LibraryAlbumsScreen(
     }
 
     val headerContent = @Composable {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 16.dp),
-        ) {
-            SortHeader(
-                sortType = sortType,
-                sortDescending = sortDescending,
-                onSortTypeChange = onSortTypeChange,
-                onSortDescendingChange = onSortDescendingChange,
-                sortTypeText = { sortType ->
-                    when (sortType) {
-                        AlbumSortType.CREATE_DATE -> R.string.sort_by_create_date
-                        AlbumSortType.NAME -> R.string.sort_by_name
-                        AlbumSortType.ARTIST -> R.string.sort_by_artist
-                        AlbumSortType.YEAR -> R.string.sort_by_year
-                        AlbumSortType.SONG_COUNT -> R.string.sort_by_song_count
-                        AlbumSortType.LENGTH -> R.string.sort_by_length
-                        AlbumSortType.PLAY_TIME -> R.string.sort_by_play_time
-                    }
-                },
-            )
-
-            Spacer(Modifier.weight(1f))
-
-            Text(
-                text = pluralStringResource(R.plurals.n_album, albums.size, albums.size),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-
-            IconButton(
-                onClick = {
-                    viewType = viewType.toggle()
-                },
-                modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+        if (isSearchActive) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp),
             ) {
-                Icon(
-                    painter =
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.search_library),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleMedium,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            painter = painterResource(R.drawable.close),
+                            contentDescription = null,
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = {
+                        isSearchActive = false
+                        searchQuery = ""
+                    },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.arrow_back),
+                        contentDescription = null,
+                    )
+                }
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 16.dp),
+            ) {
+                SortHeader(
+                    sortType = sortType,
+                    sortDescending = sortDescending,
+                    onSortTypeChange = onSortTypeChange,
+                    onSortDescendingChange = onSortDescendingChange,
+                    sortTypeText = { sortType ->
+                        when (sortType) {
+                            AlbumSortType.CREATE_DATE -> R.string.sort_by_create_date
+                            AlbumSortType.NAME -> R.string.sort_by_name
+                            AlbumSortType.ARTIST -> R.string.sort_by_artist
+                            AlbumSortType.YEAR -> R.string.sort_by_year
+                            AlbumSortType.SONG_COUNT -> R.string.sort_by_song_count
+                            AlbumSortType.LENGTH -> R.string.sort_by_length
+                            AlbumSortType.PLAY_TIME -> R.string.sort_by_play_time
+                        }
+                    },
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                Text(
+                    text = pluralStringResource(R.plurals.n_album, filteredAlbums.size, filteredAlbums.size),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+
+                IconButton(
+                    onClick = { isSearchActive = true },
+                    modifier = Modifier.padding(start = 6.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.search),
+                        contentDescription = null,
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        viewType = viewType.toggle()
+                    },
+                    modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                ) {
+                    Icon(
+                        painter =
                         painterResource(
                             when (viewType) {
                                 LibraryViewType.LIST -> R.drawable.list
                                 LibraryViewType.GRID -> R.drawable.grid_view
                             },
                         ),
-                    contentDescription = null,
-                )
+                        contentDescription = null,
+                    )
+                }
             }
         }
     }
@@ -230,26 +315,27 @@ fun LibraryAlbumsScreen(
                         headerContent()
                     }
 
-                    albums.let { albums ->
+                    filteredAlbums.let { albums ->
                         if (albums.isEmpty()) {
                             item(key = "empty_placeholder") {
-                                EmptyPlaceholder(
-                                    icon = R.drawable.album,
-                                    text = stringResource(R.string.library_album_empty),
-                                    modifier = Modifier.animateItem(),
-                                )
+                                if (searchQuery.isNotBlank()) {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.search,
+                                        text = stringResource(R.string.no_results_found),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                } else {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.album,
+                                        text = stringResource(R.string.library_album_empty),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
                             }
                         }
-
-                        val filteredAlbumsForList =
-                            if (hideExplicit) {
-                                albums.filter { !it.album.explicit }
-                            } else {
-                                albums
-                            }
                         items(
-                            items = filteredAlbumsForList.distinctBy { it.id },
-                            key = { "lib_album_list_${it.id}" },
+                            items = albums.distinctBy { it.id },
+                            key = { it.id },
                             contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
                             LibraryAlbumListItem(
@@ -292,26 +378,27 @@ fun LibraryAlbumsScreen(
                         headerContent()
                     }
 
-                    albums.let { albums ->
+                    filteredAlbums.let { albums ->
                         if (albums.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                EmptyPlaceholder(
-                                    icon = R.drawable.album,
-                                    text = stringResource(R.string.library_album_empty),
-                                    modifier = Modifier.animateItem(),
-                                )
+                                if (searchQuery.isNotBlank()) {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.search,
+                                        text = stringResource(R.string.no_results_found),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                } else {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.album,
+                                        text = stringResource(R.string.library_album_empty),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
                             }
                         }
-
-                        val filteredAlbumsForGrid =
-                            if (hideExplicit) {
-                                albums.filter { !it.album.explicit }
-                            } else {
-                                albums
-                            }
                         items(
-                            items = filteredAlbumsForGrid.distinctBy { it.id },
-                            key = { "lib_album_grid_${it.id}" },
+                            items = albums.distinctBy { it.id },
+                            key = { it.id },
                             contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
                             LibraryAlbumGridItem(

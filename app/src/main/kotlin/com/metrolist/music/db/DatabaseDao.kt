@@ -182,6 +182,18 @@ interface DatabaseDao {
 
     @Transaction
     @Query(
+        """
+        SELECT DISTINCT song.*
+        FROM song
+        JOIN playlist_song_map ON playlist_song_map.songId = song.id
+        JOIN playlist ON playlist.id = playlist_song_map.playlistId
+        WHERE playlist.bookmarkedAt IS NOT NULL
+        """,
+    )
+    fun songsInBookmarkedPlaylists(): Flow<List<Song>>
+
+    @Transaction
+    @Query(
         "SELECT song.* FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = :artistId AND inLibrary IS NOT NULL ORDER BY inLibrary",
     )
     fun artistSongsByCreateDateAsc(artistId: String): Flow<List<Song>>

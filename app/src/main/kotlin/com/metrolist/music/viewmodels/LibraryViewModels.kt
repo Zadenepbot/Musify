@@ -61,6 +61,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -327,6 +328,25 @@ constructor(
         .flatMapLatest { hideExplicit ->
             database.albumsLiked(AlbumSortType.CREATE_DATE, true).map { it.filterExplicitAlbums(hideExplicit) }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    private val librarySongs = context.dataStore.data
+        .map { Pair(it[HideExplicitKey] ?: false, it[HideVideoSongsKey] ?: false) }
+        .distinctUntilChanged()
+        .flatMapLatest { (hideExplicit, hideVideoSongs) ->
+            database.songs(SongSortType.CREATE_DATE, true)
+                .map { it.filterExplicit(hideExplicit).filterVideoSongs(hideVideoSongs) }
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val playlistSongs = context.dataStore.data
+        .map { Pair(it[HideExplicitKey] ?: false, it[HideVideoSongsKey] ?: false) }
+        .distinctUntilChanged()
+        .flatMapLatest { (hideExplicit, hideVideoSongs) ->
+            database.songsInBookmarkedPlaylists()
+                .map { it.filterExplicit(hideExplicit).filterVideoSongs(hideVideoSongs) }
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    var songs = combine(librarySongs, playlistSongs) { librarySongs, playlistSongs ->
+        (librarySongs + playlistSongs).distinctBy { it.id }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     var playlists = context.dataStore.data
         .map { it[HideYoutubeShortsKey] ?: false }
         .distinctUntilChanged()

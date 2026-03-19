@@ -8,6 +8,9 @@ package com.metrolist.music.extensions
 import androidx.sqlite.db.SimpleSQLiteQuery
 import java.net.InetSocketAddress
 import java.net.InetSocketAddress.createUnresolved
+import java.text.Normalizer
+
+private val combiningDiacriticalMarksRegex = "\\p{Mn}+".toRegex()
 
 inline fun <reified T : Enum<T>> String?.toEnum(defaultValue: T): T =
     if (this == null) {
@@ -21,6 +24,19 @@ inline fun <reified T : Enum<T>> String?.toEnum(defaultValue: T): T =
     }
 
 fun String.toSQLiteQuery(): SimpleSQLiteQuery = SimpleSQLiteQuery(this)
+
+fun String.normalizeForSearch(): String =
+    Normalizer
+        .normalize(this, Normalizer.Form.NFD)
+        .replace(combiningDiacriticalMarksRegex, "")
+        .lowercase()
+
+fun matchesNormalizedQuery(normalizedQuery: String, vararg values: String?): Boolean {
+    if (normalizedQuery.isBlank()) return true
+    return values.any { value ->
+        value?.normalizeForSearch()?.contains(normalizedQuery) == true
+    }
+}
 
 fun String.toInetSocketAddress(): InetSocketAddress {
     val (host, port) = split(":")

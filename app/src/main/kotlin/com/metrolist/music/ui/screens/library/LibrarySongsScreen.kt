@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -37,6 +39,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,13 +51,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -71,10 +79,13 @@ import com.metrolist.music.constants.SongSortDescendingKey
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.SongSortTypeKey
 import com.metrolist.music.constants.YtmSyncKey
+import com.metrolist.music.extensions.matchesNormalizedQuery
+import com.metrolist.music.extensions.normalizeForSearch
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.ui.component.ChipsRow
 import com.metrolist.music.ui.component.DefaultDialog
+import com.metrolist.music.ui.component.EmptyPlaceholder
 import com.metrolist.music.ui.component.HideOnScrollFAB
 import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.SongListItem
@@ -96,6 +107,7 @@ fun LibrarySongsScreen(
     viewModel: LibrarySongsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val menuState = LocalMenuState.current
     val uploadUnsupportedFormatStr = stringResource(R.string.upload_unsupported_format)
     val uploadFileTooLargeStr = stringResource(R.string.upload_file_too_large)
@@ -118,6 +130,9 @@ fun LibrarySongsScreen(
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
 
     val songs by viewModel.allSongs.collectAsState()
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val normalizedQuery = remember(searchQuery) { searchQuery.normalizeForSearch() }
 
     var filter by rememberEnumPreference(SongFilterKey, SongFilter.LIKED)
 
@@ -259,10 +274,13 @@ fun LibrarySongsScreen(
     }
 
     val filteredSongs =
-        if (hideExplicit) {
+        (if (hideExplicit) {
             songs.filter { !it.song.explicit }
         } else {
             songs
+        }).filter { song ->
+            val artistNames = song.artists.map { it.name }.toTypedArray()
+            matchesNormalizedQuery(normalizedQuery, song.song.title, song.album?.title, *artistNames)
         }
 
     // Upload progress dialog
@@ -361,36 +379,109 @@ fun LibrarySongsScreen(
                 key = "header",
                 contentType = CONTENT_TYPE_HEADER,
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                ) {
-                    SortHeader(
-                        sortType = sortType,
-                        sortDescending = sortDescending,
-                        onSortTypeChange = onSortTypeChange,
-                        onSortDescendingChange = onSortDescendingChange,
-                        sortTypeText = { sortType ->
-                            when (sortType) {
-                                SongSortType.CREATE_DATE -> R.string.sort_by_create_date
-                                SongSortType.NAME -> R.string.sort_by_name
-                                SongSortType.ARTIST -> R.string.sort_by_artist
-                                SongSortType.PLAY_TIME -> R.string.sort_by_play_time
-                            }
-                        },
-                    )
-
-                    Spacer(Modifier.weight(1f))
-
-                    Text(
-                        text =
-                            pluralStringResource(
-                                R.plurals.n_song,
-                                filteredSongs.size,
-                                filteredSongs.size,
+                if (isSearchActive) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = {
+                                Text(
+                                    text = stringResource(R.string.search_library),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.titleMedium,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
                             ),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                        )
+
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.close),
+                                    contentDescription = null,
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                isSearchActive = false
+                                searchQuery = ""
+                            },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.arrow_back),
+                                contentDescription = null,
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) {
+                        SortHeader(
+                            sortType = sortType,
+                            sortDescending = sortDescending,
+                            onSortTypeChange = onSortTypeChange,
+                            onSortDescendingChange = onSortDescendingChange,
+                            sortTypeText = { sortType ->
+                                when (sortType) {
+                                    SongSortType.CREATE_DATE -> R.string.sort_by_create_date
+                                    SongSortType.NAME -> R.string.sort_by_name
+                                    SongSortType.ARTIST -> R.string.sort_by_artist
+                                    SongSortType.PLAY_TIME -> R.string.sort_by_play_time
+                                }
+                            },
+                        )
+
+                        Spacer(Modifier.weight(1f))
+
+                        Text(
+                            text =
+                                pluralStringResource(
+                                    R.plurals.n_song,
+                                    filteredSongs.size,
+                                    filteredSongs.size,
+                                ),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+
+                        IconButton(
+                            onClick = { isSearchActive = true },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.search),
+                                contentDescription = null,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (filteredSongs.isEmpty() && searchQuery.isNotBlank()) {
+                item(
+                    key = "empty_search_result",
+                    contentType = CONTENT_TYPE_HEADER,
+                ) {
+                    EmptyPlaceholder(
+                        icon = R.drawable.search,
+                        text = stringResource(R.string.no_results_found),
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }

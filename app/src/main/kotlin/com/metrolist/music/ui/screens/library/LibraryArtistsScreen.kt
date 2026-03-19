@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -29,18 +31,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -60,6 +70,8 @@ import com.metrolist.music.constants.GridItemsSizeKey
 import com.metrolist.music.constants.GridThumbnailHeight
 import com.metrolist.music.constants.LibraryViewType
 import com.metrolist.music.constants.YtmSyncKey
+import com.metrolist.music.extensions.matchesNormalizedQuery
+import com.metrolist.music.extensions.normalizeForSearch
 import com.metrolist.music.ui.component.ChipsRow
 import com.metrolist.music.ui.component.EmptyPlaceholder
 import com.metrolist.music.ui.component.LibraryArtistGridItem
@@ -81,6 +93,7 @@ fun LibraryArtistsScreen(
 ) {
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
     var viewType by rememberEnumPreference(ArtistViewTypeKey, LibraryViewType.GRID)
 
@@ -131,6 +144,14 @@ fun LibraryArtistsScreen(
     }
 
     val artists by viewModel.allArtists.collectAsState()
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val normalizedQuery = remember(searchQuery) { searchQuery.normalizeForSearch() }
+    val filteredArtists = remember(artists, normalizedQuery) {
+        artists.filter { artist ->
+            matchesNormalizedQuery(normalizedQuery, artist.artist.name)
+        }
+    }
 
     val lazyListState = rememberLazyListState()
     val lazyGridState = rememberLazyGridState()
@@ -149,54 +170,114 @@ fun LibraryArtistsScreen(
     }
 
     val headerContent = @Composable {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 16.dp),
-        ) {
-            SortHeader(
-                sortType = sortType,
-                sortDescending = sortDescending,
-                onSortTypeChange = onSortTypeChange,
-                onSortDescendingChange = onSortDescendingChange,
-                sortTypeText = { sortType ->
-                    when (sortType) {
-                        ArtistSortType.CREATE_DATE -> R.string.sort_by_create_date
-                        ArtistSortType.NAME -> R.string.sort_by_name
-                        ArtistSortType.SONG_COUNT -> R.string.sort_by_song_count
-                        ArtistSortType.PLAY_TIME -> R.string.sort_by_play_time
-                    }
-                },
-            )
-
-            Spacer(Modifier.weight(1f))
-
-            Text(
-                text =
-                    pluralStringResource(
-                        R.plurals.n_artist,
-                        artists.size,
-                        artists.size,
-                    ),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-
-            IconButton(
-                onClick = {
-                    viewType = viewType.toggle()
-                },
-                modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+        if (isSearchActive) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp),
             ) {
-                Icon(
-                    painter =
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.search_library),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.titleMedium,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            painter = painterResource(R.drawable.close),
+                            contentDescription = null,
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = {
+                        isSearchActive = false
+                        searchQuery = ""
+                    },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.arrow_back),
+                        contentDescription = null,
+                    )
+                }
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 16.dp),
+            ) {
+                SortHeader(
+                    sortType = sortType,
+                    sortDescending = sortDescending,
+                    onSortTypeChange = onSortTypeChange,
+                    onSortDescendingChange = onSortDescendingChange,
+                    sortTypeText = { sortType ->
+                        when (sortType) {
+                            ArtistSortType.CREATE_DATE -> R.string.sort_by_create_date
+                            ArtistSortType.NAME -> R.string.sort_by_name
+                            ArtistSortType.SONG_COUNT -> R.string.sort_by_song_count
+                            ArtistSortType.PLAY_TIME -> R.string.sort_by_play_time
+                        }
+                    },
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.n_artist,
+                        filteredArtists.size,
+                        filteredArtists.size,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+
+                IconButton(
+                    onClick = { isSearchActive = true },
+                    modifier = Modifier.padding(start = 6.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.search),
+                        contentDescription = null,
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        viewType = viewType.toggle()
+                    },
+                    modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                ) {
+                    Icon(
+                        painter =
                         painterResource(
                             when (viewType) {
                                 LibraryViewType.LIST -> R.drawable.list
                                 LibraryViewType.GRID -> R.drawable.grid_view
                             },
                         ),
-                    contentDescription = null,
-                )
+                        contentDescription = null,
+                    )
+                }
             }
         }
     }
@@ -224,14 +305,22 @@ fun LibraryArtistsScreen(
                         headerContent()
                     }
 
-                    artists.let { artists ->
+                    filteredArtists.let { artists ->
                         if (artists.isEmpty()) {
                             item(key = "empty_placeholder") {
-                                EmptyPlaceholder(
-                                    icon = R.drawable.artist,
-                                    text = stringResource(R.string.library_artist_empty),
-                                    modifier = Modifier.animateItem(),
-                                )
+                                if (searchQuery.isNotBlank()) {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.search,
+                                        text = stringResource(R.string.no_results_found),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                } else {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.artist,
+                                        text = stringResource(R.string.library_artist_empty),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
                             }
                         }
 
@@ -277,14 +366,22 @@ fun LibraryArtistsScreen(
                         headerContent()
                     }
 
-                    artists.let { artists ->
+                    filteredArtists.let { artists ->
                         if (artists.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                EmptyPlaceholder(
-                                    icon = R.drawable.artist,
-                                    text = stringResource(R.string.library_artist_empty),
-                                    modifier = Modifier.animateItem(),
-                                )
+                                if (searchQuery.isNotBlank()) {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.search,
+                                        text = stringResource(R.string.no_results_found),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                } else {
+                                    EmptyPlaceholder(
+                                        icon = R.drawable.artist,
+                                        text = stringResource(R.string.library_artist_empty),
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
                             }
                         }
 
