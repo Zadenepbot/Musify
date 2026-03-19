@@ -283,7 +283,7 @@ fun LibraryPlaylistsScreen(
                     IconButton(onClick = { searchQuery = "" }) {
                         Icon(
                             painter = painterResource(R.drawable.close),
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.clear_search),
                         )
                     }
                 }
@@ -296,7 +296,7 @@ fun LibraryPlaylistsScreen(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.arrow_back),
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.back),
                     )
                 }
             }
@@ -338,7 +338,7 @@ fun LibraryPlaylistsScreen(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.search),
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.search),
                     )
                 }
 
@@ -356,7 +356,12 @@ fun LibraryPlaylistsScreen(
                                 LibraryViewType.GRID -> R.drawable.grid_view
                             },
                         ),
-                        contentDescription = null,
+                        contentDescription = stringResource(
+                            when (viewType) {
+                                LibraryViewType.LIST -> R.string.switch_to_grid_view
+                                LibraryViewType.GRID -> R.string.switch_to_list_view
+                            },
+                        ),
                     )
                 }
             }

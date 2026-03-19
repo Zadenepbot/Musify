@@ -411,7 +411,7 @@ fun LibrarySongsScreen(
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
                                     painter = painterResource(R.drawable.close),
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.clear_search),
                                 )
                             }
                         }
@@ -424,7 +424,7 @@ fun LibrarySongsScreen(
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.arrow_back),
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -466,7 +466,7 @@ fun LibrarySongsScreen(
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.search),
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.search),
                             )
                         }
                     }

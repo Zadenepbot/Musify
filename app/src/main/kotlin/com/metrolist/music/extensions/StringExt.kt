@@ -27,14 +27,15 @@ fun String.toSQLiteQuery(): SimpleSQLiteQuery = SimpleSQLiteQuery(this)
 
 fun String.normalizeForSearch(): String =
     Normalizer
-        .normalize(this, Normalizer.Form.NFD)
+        .normalize(this.trim(), Normalizer.Form.NFD)
         .replace(combiningDiacriticalMarksRegex, "")
         .lowercase()
 
 fun matchesNormalizedQuery(normalizedQuery: String, vararg values: String?): Boolean {
-    if (normalizedQuery.isBlank()) return true
+    val q = normalizedQuery.trim()
+    if (q.isBlank()) return true
     return values.any { value ->
-        value?.normalizeForSearch()?.contains(normalizedQuery) == true
+        value?.normalizeForSearch()?.contains(q) == true
     }
 }
 
