@@ -87,10 +87,14 @@ fun LibrarySearchHeader(
 }
 
 @Composable
-fun LibrarySearchEmptyPlaceholder(modifier: Modifier = Modifier) {
+fun LibrarySearchEmptyPlaceholder(
+    modifier: Modifier = Modifier,
+    icon: Int = R.drawable.search,
+    text: String? = null,
+) {
     EmptyPlaceholder(
-        icon = R.drawable.search,
-        text = stringResource(R.string.no_results_found),
+        icon = icon,
+        text = text ?: stringResource(R.string.no_results_found),
         modifier = modifier,
     )
 }

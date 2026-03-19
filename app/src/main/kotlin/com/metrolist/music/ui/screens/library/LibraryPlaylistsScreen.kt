@@ -445,6 +445,12 @@ fun LibraryPlaylistsScreen(
                             item(key = "empty_placeholder") {
                                 if (searchQuery.isNotBlank()) {
                                     LibrarySearchEmptyPlaceholder(modifier = Modifier.animateItem())
+                                } else {
+                                    LibrarySearchEmptyPlaceholder(
+                                        modifier = Modifier.animateItem(),
+                                        icon = R.drawable.playlist_play,
+                                        text = stringResource(R.string.library_playlist_empty),
+                                    )
                                 }
                             }
                         }
@@ -635,6 +641,12 @@ fun LibraryPlaylistsScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 if (searchQuery.isNotBlank()) {
                                     LibrarySearchEmptyPlaceholder(modifier = Modifier.animateItem())
+                                } else {
+                                    LibrarySearchEmptyPlaceholder(
+                                        modifier = Modifier.animateItem(),
+                                        icon = R.drawable.playlist_play,
+                                        text = stringResource(R.string.library_playlist_empty),
+                                    )
                                 }
                             }
                         }
