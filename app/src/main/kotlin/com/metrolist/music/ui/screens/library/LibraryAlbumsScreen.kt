@@ -149,8 +149,7 @@ fun LibraryAlbumsScreen(
     val albums by viewModel.allAlbums.collectAsState()
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val debouncedSearchQuery by viewModel.debouncedSearchQuery.collectAsState()
-    val normalizedQuery = remember(debouncedSearchQuery) { debouncedSearchQuery.normalizeForSearch() }
+    val normalizedQuery = remember(searchQuery) { searchQuery.normalizeForSearch() }
 
     val filteredAlbums = remember(albums, hideExplicit, normalizedQuery) {
         val visibleAlbums = if (hideExplicit) albums.filter { !it.album.explicit } else albums

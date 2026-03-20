@@ -135,7 +135,13 @@ fun LibraryMixScreen(
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     val searchQuery by viewModel.searchQuery.collectAsState()
     val debouncedSearchQuery by viewModel.debouncedSearchQuery.collectAsState()
-    val normalizedQuery = remember(debouncedSearchQuery) { debouncedSearchQuery.normalizeForSearch() }
+    val normalizedQuery = remember(isSearchActive, searchQuery, debouncedSearchQuery) {
+        if (isSearchActive) {
+            searchQuery.normalizeForSearch()
+        } else {
+            debouncedSearchQuery.normalizeForSearch()
+        }
+    }
 
     val topSize by viewModel.topValue.collectAsState(initial = 50)
     val likedPlaylist =

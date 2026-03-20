@@ -209,6 +209,7 @@ fun LibraryPlaylistsScreen(
         showCachedPlaylists,
         showTopPlaylists,
         showUploadedPlaylists,
+        topSize,
     ) {
         buildList {
             if (showLikedPlaylist) {
