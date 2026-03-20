@@ -378,7 +378,6 @@ fun LibrarySongsScreen(
                     isSearchActive = isSearchActive,
                     searchQuery = searchQuery,
                     onSearchQueryChange = viewModel::updateSearchQuery,
-                    onClose = { viewModel.updateSearchQuery("") },
                     onBack = {
                         isSearchActive = false
                         viewModel.updateSearchQuery("")

@@ -17,8 +17,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -31,12 +35,20 @@ fun LibrarySearchHeader(
     isSearchActive: Boolean,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    onClose: () -> Unit,
     onBack: () -> Unit,
     keyboardController: SoftwareKeyboardController?,
     modifier: Modifier = Modifier,
     inactiveContent: @Composable RowScope.() -> Unit,
 ) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isSearchActive) {
+        if (isSearchActive) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
@@ -62,22 +74,16 @@ fun LibrarySearchHeader(
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
             )
-
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        painter = painterResource(R.drawable.close),
-                        contentDescription = stringResource(R.string.clear_search),
-                    )
-                }
-            }
 
             IconButton(onClick = onBack) {
                 Icon(
-                    painter = painterResource(R.drawable.arrow_back),
-                    contentDescription = stringResource(R.string.back),
+                    painter = painterResource(R.drawable.close),
+                    contentDescription = stringResource(R.string.close),
                 )
             }
         } else {
