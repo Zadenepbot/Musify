@@ -797,19 +797,17 @@ fun SpeedDialog(onDismiss: () -> Unit) {
         },
         text = {
             Column {
-                if (!isInRoom) {
-                    ValueAdjuster(
-                        icon = R.drawable.speed,
-                        currentValue = speed,
-                        values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
-                        onValueUpdate = {
-                            speed = it
-                            updatePlaybackParameters()
-                        },
-                        valueText = { "x$it" },
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
+                ValueAdjuster(
+                    icon = R.drawable.speed,
+                    currentValue = speed,
+                    values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
+                    onValueUpdate = {
+                        speed = it
+                        updatePlaybackParameters()
+                    },
+                    valueText = { "x$it" },
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
             }
         },
     )
