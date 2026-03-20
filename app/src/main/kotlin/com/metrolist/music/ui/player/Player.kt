@@ -530,32 +530,6 @@ fun BottomSheetPlayer(
         .getDownload(mediaMetadata?.id ?: "")
         .collectAsState(initial = null)
 
-    val sleepTimerEnabled =
-        remember(
-            playerConnection.service.sleepTimer.triggerTime,
-            playerConnection.service.sleepTimer.pauseWhenSongEnd,
-        ) {
-            playerConnection.service.sleepTimer.isActive
-        }
-
-    var sleepTimerTimeLeft by remember {
-        mutableLongStateOf(0L)
-    }
-
-    LaunchedEffect(sleepTimerEnabled) {
-        if (sleepTimerEnabled) {
-            while (isActive) {
-                sleepTimerTimeLeft =
-                    if (playerConnection.service.sleepTimer.pauseWhenSongEnd) {
-                        playerConnection.player.duration - playerConnection.player.currentPosition
-                    } else {
-                        playerConnection.service.sleepTimer.triggerTime - System.currentTimeMillis()
-                    }
-                delay(1000L)
-            }
-        }
-    }
-
     val scope = rememberCoroutineScope()
     var showSleepTimerDialog by remember {
         mutableStateOf(false)
@@ -572,114 +546,169 @@ fun BottomSheetPlayer(
     val sleepTimerFadeOut by rememberPreference(SleepTimerFadeOutKey, false)
 
 
-    if (showSleepTimerDialog) {
-        AlertDialog(
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            onDismissRequest = { showSleepTimerDialog = false },
-            icon = {
-                Icon(
-                    painter = painterResource(R.drawable.bedtime),
-                    contentDescription = null,
-                )
-            },
-            title = { Text(stringResource(R.string.sleep_timer)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSleepTimerDialog = false
-                        playerConnection.service.sleepTimer.start(
-                            minute = sleepTimerValue.roundToInt(),
-                            stopAfterCurrentSong = sleepTimerStopAfterCurrentSong,
-                            fadeOut = sleepTimerFadeOut,
-                        )
-                    },
-                ) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showSleepTimerDialog = false },
-                ) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text =
-                            pluralStringResource(
-                                R.plurals.minute,
-                                sleepTimerValue.roundToInt(),
-                                sleepTimerValue.roundToInt(),
-                            ),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
 
-                    Slider(
-                        value = sleepTimerValue,
-                        onValueChange = { sleepTimerValue = it },
-                        valueRange = 5f..120f,
-                        steps = (120 - 5) / 5 - 1,
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isAtDefault) {
-                            FilledIconButton(
-                                onClick = {
-                                    scope.launch {
-                                        context.dataStore.edit { settings ->
-                                            settings[SleepTimerDefaultKey] = sleepTimerValue
-                                        }
-                                    }
-                                    Toast.makeText(
-                                        context,
-                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                },
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
-                            ) {
-                                Text(stringResource(R.string.set_as_default))
-                            }
-                        } else {
-                            OutlinedIconButton(
-                                onClick = {
-                                    scope.launch {
-                                        context.dataStore.edit { settings ->
-                                            settings[SleepTimerDefaultKey] = sleepTimerValue
-                                        }
-                                    }
-                                    Toast.makeText(
-                                        context,
-                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                },
-                            ) {
-                                Text(stringResource(R.string.set_as_default))
-                            }
-                        }
-
-                        OutlinedIconButton(
-                            onClick = {
-                                showSleepTimerDialog = false
-                                playerConnection.service.sleepTimer.start(minute = -1)
-                            },
-                        ) {
-                            Text(stringResource(R.string.end_of_song))
-                        }
-                    }
-                }
-            },
-        )
-    }
+//    if (showSleepTimerDialog) {
+//        ActionPromptDialog(
+//            titleBar = {
+//                Row(
+//                    modifier = Modifier.fillMaxWidth(),
+//                    horizontalArrangement = Arrangement.Center,
+//                ) {
+//                    Text(
+//                        text = stringResource(R.string.sleep_timer),
+//                        overflow = TextOverflow.Ellipsis,
+//                        maxLines = 1,
+//                        style = MaterialTheme.typography.headlineSmall,
+//                    )
+//                }
+//            },
+//            onDismiss = { showSleepTimerDialog = false },
+//            onConfirm = {
+//                showSleepTimerDialog = false
+//                playerConnection.service.sleepTimer.start(
+//                    value = sleepTimerValue.roundToInt(),
+//                    _type = sleepTimerType
+////                            fadeOut = sleepTimerFadeOut,
+//                )
+//            },
+//            onCancel = {
+//                showSleepTimerDialog = false
+//            },
+//            onReset = {
+//                sleepTimerValue = sleepTimerDefault
+//                sleepTimerType = sleepTimerDefaultType
+//            },
+//            content = {
+//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//
+//                    Row(
+//                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+//                        verticalAlignment = Alignment.CenterVertically,
+//                        modifier = Modifier
+//                    ) {
+//                        OutlinedToggleButton(
+//                            checked = sleepTimerType == SleepTimer.TIME,
+//                            onCheckedChange = {
+//                                if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
+//                                sleepTimerType = 0
+//                            },
+//                            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+//                            colors = ToggleButtonDefaults.toggleButtonColors(),
+//                            modifier = Modifier.weight(1f)
+//                        ) {
+//                            Text("Time")
+//                        }
+//                        OutlinedToggleButton(
+//                            checked = sleepTimerType == SleepTimer.TIME_FINISH,
+//                            onCheckedChange = {
+//                                if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
+//                                sleepTimerType = SleepTimer.TIME_FINISH
+//                            },
+//                            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+//                            colors = ToggleButtonDefaults.toggleButtonColors(),
+//                            modifier = Modifier.weight(1f)
+//                        ) {
+//                            Text("Time (FS)")
+//                        }
+//                        OutlinedToggleButton(
+//                            checked = sleepTimerType == SleepTimer.SONGS,
+//                            onCheckedChange = {
+//                                if (sleepTimerType != SleepTimer.SONGS ) sleepTimerValue/=5
+//                                sleepTimerType = SleepTimer.SONGS
+//                            },
+//                            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+//                            colors = ToggleButtonDefaults.toggleButtonColors(),
+//                            modifier = Modifier.weight(1f)
+//                        ) {
+//                            Text("Songs")
+//                        }
+//                    }
+//
+//                    Text(
+//                        text = "ⓘ FS: Finishes Song before stopping",
+//                        style = MaterialTheme.typography.bodySmall,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                        textAlign = TextAlign.End,
+//                        modifier = Modifier.fillMaxWidth()
+//                    )
+//
+//                    Spacer(Modifier.height(16.dp))
+//
+//                    Text(
+//                        text = pluralStringResource(
+//                            if (sleepTimerType == SleepTimer.SONGS) R.plurals.song else R.plurals.minute,
+//                            sleepTimerValue.roundToInt(),
+//                            sleepTimerValue.roundToInt(),
+//                        ),
+//                        style = MaterialTheme.typography.bodyLarge,
+//                    )
+//
+//                    Spacer(Modifier.height(8.dp))
+//
+//                    val topValue = if (sleepTimerType == SleepTimer.SONGS) 24 else 120
+//                    val bottomValue = if (sleepTimerType == SleepTimer.SONGS) 1 else 5
+//                    Slider(
+//                        value = sleepTimerValue,
+//                        onValueChange = { sleepTimerValue = it },
+//                        valueRange = bottomValue.toFloat()..topValue.toFloat(),
+//                        steps = (topValue - bottomValue) / bottomValue - 1,
+//                        modifier = Modifier.fillMaxWidth(),
+//                    )
+//
+//                    Spacer(Modifier.height(8.dp))
+//
+//                    Row(
+//                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+//                        verticalAlignment = Alignment.CenterVertically,
+//                    ) {
+//                        if (isAtDefault) {
+//                            val text = stringResource(R.string.already_set_as_default)
+//                            Button(
+//                                onClick = {
+//                                    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+//                                },
+//                                colors = ButtonDefaults.buttonColors(
+//                                    containerColor = MaterialTheme.colorScheme.primary,
+//                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+//                                ),
+//                            ) {
+//                                Text(stringResource(R.string.set_as_default))
+//                            }
+//                        } else {
+//                            OutlinedButton(
+//                                onClick = {
+//                                    coroutineScope.launch {
+//                                        context.dataStore.edit { settings ->
+//                                            settings[SleepTimerDefaultKey] = sleepTimerValue
+//                                            settings[SleepTimerDefaultTypeKey] = sleepTimerType
+//                                        }
+//                                    }
+//                                    Toast.makeText(
+//                                        context,
+//                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
+//                                        Toast.LENGTH_SHORT,
+//                                    ).show()
+//                                },
+//                            ) {
+//                                Text(stringResource(R.string.set_as_default))
+//                            }
+//                        }
+//
+////                                OutlinedButton(
+////                                    onClick = {
+////                                        showSleepTimerDialog = false
+////                                        playerConnection.service.sleepTimer.start(
+////                                            minute = -1,
+////                                        )
+////                                    },
+////                                ) {
+////                                    Text(stringResource(R.string.end_of_song))
+////                                }
+//                    }
+//                }
+//            },
+//        )
+//    }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)

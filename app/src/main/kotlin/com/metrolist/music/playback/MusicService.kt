@@ -3451,7 +3451,7 @@ class MusicService :
 
         crossfadeTriggerJob = scope.launch {
             delay(delayMs)
-            if (isActive && player.isPlaying && player.currentMediaItem?.mediaId == targetMediaId && !sleepTimer.pauseWhenSongEnd) {
+            if (isActive && player.isPlaying && player.currentMediaItem?.mediaId == targetMediaId && sleepTimer.remainingSongs != 1) {
                 startCrossfade()
             }
         }
