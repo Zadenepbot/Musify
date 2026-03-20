@@ -5,8 +5,8 @@
 
 package com.metrolist.music.playback
 
-import androidx.media3.common.C
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,85 +23,63 @@ class SleepTimer(
     var player: Player,
     private val onVolumeMultiplierChanged: (Float) -> Unit = {},
 ) : Player.Listener {
-    private companion object {
+    companion object {
         private const val TIMER_TICK_MS = 1000L
         private const val FADE_OUT_WINDOW_MS = 60_000L
+
+        const val TIME = 0
+        const val TIME_FINISH = 1
+        const val SONGS = 2
     }
 
     private var sleepTimerJob: Job? = null
     var triggerTime by mutableLongStateOf(-1L)
         private set
-    var pauseWhenSongEnd by mutableStateOf(false)
+
+    var remainingSongs by mutableIntStateOf(0)
         private set
-    var stopAfterCurrentSongOnTimeout by mutableStateOf(false)
+    var type by mutableIntStateOf(TIME)
         private set
     var fadeOutEnabled by mutableStateOf(false)
         private set
     val isActive: Boolean
-        get() = triggerTime != -1L || pauseWhenSongEnd
-
-    fun start(minute: Int) {
-        start(
-            minute = minute,
-            stopAfterCurrentSong = false,
-            fadeOut = false,
-        )
-    }
+        get() = triggerTime != -1L || remainingSongs > 0
 
     fun start(
-        minute: Int,
-        stopAfterCurrentSong: Boolean,
-        fadeOut: Boolean,
+        value: Int,
+        _type: Int,
+        fadeOut: Boolean = false,
     ) {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-        updateVolumeMultiplier(1f)
+//        updateVolumeMultiplier(1f)
         fadeOutEnabled = fadeOut
+        type = _type
 
-        if (minute == -1) {
-            pauseWhenSongEnd = true
-            stopAfterCurrentSongOnTimeout = false
+        if (type == SONGS) {
             triggerTime = -1L
-            if (fadeOutEnabled) {
-                sleepTimerJob =
-                    scope.launch {
-                        while (this@SleepTimer.isActive) {
-                            updateVolumeMultiplierForCurrentSong()
-                            delay(TIMER_TICK_MS)
-                        }
-                    }
-            }
+            remainingSongs = value
         } else {
-            pauseWhenSongEnd = false
-            stopAfterCurrentSongOnTimeout = stopAfterCurrentSong
-            triggerTime = System.currentTimeMillis() + minute.minutes.inWholeMilliseconds
-            sleepTimerJob =
-                scope.launch {
-                    while (this@SleepTimer.isActive) {
-                        if (triggerTime != -1L) {
-                            val remainingMs = triggerTime - System.currentTimeMillis()
-                            if (remainingMs <= 0L) {
-                                triggerTime = -1L
-                                if (stopAfterCurrentSongOnTimeout) {
-                                    pauseWhenSongEnd = true
-                                    stopAfterCurrentSongOnTimeout = false
-                                    if (!fadeOutEnabled) {
-                                        break
-                                    }
-                                } else {
-                                    completeTimerAndPause()
-                                    break
-                                }
-                            } else if (fadeOutEnabled && !stopAfterCurrentSongOnTimeout) {
-                                updateVolumeMultiplierForRemainingTime(remainingMs)
-                            }
-                        } else if (pauseWhenSongEnd && fadeOutEnabled) {
-                            updateVolumeMultiplierForCurrentSong()
-                        }
 
+            triggerTime = System.currentTimeMillis() + value.minutes.inWholeMilliseconds
+            sleepTimerJob = scope.launch {
+                while (this@SleepTimer.isActive) {
+                    if (triggerTime != -1L) {
+                        val remainingMs = triggerTime - System.currentTimeMillis()
+                        if (remainingMs <= 0L) {
+                            triggerTime = -1L
+                            if (type == TIME_FINISH) {
+                                remainingSongs = 1
+                                type = SONGS
+                            } else {
+                                completeTimerAndPause()
+                            }
+                            break
+                        }
                         delay(TIMER_TICK_MS)
                     }
                 }
+            }
         }
     }
 
@@ -111,70 +89,71 @@ class SleepTimer(
      * is active, this will pause the player and deactivate the timer.
      */
     fun notifySongTransition() {
-        if (pauseWhenSongEnd) {
-            completeTimerAndPause()
+        if (remainingSongs > 0) {
+            if (--remainingSongs == 0){
+                completeTimerAndPause()
+            }
         }
     }
 
     fun clear() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-        pauseWhenSongEnd = false
-        stopAfterCurrentSongOnTimeout = false
         fadeOutEnabled = false
+        remainingSongs = 0
         triggerTime = -1L
-        updateVolumeMultiplier(1f)
+//        updateVolumeMultiplier(1f)
     }
 
     override fun onMediaItemTransition(
         mediaItem: MediaItem?,
         reason: Int,
     ) {
-        if (pauseWhenSongEnd) {
-            completeTimerAndPause()
+        if (remainingSongs > 0) {
+            if (--remainingSongs == 0){
+                completeTimerAndPause()
+            }
         }
     }
 
-    override fun onPlaybackStateChanged(
-        @Player.State playbackState: Int,
-    ) {
-        if (playbackState == Player.STATE_ENDED && pauseWhenSongEnd) {
-            completeTimerAndPause()
-        }
-    }
+//    override fun onPlaybackStateChanged(
+//        @Player.State playbackState: Int,
+//    ) {
+//        if (playbackState == Player.STATE_ENDED && pauseWhenSongEnd) {
+//            completeTimerAndPause()
+//        }
+//    }
 
     private fun completeTimerAndPause() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-        pauseWhenSongEnd = false
-        stopAfterCurrentSongOnTimeout = false
         fadeOutEnabled = false
         triggerTime = -1L
-        updateVolumeMultiplier(1f)
+//        updateVolumeMultiplier(1f)
         player.pause()
     }
 
-    private fun updateVolumeMultiplierForRemainingTime(remainingMs: Long) {
-        updateVolumeMultiplier(volumeMultiplierForRemainingTime(remainingMs))
-    }
+//    private fun updateVolumeMultiplierForRemainingTime(remainingMs: Long) {
+//        updateVolumeMultiplier(volumeMultiplierForRemainingTime(remainingMs))
+//    }
 
-    private fun updateVolumeMultiplierForCurrentSong() {
-        val duration = player.duration
-        if (duration == C.TIME_UNSET || duration <= 0) {
-            updateVolumeMultiplier(1f)
-            return
-        }
+//    private fun updateVolumeMultiplierForCurrentSong() {
+//        val duration = player.duration
+//        if (duration == C.TIME_UNSET || duration <= 0) {
+//            updateVolumeMultiplier(1f)
+//            return
+//        }
+//
+//        val remainingMs = (duration - player.currentPosition).coerceAtLeast(0L)
+//        updateVolumeMultiplierForRemainingTime(remainingMs)
+//    }
 
-        val remainingMs = (duration - player.currentPosition).coerceAtLeast(0L)
-        updateVolumeMultiplierForRemainingTime(remainingMs)
-    }
-
-    private fun volumeMultiplierForRemainingTime(remainingMs: Long): Float {
-        if (remainingMs >= FADE_OUT_WINDOW_MS) return 1f
-        return (remainingMs.toFloat() / FADE_OUT_WINDOW_MS).coerceIn(0f, 1f)
-    }
-
-    private fun updateVolumeMultiplier(multiplier: Float) {
-        onVolumeMultiplierChanged(multiplier)
-    }
+//    private fun volumeMultiplierForRemainingTime(remainingMs: Long): Float {
+//        if (remainingMs >= FADE_OUT_WINDOW_MS) return 1f
+//        return (remainingMs.toFloat() / FADE_OUT_WINDOW_MS).coerceIn(0f, 1f)
+//    }
+//
+//    private fun updateVolumeMultiplier(multiplier: Float) {
+//        onVolumeMultiplierChanged(multiplier)
+//    }
 }

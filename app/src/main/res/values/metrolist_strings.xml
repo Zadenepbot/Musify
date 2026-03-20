@@ -248,7 +248,9 @@
 
     <!-- Sleep timer -->
     <string name="set_as_default">Set as default</string>
+    <string name="already_set_as_default">Already set as default</string>
     <string name="sleep_timer_default_set">Sleep timer default set to %d min</string>
+    <string name="sleep_timer_default_set_songs">Sleep timer default set to %d songs</string>
     <string name="enable_automatic_sleeptimer">Enable automatic sleep timer</string>
     <string name="sleeptimer_description">Enables the sleep timer automatically with the default value by a custom time</string>
     <string name="sleep_timer_repeat_description">Set a custom day and time when the sleep timer should automatically activate</string>

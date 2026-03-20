@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.metrolist.music.constants.SleepTimerCustomDaysKey
 import com.metrolist.music.constants.SleepTimerDayTimesKey
 import com.metrolist.music.constants.SleepTimerDefaultKey
+import com.metrolist.music.constants.SleepTimerDefaultTypeKey
 import com.metrolist.music.constants.SleepTimerEnabledKey
 import com.metrolist.music.constants.SleepTimerEndTimeKey
 import com.metrolist.music.constants.SleepTimerRepeatKey
@@ -476,7 +477,8 @@ class PlayerConnection(
             val sleepTimerRepeat = service.applicationContext.dataStore.get(SleepTimerRepeatKey) ?: "daily"
             val sleepTimerStartTime = service.applicationContext.dataStore.get(SleepTimerStartTimeKey) ?: "09:00"
             val sleepTimerEndTime = service.applicationContext.dataStore.get(SleepTimerEndTimeKey) ?: "23:00"
-            val sleepTimerDefaultMinutes = (service.applicationContext.dataStore.get(SleepTimerDefaultKey) ?: 30f).roundToInt()
+            val sleepTimerDefaultValue = (service.applicationContext.dataStore.get(SleepTimerDefaultKey) ?: 30f).roundToInt()
+            val sleepTimerDefaultType = service.applicationContext.dataStore.get(SleepTimerDefaultTypeKey) ?: SleepTimer.TIME
             val sleepTimerCustomDaysStr = service.applicationContext.dataStore.get(SleepTimerCustomDaysKey) ?: "0,1,2,3,4"
             val sleepTimerDayTimesStr = service.applicationContext.dataStore.get(SleepTimerDayTimesKey) ?: ""
 
@@ -484,7 +486,7 @@ class PlayerConnection(
                 .tag(
                     TAG,
                 ).d(
-                    "Sleep Timer Config: repeat=$sleepTimerRepeat start=$sleepTimerStartTime end=$sleepTimerEndTime default=$sleepTimerDefaultMinutes custom=$sleepTimerCustomDaysStr",
+                    "Sleep Timer Config: repeat=$sleepTimerRepeat start=$sleepTimerStartTime end=$sleepTimerEndTime default=$sleepTimerDefaultValue custom=$sleepTimerCustomDaysStr",
                 )
 
             val currentTime = LocalTime.now()
@@ -556,8 +558,8 @@ class PlayerConnection(
             Timber.tag(TAG).d("Time check: $currentTime between $startStr-$endStr? $isTimeInRange")
 
             if (isTimeInRange) {
-                Timber.tag(TAG).i("AUTO SLEEP TIMER STARTED: $sleepTimerDefaultMinutes minutes")
-                service.sleepTimer.start(sleepTimerDefaultMinutes)
+                Timber.tag(TAG).i("AUTO SLEEP TIMER STARTED: $sleepTimerDefaultValue minutes")
+                service.sleepTimer.start(sleepTimerDefaultValue, sleepTimerDefaultType)
                 return true
             }
 
