@@ -770,7 +770,6 @@ fun SpeedDialog(onDismiss: () -> Unit) {
             PlaybackParameters(speed, speed)
     }
     val listenTogetherManager = com.metrolist.music.LocalListenTogetherManager.current
-    val isInRoom = listenTogetherManager?.isInRoom ?: false
 
     AlertDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
