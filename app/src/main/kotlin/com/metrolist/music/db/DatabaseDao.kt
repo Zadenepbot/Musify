@@ -103,12 +103,12 @@ interface DatabaseDao {
                 songs
                     .sortedWith(
                         compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
+                            song.orderedArtists.joinToString("") { it.name }
                         },
                     ).groupBy { it.album?.title }
                     .flatMap { (_, songsByAlbum) ->
                         songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
+                            album.orderedArtists.joinToString(
                                 "",
                             ) { it.name }
                         }
@@ -153,12 +153,12 @@ interface DatabaseDao {
                 songs
                     .sortedWith(
                         compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
+                            song.orderedArtists.joinToString("") { it.name }
                         },
                     ).groupBy { it.album?.title }
                     .flatMap { (_, songsByAlbum) ->
                         songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
+                            album.orderedArtists.joinToString(
                                 "",
                             ) { it.name }
                         }
@@ -1064,6 +1064,11 @@ interface DatabaseDao {
         songIds: List<String>,
     ): List<String>
 
+    @Query("UPDATE playlist SET lastUpdateTime = :now WHERE id = :playlistId")
+    fun updatePlaylistLastUpdated(
+        playlistId: String,
+        now: LocalDateTime = LocalDateTime.now(),
+    )
     @Transaction
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
         var position = playlist.songCount
@@ -1076,6 +1081,7 @@ interface DatabaseDao {
                 )
             )
         }
+        updatePlaylistLastUpdated(playlist.id)
     }
 
     fun downloadedSongs(
@@ -1093,7 +1099,7 @@ interface DatabaseDao {
             val collator = Collator.getInstance(Locale.getDefault())
             collator.strength = Collator.PRIMARY
             songs.sortedWith(compareBy(collator) { song ->
-                song.artists.joinToString("") { it.name }
+                song.orderedArtists.joinToString("") { it.name }
             })
         }
 
@@ -1165,12 +1171,12 @@ interface DatabaseDao {
                 songs
                     .sortedWith(
                         compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
+                            song.orderedArtists.joinToString("") { it.name }
                         },
                     ).groupBy { it.album?.title }
                     .flatMap { (_, songsByAlbum) ->
                         songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
+                            album.orderedArtists.joinToString(
                                 "",
                             ) { it.name }
                         }
@@ -1215,12 +1221,12 @@ interface DatabaseDao {
                 songs
                     .sortedWith(
                         compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
+                            song.orderedArtists.joinToString("") { it.name }
                         },
                     ).groupBy { it.album?.title }
                     .flatMap { (_, songsByAlbum) ->
                         songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
+                            album.orderedArtists.joinToString(
                                 "",
                             ) { it.name }
                         }
@@ -1271,7 +1277,7 @@ interface DatabaseDao {
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
                 songs.sortedWith(compareBy(collator) { song ->
-                    song.artists.joinToString("") { it.name }
+                    song.orderedArtists.joinToString("") { it.name }
                 })
             }
         SongSortType.PLAY_TIME -> savedPodcastEpisodesByPlayTimeAsc()
@@ -1293,7 +1299,7 @@ interface DatabaseDao {
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
                 songs.sortedWith(compareBy(collator) { song ->
-                    song.artists.joinToString("") { it.name }
+                    song.orderedArtists.joinToString("") { it.name }
                 })
             }
         SongSortType.PLAY_TIME -> downloadedPodcastEpisodesByPlayTimeAsc()
