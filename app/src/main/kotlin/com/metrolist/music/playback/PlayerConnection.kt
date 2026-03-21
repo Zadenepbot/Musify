@@ -478,7 +478,9 @@ class PlayerConnection(
             val sleepTimerStartTime = service.applicationContext.dataStore.get(SleepTimerStartTimeKey) ?: "09:00"
             val sleepTimerEndTime = service.applicationContext.dataStore.get(SleepTimerEndTimeKey) ?: "23:00"
             val sleepTimerDefaultValue = (service.applicationContext.dataStore.get(SleepTimerDefaultKey) ?: 30f).roundToInt()
-            val sleepTimerDefaultType = service.applicationContext.dataStore.get(SleepTimerDefaultTypeKey) ?: SleepTimer.TIME
+            val sleepTimerDefaultType = service.applicationContext.dataStore.get(SleepTimerDefaultTypeKey).takeIf {
+                it in listOf(SleepTimer.TIME, SleepTimer.TIME_FINISH, SleepTimer.SONGS)
+            } ?: SleepTimer.TIME
             val sleepTimerCustomDaysStr = service.applicationContext.dataStore.get(SleepTimerCustomDaysKey) ?: "0,1,2,3,4"
             val sleepTimerDayTimesStr = service.applicationContext.dataStore.get(SleepTimerDayTimesKey) ?: ""
 
@@ -558,7 +560,8 @@ class PlayerConnection(
             Timber.tag(TAG).d("Time check: $currentTime between $startStr-$endStr? $isTimeInRange")
 
             if (isTimeInRange) {
-                Timber.tag(TAG).i("AUTO SLEEP TIMER STARTED: $sleepTimerDefaultValue minutes")
+                val unit = if (sleepTimerDefaultType == SleepTimer.SONGS) "songs" else "minutes"
+                Timber.tag(TAG).i("AUTO SLEEP TIMER STARTED: $sleepTimerDefaultValue $unit")
                 service.sleepTimer.start(sleepTimerDefaultValue, sleepTimerDefaultType)
                 return true
             }

@@ -67,7 +67,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,8 +134,6 @@ import com.metrolist.music.constants.SleepTimerDefaultKey
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.derivedStateOf
-import com.metrolist.music.constants.SleepTimerFadeOutKey
-import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -146,6 +143,9 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.mutableIntStateOf
 import com.metrolist.music.constants.SleepTimerDefaultTypeKey
 import com.metrolist.music.playback.SleepTimer
+import com.metrolist.music.playback.SleepTimer.Companion.TIME_FINISH
+import com.metrolist.music.utils.get
+import kotlin.collections.contains
 
 
 @SuppressLint("UnrememberedMutableState")
@@ -229,20 +229,9 @@ fun Queue(
     val snackbarHostState = remember { SnackbarHostState() }
     var dismissJob: Job? by remember { mutableStateOf(null) }
 
-    val coroutineScope = rememberCoroutineScope()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
-    val sleepTimerDefault by rememberPreference(SleepTimerDefaultKey, 30f)
-    var sleepTimerValue by remember { mutableFloatStateOf(sleepTimerDefault) }
-    val sleepTimerDefaultType by rememberPreference(SleepTimerDefaultTypeKey, SleepTimer.TIME)
-    var sleepTimerType by remember {
-        mutableIntStateOf(sleepTimerDefaultType)
-    }
-    val isAtDefault by remember {
-        derivedStateOf { sleepTimerValue.roundToInt() == sleepTimerDefault.roundToInt() && sleepTimerDefaultType == sleepTimerType }
-    }
-    val sleepTimerDefaultSetTemplate =
-        if (sleepTimerType == SleepTimer.SONGS) stringResource(R.string.sleep_timer_default_set_songs)
-        else stringResource(R.string.sleep_timer_default_set)
+
+
 
     val sleepTimerEnabled = remember(
         playerConnection.service.sleepTimer.triggerTime,
@@ -549,156 +538,8 @@ fun Queue(
                     }
                 }
             }
-
-            if (showSleepTimerDialog) {
-                ActionPromptDialog(
-                    titleBar = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.sleep_timer),
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                        }
-                    },
-                    onDismiss = { showSleepTimerDialog = false },
-                    onConfirm = {
-                        showSleepTimerDialog = false
-                        playerConnection.service.sleepTimer.start(
-                            value = sleepTimerValue.roundToInt(),
-                            _type = sleepTimerType
-                        )
-                    },
-                    onCancel = {
-                        showSleepTimerDialog = false
-                    },
-                    onReset = {
-                        sleepTimerValue = sleepTimerDefault
-                        sleepTimerType = sleepTimerDefaultType
-                    },
-                    content = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                            ) {
-                                OutlinedToggleButton(
-                                    checked = sleepTimerType == SleepTimer.TIME,
-                                    onCheckedChange = {
-                                        if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
-                                        sleepTimerType = SleepTimer.TIME
-                                    },
-                                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                                    colors = ToggleButtonDefaults.toggleButtonColors(),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Time")
-                                }
-                                OutlinedToggleButton(
-                                    checked = sleepTimerType == SleepTimer.TIME_FINISH,
-                                    onCheckedChange = {
-                                        if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
-                                        sleepTimerType = SleepTimer.TIME_FINISH
-                                    },
-                                    shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-                                    colors = ToggleButtonDefaults.toggleButtonColors(),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Time (FS)")
-                                }
-                                OutlinedToggleButton(
-                                    checked = sleepTimerType == SleepTimer.SONGS,
-                                    onCheckedChange = {
-                                        if (sleepTimerType != SleepTimer.SONGS ) sleepTimerValue/=5
-                                        sleepTimerType = SleepTimer.SONGS
-                                    },
-                                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                                    colors = ToggleButtonDefaults.toggleButtonColors(),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Songs")
-                                }
-                            }
-
-                            Text(
-                                text = "ⓘ FS: Finishes Song before stopping",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(Modifier.height(16.dp))
-
-                            Text(
-                                text = pluralStringResource(
-                                        if (sleepTimerType == SleepTimer.SONGS) R.plurals.song else R.plurals.minute,
-                                        sleepTimerValue.roundToInt(),
-                                        sleepTimerValue.roundToInt(),
-                                    ),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-
-                            val topValue = if (sleepTimerType == SleepTimer.SONGS) 24 else 120
-                            val bottomValue = if (sleepTimerType == SleepTimer.SONGS) 1 else 5
-                            Slider(
-                                value = sleepTimerValue,
-                                onValueChange = { sleepTimerValue = it },
-                                valueRange = bottomValue.toFloat()..topValue.toFloat(),
-                                steps = (topValue - bottomValue) / bottomValue - 1,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (isAtDefault) {
-                                    val text = stringResource(R.string.already_set_as_default)
-                                    Button(
-                                        onClick = {
-                                            Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        ),
-                                    ) {
-                                        Text(stringResource(R.string.set_as_default))
-                                    }
-                                } else {
-                                    OutlinedButton(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                context.dataStore.edit { settings ->
-                                                    settings[SleepTimerDefaultKey] = sleepTimerValue
-                                                    settings[SleepTimerDefaultTypeKey] = sleepTimerType
-                                                }
-                                            }
-                                            Toast.makeText(
-                                                context,
-                                                String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        },
-                                    ) {
-                                        Text(stringResource(R.string.set_as_default))
-                                    }
-                                }
-                            }
-                        }
-                    },
-                )
+            SleepTimerDialog(playerConnection, showSleepTimerDialog) {
+                showSleepTimerDialog = false
             }
         },
     ) {

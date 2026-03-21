@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import kotlin.time.Duration.Companion.minutes
 
 class SleepTimer(
@@ -25,7 +26,6 @@ class SleepTimer(
 ) : Player.Listener {
     companion object {
         private const val TIMER_TICK_MS = 1000L
-        private const val FADE_OUT_WINDOW_MS = 60_000L
 
         const val TIME = 0
         const val TIME_FINISH = 1
@@ -40,6 +40,7 @@ class SleepTimer(
         private set
     var type by mutableIntStateOf(TIME)
         private set
+    // fadeOut is disabled for now
     var fadeOutEnabled by mutableStateOf(false)
         private set
     val isActive: Boolean
@@ -47,14 +48,12 @@ class SleepTimer(
 
     fun start(
         value: Int,
-        _type: Int,
-        fadeOut: Boolean = false,
+        timerType: Int,
     ) {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-//        updateVolumeMultiplier(1f)
-        fadeOutEnabled = fadeOut
-        type = _type
+        updateVolumeMultiplier(1f)
+        type = timerType
 
         if (type == SONGS) {
             triggerTime = -1L
@@ -102,7 +101,7 @@ class SleepTimer(
         fadeOutEnabled = false
         remainingSongs = 0
         triggerTime = -1L
-//        updateVolumeMultiplier(1f)
+        updateVolumeMultiplier(1f)
     }
 
     override fun onMediaItemTransition(
@@ -116,44 +115,26 @@ class SleepTimer(
         }
     }
 
-//    override fun onPlaybackStateChanged(
-//        @Player.State playbackState: Int,
-//    ) {
-//        if (playbackState == Player.STATE_ENDED && pauseWhenSongEnd) {
-//            completeTimerAndPause()
-//        }
-//    }
+    override fun onPlaybackStateChanged(
+        @Player.State playbackState: Int,
+    ) {
+        // this only triggers when the playlist ended, not between songs
+        if (playbackState == Player.STATE_ENDED && remainingSongs > 0) {
+            completeTimerAndPause()
+        }
+    }
 
     private fun completeTimerAndPause() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
         fadeOutEnabled = false
+        remainingSongs = 0
         triggerTime = -1L
-//        updateVolumeMultiplier(1f)
+        updateVolumeMultiplier(1f)
         player.pause()
     }
 
-//    private fun updateVolumeMultiplierForRemainingTime(remainingMs: Long) {
-//        updateVolumeMultiplier(volumeMultiplierForRemainingTime(remainingMs))
-//    }
-
-//    private fun updateVolumeMultiplierForCurrentSong() {
-//        val duration = player.duration
-//        if (duration == C.TIME_UNSET || duration <= 0) {
-//            updateVolumeMultiplier(1f)
-//            return
-//        }
-//
-//        val remainingMs = (duration - player.currentPosition).coerceAtLeast(0L)
-//        updateVolumeMultiplierForRemainingTime(remainingMs)
-//    }
-
-//    private fun volumeMultiplierForRemainingTime(remainingMs: Long): Float {
-//        if (remainingMs >= FADE_OUT_WINDOW_MS) return 1f
-//        return (remainingMs.toFloat() / FADE_OUT_WINDOW_MS).coerceIn(0f, 1f)
-//    }
-//
-//    private fun updateVolumeMultiplier(multiplier: Float) {
-//        onVolumeMultiplierChanged(multiplier)
-//    }
+    private fun updateVolumeMultiplier(multiplier: Float) {
+        onVolumeMultiplierChanged(multiplier)
+    }
 }

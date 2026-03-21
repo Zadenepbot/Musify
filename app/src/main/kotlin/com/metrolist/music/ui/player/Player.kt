@@ -55,7 +55,9 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -63,11 +65,12 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedToggleButton
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +78,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -139,8 +143,6 @@ import com.metrolist.music.constants.PlayerButtonsStyleKey
 import com.metrolist.music.constants.PlayerHorizontalPadding
 import com.metrolist.music.constants.QueuePeekHeight
 import com.metrolist.music.constants.SleepTimerDefaultKey
-import com.metrolist.music.constants.SleepTimerFadeOutKey
-import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
 import com.metrolist.music.constants.SliderStyle
 import com.metrolist.music.constants.SliderStyleKey
 import com.metrolist.music.constants.SquigglySliderKey
@@ -180,14 +182,13 @@ import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.roundToInt
 import com.metrolist.music.ui.component.Icon as MIcon
-import com.metrolist.music.constants.SleepTimerDefaultKey
-import com.metrolist.music.utils.dataStore
-import androidx.datastore.preferences.core.edit
-import com.metrolist.music.constants.SleepTimerFadeOutKey
-import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
+import com.metrolist.music.constants.SleepTimerDefaultTypeKey
+import com.metrolist.music.playback.SleepTimer
+import com.metrolist.music.playback.SleepTimer.Companion.TIME_FINISH
+import com.metrolist.music.ui.component.ActionPromptDialog
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BottomSheetPlayer(
     state: BottomSheetState,
@@ -198,7 +199,6 @@ fun BottomSheetPlayer(
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val menuState = LocalMenuState.current
-    val sleepTimerDefaultSetTemplate = stringResource(R.string.sleep_timer_default_set)
     val copiedTitleStr = stringResource(R.string.copied_title)
     val copiedArtistStr = stringResource(R.string.copied_artist)
     val bottomSheetPageState = LocalBottomSheetPageState.current
@@ -530,185 +530,9 @@ fun BottomSheetPlayer(
         .getDownload(mediaMetadata?.id ?: "")
         .collectAsState(initial = null)
 
-    val scope = rememberCoroutineScope()
-    var showSleepTimerDialog by remember {
-        mutableStateOf(false)
-    }
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
 
-    val sleepTimerDefault by rememberPreference(SleepTimerDefaultKey, 30f)
-    var sleepTimerValue by remember {
-        mutableFloatStateOf(sleepTimerDefault)
-    }
-    val isAtDefault by remember {
-        derivedStateOf { sleepTimerValue.roundToInt() == sleepTimerDefault.roundToInt() }
-    }
-    val sleepTimerStopAfterCurrentSong by rememberPreference(SleepTimerStopAfterCurrentSongKey, false)
-    val sleepTimerFadeOut by rememberPreference(SleepTimerFadeOutKey, false)
-
-
-
-//    if (showSleepTimerDialog) {
-//        ActionPromptDialog(
-//            titleBar = {
-//                Row(
-//                    modifier = Modifier.fillMaxWidth(),
-//                    horizontalArrangement = Arrangement.Center,
-//                ) {
-//                    Text(
-//                        text = stringResource(R.string.sleep_timer),
-//                        overflow = TextOverflow.Ellipsis,
-//                        maxLines = 1,
-//                        style = MaterialTheme.typography.headlineSmall,
-//                    )
-//                }
-//            },
-//            onDismiss = { showSleepTimerDialog = false },
-//            onConfirm = {
-//                showSleepTimerDialog = false
-//                playerConnection.service.sleepTimer.start(
-//                    value = sleepTimerValue.roundToInt(),
-//                    _type = sleepTimerType
-////                            fadeOut = sleepTimerFadeOut,
-//                )
-//            },
-//            onCancel = {
-//                showSleepTimerDialog = false
-//            },
-//            onReset = {
-//                sleepTimerValue = sleepTimerDefault
-//                sleepTimerType = sleepTimerDefaultType
-//            },
-//            content = {
-//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-//
-//                    Row(
-//                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-//                        verticalAlignment = Alignment.CenterVertically,
-//                        modifier = Modifier
-//                    ) {
-//                        OutlinedToggleButton(
-//                            checked = sleepTimerType == SleepTimer.TIME,
-//                            onCheckedChange = {
-//                                if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
-//                                sleepTimerType = 0
-//                            },
-//                            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-//                            colors = ToggleButtonDefaults.toggleButtonColors(),
-//                            modifier = Modifier.weight(1f)
-//                        ) {
-//                            Text("Time")
-//                        }
-//                        OutlinedToggleButton(
-//                            checked = sleepTimerType == SleepTimer.TIME_FINISH,
-//                            onCheckedChange = {
-//                                if (sleepTimerType == SleepTimer.SONGS) sleepTimerValue*=5
-//                                sleepTimerType = SleepTimer.TIME_FINISH
-//                            },
-//                            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-//                            colors = ToggleButtonDefaults.toggleButtonColors(),
-//                            modifier = Modifier.weight(1f)
-//                        ) {
-//                            Text("Time (FS)")
-//                        }
-//                        OutlinedToggleButton(
-//                            checked = sleepTimerType == SleepTimer.SONGS,
-//                            onCheckedChange = {
-//                                if (sleepTimerType != SleepTimer.SONGS ) sleepTimerValue/=5
-//                                sleepTimerType = SleepTimer.SONGS
-//                            },
-//                            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-//                            colors = ToggleButtonDefaults.toggleButtonColors(),
-//                            modifier = Modifier.weight(1f)
-//                        ) {
-//                            Text("Songs")
-//                        }
-//                    }
-//
-//                    Text(
-//                        text = "ⓘ FS: Finishes Song before stopping",
-//                        style = MaterialTheme.typography.bodySmall,
-//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-//                        textAlign = TextAlign.End,
-//                        modifier = Modifier.fillMaxWidth()
-//                    )
-//
-//                    Spacer(Modifier.height(16.dp))
-//
-//                    Text(
-//                        text = pluralStringResource(
-//                            if (sleepTimerType == SleepTimer.SONGS) R.plurals.song else R.plurals.minute,
-//                            sleepTimerValue.roundToInt(),
-//                            sleepTimerValue.roundToInt(),
-//                        ),
-//                        style = MaterialTheme.typography.bodyLarge,
-//                    )
-//
-//                    Spacer(Modifier.height(8.dp))
-//
-//                    val topValue = if (sleepTimerType == SleepTimer.SONGS) 24 else 120
-//                    val bottomValue = if (sleepTimerType == SleepTimer.SONGS) 1 else 5
-//                    Slider(
-//                        value = sleepTimerValue,
-//                        onValueChange = { sleepTimerValue = it },
-//                        valueRange = bottomValue.toFloat()..topValue.toFloat(),
-//                        steps = (topValue - bottomValue) / bottomValue - 1,
-//                        modifier = Modifier.fillMaxWidth(),
-//                    )
-//
-//                    Spacer(Modifier.height(8.dp))
-//
-//                    Row(
-//                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-//                        verticalAlignment = Alignment.CenterVertically,
-//                    ) {
-//                        if (isAtDefault) {
-//                            val text = stringResource(R.string.already_set_as_default)
-//                            Button(
-//                                onClick = {
-//                                    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-//                                },
-//                                colors = ButtonDefaults.buttonColors(
-//                                    containerColor = MaterialTheme.colorScheme.primary,
-//                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-//                                ),
-//                            ) {
-//                                Text(stringResource(R.string.set_as_default))
-//                            }
-//                        } else {
-//                            OutlinedButton(
-//                                onClick = {
-//                                    coroutineScope.launch {
-//                                        context.dataStore.edit { settings ->
-//                                            settings[SleepTimerDefaultKey] = sleepTimerValue
-//                                            settings[SleepTimerDefaultTypeKey] = sleepTimerType
-//                                        }
-//                                    }
-//                                    Toast.makeText(
-//                                        context,
-//                                        String.format(sleepTimerDefaultSetTemplate, sleepTimerValue.roundToInt()),
-//                                        Toast.LENGTH_SHORT,
-//                                    ).show()
-//                                },
-//                            ) {
-//                                Text(stringResource(R.string.set_as_default))
-//                            }
-//                        }
-//
-////                                OutlinedButton(
-////                                    onClick = {
-////                                        showSleepTimerDialog = false
-////                                        playerConnection.service.sleepTimer.start(
-////                                            minute = -1,
-////                                        )
-////                                    },
-////                                ) {
-////                                    Text(stringResource(R.string.end_of_song))
-////                                }
-//                    }
-//                }
-//            },
-//        )
-//    }
+    SleepTimerDialog(playerConnection, showSleepTimerDialog) { showSleepTimerDialog = false }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
