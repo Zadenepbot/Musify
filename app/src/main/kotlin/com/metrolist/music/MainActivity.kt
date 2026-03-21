@@ -234,6 +234,11 @@ class MainActivity : ComponentActivity() {
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
     private var isServiceBound = false
 
+    // FIX: Retain the binder across the onStop/onStart cycle instead of
+    // destroying it. onStart reuses it directly without re-binding,
+    // preventing unnecessary UI recomposition.
+    private var cachedBinder: MusicBinder? = null
+
     private val serviceConnection =
         object : ServiceConnection {
             override fun onServiceConnected(
@@ -241,35 +246,47 @@ class MainActivity : ComponentActivity() {
                 service: IBinder?,
             ) {
                 if (service is MusicBinder) {
-                    try {
-                        playerConnection = PlayerConnection(this@MainActivity, service, database, lifecycleScope)
-                        Timber.tag("MainActivity").d("PlayerConnection created successfully")
-                        // Connect Listen Together manager to player
-                        listenTogetherManager.setPlayerConnection(playerConnection)
-                    } catch (e: Exception) {
-                        Timber.tag("MainActivity").e(e, "Failed to create PlayerConnection")
-                        // Retry after a delay of 500ms
-                        lifecycleScope.launch {
-                            delay(500)
-                            try {
-                                playerConnection = PlayerConnection(this@MainActivity, service, database, lifecycleScope)
-                                listenTogetherManager.setPlayerConnection(playerConnection)
-                            } catch (e2: Exception) {
-                                Timber.tag("MainActivity").e(e2, "Failed to create PlayerConnection on retry")
-                            }
-                        }
-                    }
+                    cachedBinder = service
+                    connectPlayerFromBinder(service)
                 }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
-                // Disconnect Listen Together manager
-                listenTogetherManager.setPlayerConnection(null)
-                playerConnection?.dispose()
-                playerConnection = null
+                // Called only when service is unexpectedly killed by the system - clean up everything
+                Timber.tag("MainActivity").w("Service disconnected unexpectedly")
+                cachedBinder = null
+                disconnectPlayer()
             }
         }
 
+    // Build a PlayerConnection from an existing binder without re-binding
+    private fun connectPlayerFromBinder(binder: MusicBinder) {
+        try {
+            playerConnection = PlayerConnection(this, binder, database, lifecycleScope)
+            listenTogetherManager.setPlayerConnection(playerConnection)
+            Timber.tag("MainActivity").d("PlayerConnection created from binder")
+        } catch (e: Exception) {
+            Timber.tag("MainActivity").e(e, "Failed to create PlayerConnection")
+            lifecycleScope.launch {
+                delay(500)
+                try {
+                    playerConnection = PlayerConnection(this@MainActivity, binder, database, lifecycleScope)
+                    listenTogetherManager.setPlayerConnection(playerConnection)
+                } catch (e2: Exception) {
+                    Timber.tag("MainActivity").e(e2, "Failed to create PlayerConnection on retry")
+                }
+            }
+        }
+    }
+
+    // Release the PlayerConnection without touching the binder
+    private fun disconnectPlayer() {
+        listenTogetherManager.setPlayerConnection(null)
+        playerConnection?.dispose()
+        playerConnection = null
+    }
+
+    // Safe unbind — called only on actual destruction (onDestroy)
     private fun safeUnbindService(source: String) {
         if (!isServiceBound) return
         try {
@@ -278,14 +295,14 @@ class MainActivity : ComponentActivity() {
             Timber.tag("MainActivity").w(e, "Service was not bound when attempting to unbind in $source")
         } finally {
             isServiceBound = false
-            listenTogetherManager.setPlayerConnection(null)
-            playerConnection?.dispose()
-            playerConnection = null
+            cachedBinder = null
+            disconnectPlayer()
         }
     }
 
     override fun onStart() {
         super.onStart()
+
         // Request notification permission on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -293,36 +310,73 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Explicitly start the service so it becomes an "explicitly started" service.
-        // Without this, the service only exists while a client is bound (BIND_AUTO_CREATE).
-        // When onStop() releases the binding (e.g. screen off, app backgrounded), Media3's
-        // MediaNotificationManager tries to call startForegroundService() to keep the service
-        // alive — but this is blocked on Android 12+ when the app is in the background,
-        // causing ForegroundServiceStartNotAllowedException. Starting the service explicitly
-        // here ensures it persists independently of binding state, so Media3 never needs to
-        // re-start it from a background context.
-        startService(Intent(this, MusicService::class.java))
-        bindService(
-            Intent(this, MusicService::class.java),
-            serviceConnection,
-            BIND_AUTO_CREATE,
-        )
-        isServiceBound = true
+        if (isServiceBound && cachedBinder != null) {
+            // FIX: App returned from background with binding still active.
+            // Reconnect PlayerConnection from the cached binder directly,
+            // without issuing a new bindService call — no UI recomposition.
+            if (playerConnection == null) {
+                Timber.tag("MainActivity").d("onStart: reusing cached binder, reconnecting player")
+                connectPlayerFromBinder(cachedBinder!!)
+            }
+        } else {
+            // First launch or after full termination — new bind
+            // Explicitly start the service so it becomes an "explicitly started" service.
+            // Without this, the service only exists while a client is bound (BIND_AUTO_CREATE).
+            // When onStop() releases the binding (e.g. screen off, app backgrounded), Media3's
+            // MediaNotificationManager tries to call startForegroundService() to keep the service
+            // alive — but this is blocked on Android 12+ when the app is in the background,
+            // causing ForegroundServiceStartNotAllowedException. Starting the service explicitly
+            // here ensures it persists independently of binding state, so Media3 never needs to
+            // re-start it from a background context.
+            startService(Intent(this, MusicService::class.java))
+            bindService(
+                Intent(this, MusicService::class.java),
+                serviceConnection,
+                BIND_AUTO_CREATE,
+            )
+            isServiceBound = true
+        }
     }
 
     override fun onStop() {
-        safeUnbindService("onStop()")
+        // FIX: Do not unbind or destroy the PlayerConnection here.
+        // Only release the Compose-facing references (dispose without unbind)
+        // so the binder stays alive and onStart can reuse it on resume.
+        Timber.tag("MainActivity").d("onStop: suspending player connection, keeping service bound")
+        listenTogetherManager.setPlayerConnection(null)
+        playerConnection?.dispose()
+        playerConnection = null
+        // Do not clear cachedBinder — it is what we reconnect from in onStart
         super.onStop()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // Check playback state before releasing playerConnection
+        val wasPlaying: Boolean = cachedBinder?.let {
+            try {
+                if (playerConnection == null) {
+                    PlayerConnection(this, it, database, lifecycleScope).run {
+                        val playing = isPlaying.value
+                        dispose()
+                        playing
+                    }
+                } else {
+                    playerConnection?.isPlaying?.value ?: false
+                }
+            } catch (e: Exception) {
+                false
+            }
+        } ?: (playerConnection?.isPlaying?.value == true)
+
         if (dataStore.get(StopMusicOnTaskClearKey, false) &&
-            playerConnection?.isPlaying?.value == true &&
+            wasPlaying &&
             isFinishing
         ) {
             stopService(Intent(this, MusicService::class.java))
         }
+
+        // Full teardown — release all resources and unbind the service
         safeUnbindService("onDestroy()")
     }
 
