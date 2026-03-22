@@ -22,6 +22,7 @@ val PureBlackKey = booleanPreferencesKey("pureBlack")
 val PureBlackMiniPlayerKey = booleanPreferencesKey("pureBlackMiniPlayer")
 val MiniPlayerOutlineKey = booleanPreferencesKey("miniPlayerOutline")
 val MiniPlayerBackgroundStyleKey = stringPreferencesKey("miniPlayerBackgroundStyle")
+val EnableBlurEffectKey = booleanPreferencesKey("enableBlurEffect")
 
 enum class MiniPlayerBackgroundStyle {
     DEFAULT,

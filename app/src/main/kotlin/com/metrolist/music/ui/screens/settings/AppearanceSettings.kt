@@ -62,6 +62,7 @@ import com.metrolist.music.constants.DefaultOpenTabKey
 import com.metrolist.music.constants.DensityScale
 import com.metrolist.music.constants.DensityScaleKey
 import com.metrolist.music.constants.DynamicThemeKey
+import com.metrolist.music.constants.EnableBlurEffectKey
 import com.metrolist.music.constants.EnableDynamicIconKey
 import com.metrolist.music.constants.EnableHighRefreshRateKey
 import com.metrolist.music.constants.GridItemSize
@@ -134,6 +135,10 @@ fun AppearanceSettings(
     )
     val (enableHighRefreshRate, onEnableHighRefreshRateChange) = rememberPreference(
         EnableHighRefreshRateKey,
+        defaultValue = true
+    )
+    val (blurEffectEnabled, onBlurEffectEnabledChange) = rememberPreference(
+        EnableBlurEffectKey,
         defaultValue = true
     )
     val (selectedThemeColorInt) = rememberPreference(
@@ -998,6 +1003,29 @@ fun AppearanceSettings(
                         title = { Text(stringResource(R.string.theme)) },
                         description = { Text(stringResource(R.string.theme_desc)) },
                         onClick = { navController.navigate("settings/appearance/theme") }
+                    )
+                )
+                add(
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.gradient),
+                        title = { Text(stringResource(R.string.enable_blur_effect)) },
+                        description = { Text(stringResource(R.string.enable_blur_effect_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = blurEffectEnabled,
+                                onCheckedChange = onBlurEffectEnabledChange,
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (blurEffectEnabled) R.drawable.check else R.drawable.close
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        },
+                        onClick = { onBlurEffectEnabledChange(!blurEffectEnabled) }
                     )
                 )
             }
