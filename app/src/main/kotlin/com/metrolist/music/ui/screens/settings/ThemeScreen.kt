@@ -81,8 +81,8 @@ import com.metrolist.music.constants.DynamicThemeKey
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.constants.PureBlackMiniPlayerKey
 import com.metrolist.music.constants.SelectedThemeColorKey
-import com.metrolist.music.constants.AppThemeModeKey
-import com.metrolist.music.constants.AppThemeMode
+import com.metrolist.music.constants.PlayerBackgroundStyleKey
+import com.metrolist.music.constants.PlayerBackgroundStyle
 import com.metrolist.music.ui.theme.DefaultThemeColor
 import com.metrolist.music.ui.theme.MetrolistTheme
 import com.metrolist.music.ui.component.EnumDialog
@@ -152,13 +152,13 @@ fun ThemeScreen(
         onDynamicThemeChange(isDynamicColor)
     }
 
-    // Theme mode for NavBar, NavRail and background
-    val (appThemeMode, onAppThemeModeChange) = rememberEnumPreference(
-        AppThemeModeKey,
-        defaultValue = AppThemeMode.FOLLOW_SYSTEM
+    // Background style for NavBar, NavRail and background
+    val (playerBackgroundStyle, onPlayerBackgroundStyleChange) = rememberEnumPreference(
+        PlayerBackgroundStyleKey,
+        defaultValue = PlayerBackgroundStyle.DEFAULT
     )
 
-    var showAppThemeModeDialog by rememberSaveable { mutableStateOf(false) }
+    var showPlayerBackgroundStyleDialog by rememberSaveable { mutableStateOf(false) }
 
     if (isLandscape) {
         LandscapeThemeLayout(
@@ -169,9 +169,9 @@ fun ThemeScreen(
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
             onSelectedThemeColorChange = handleColorSelection,
-            appThemeMode = appThemeMode,
-            onAppThemeModeChange = onAppThemeModeChange,
-            showAppThemeModeDialog = { showAppThemeModeDialog = true }
+            playerBackgroundStyle = playerBackgroundStyle,
+            onPlayerBackgroundStyleChange = onPlayerBackgroundStyleChange,
+            showPlayerBackgroundStyleDialog = { showPlayerBackgroundStyleDialog = true }
         )
     } else {
         PortraitThemeLayout(
@@ -182,27 +182,27 @@ fun ThemeScreen(
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
             onSelectedThemeColorChange = handleColorSelection,
-            appThemeMode = appThemeMode,
-            onAppThemeModeChange = onAppThemeModeChange,
-            showAppThemeModeDialog = { showAppThemeModeDialog = true }
+            playerBackgroundStyle = playerBackgroundStyle,
+            onPlayerBackgroundStyleChange = onPlayerBackgroundStyleChange,
+            showPlayerBackgroundStyleDialog = { showPlayerBackgroundStyleDialog = true }
         )
     }
 
-    if (showAppThemeModeDialog) {
+    if (showPlayerBackgroundStyleDialog) {
         EnumDialog(
-            onDismiss = { showAppThemeModeDialog = false },
+            onDismiss = { showPlayerBackgroundStyleDialog = false },
             onSelect = {
-                onAppThemeModeChange(it)
-                showAppThemeModeDialog = false
+                onPlayerBackgroundStyleChange(it)
+                showPlayerBackgroundStyleDialog = false
             },
-            title = stringResource(R.string.app_theme_mode),
-            current = appThemeMode,
-            values = AppThemeMode.entries,
+            title = stringResource(R.string.player_background_style),
+            current = playerBackgroundStyle,
+            values = PlayerBackgroundStyle.entries,
             valueText = {
                 when (it) {
-                    AppThemeMode.FOLLOW_SYSTEM -> stringResource(R.string.follow_theme)
-                    AppThemeMode.USE_THEME_COLOR -> stringResource(R.string.use_theme_color)
-                    AppThemeMode.PURE_BLACK -> stringResource(R.string.pure_black)
+                    PlayerBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
+                    PlayerBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
+                    PlayerBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
                 }
             },
         )
@@ -230,9 +230,9 @@ fun PortraitThemeLayout(
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
-    appThemeMode: AppThemeMode,
-    onAppThemeModeChange: (AppThemeMode) -> Unit,
-    showAppThemeModeDialog: () -> Unit
+    playerBackgroundStyle: PlayerBackgroundStyle,
+    onPlayerBackgroundStyleChange: (PlayerBackgroundStyle) -> Unit,
+    showPlayerBackgroundStyleDialog: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -264,9 +264,9 @@ fun PortraitThemeLayout(
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
             onSelectedThemeColorChange = onSelectedThemeColorChange,
-            appThemeMode = appThemeMode,
-            onAppThemeModeChange = onAppThemeModeChange,
-            showAppThemeModeDialog = showAppThemeModeDialog
+            playerBackgroundStyle = playerBackgroundStyle,
+            onPlayerBackgroundStyleChange = onPlayerBackgroundStyleChange,
+            showPlayerBackgroundStyleDialog = showPlayerBackgroundStyleDialog
         )
 
         Spacer(modifier = Modifier.height(120.dp))
@@ -282,9 +282,9 @@ fun LandscapeThemeLayout(
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
-    appThemeMode: AppThemeMode,
-    onAppThemeModeChange: (AppThemeMode) -> Unit,
-    showAppThemeModeDialog: () -> Unit
+    playerBackgroundStyle: PlayerBackgroundStyle,
+    onPlayerBackgroundStyleChange: (PlayerBackgroundStyle) -> Unit,
+    showPlayerBackgroundStyleDialog: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -327,9 +327,9 @@ fun LandscapeThemeLayout(
                 onPureBlackChange = onPureBlackChange,
                 selectedThemeColor = selectedThemeColor,
                 onSelectedThemeColorChange = onSelectedThemeColorChange,
-                appThemeMode = appThemeMode,
-                onAppThemeModeChange = onAppThemeModeChange,
-                showAppThemeModeDialog = showAppThemeModeDialog
+                playerBackgroundStyle = playerBackgroundStyle,
+                onPlayerBackgroundStyleChange = onPlayerBackgroundStyleChange,
+                showPlayerBackgroundStyleDialog = showPlayerBackgroundStyleDialog
             )
 
             Spacer(modifier = Modifier.height(80.dp))
@@ -345,9 +345,9 @@ fun ThemeControls(
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
-    appThemeMode: AppThemeMode,
-    onAppThemeModeChange: (AppThemeMode) -> Unit,
-    showAppThemeModeDialog: () -> Unit
+    playerBackgroundStyle: PlayerBackgroundStyle,
+    onPlayerBackgroundStyleChange: (PlayerBackgroundStyle) -> Unit,
+    showPlayerBackgroundStyleDialog: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -363,10 +363,10 @@ fun ThemeControls(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // App Theme Mode setting (for NavBar, NavRail and background)
+            // Background Style setting (for NavBar, NavRail and background)
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = stringResource(R.string.app_theme_mode),
+                    text = stringResource(R.string.player_background_style),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -376,13 +376,21 @@ fun ThemeControls(
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AppThemeMode.entries.forEach { mode ->
-                        AppThemeModeItem(
-                            appThemeMode = appThemeMode,
-                            targetMode = mode,
-                            onClick = { onAppThemeModeChange(mode) }
-                        )
-                    }
+                    ModeCircle(
+                        isSelected = playerBackgroundStyle == PlayerBackgroundStyle.DEFAULT,
+                        showIcon = true,
+                        onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.DEFAULT) }
+                    )
+                    ModeCircle(
+                        isSelected = playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT,
+                        showIcon = false,
+                        onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.GRADIENT) }
+                    )
+                    ModeCircle(
+                        isSelected = playerBackgroundStyle == PlayerBackgroundStyle.BLUR,
+                        showIcon = false,
+                        onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.BLUR) }
+                    )
                 }
             }
 
@@ -959,105 +967,4 @@ fun ThemeMockupPortrait(
         }
     }
 }
-@Composable
-fun AppThemeModeItem(
-    appThemeMode: AppThemeMode,
-    targetMode: AppThemeMode,
-    onClick: () -> Unit
-) {
-    val isSelected = appThemeMode == targetMode
-    
-    val modeColor = when (targetMode) {
-        AppThemeMode.FOLLOW_SYSTEM -> MaterialTheme.colorScheme.surface
-        AppThemeMode.USE_THEME_COLOR -> MaterialTheme.colorScheme.primary
-        AppThemeMode.PURE_BLACK -> Color.Black
-    }
-    
-    val borderWidth by animateDpAsState(
-        targetValue = if (isSelected) 3.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "borderWidth"
-    )
-    
-    val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.05f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "scale"
-    )
-    
-    val interactionSource = remember { MutableInteractionSource() }
-    
-    val contentDesc = when (targetMode) {
-        AppThemeMode.FOLLOW_SYSTEM -> stringResource(R.string.follow_theme)
-        AppThemeMode.USE_THEME_COLOR -> stringResource(R.string.use_theme_color)
-        AppThemeMode.PURE_BLACK -> stringResource(R.string.pure_black)
-    }
-    
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(CircleShape)
-            .background(modeColor)
-            .then(
-                if (borderWidth > 0.dp) {
-                    Modifier.border(
-                        width = borderWidth,
-                        color = MaterialTheme.colorScheme.inversePrimary,
-                        shape = CircleShape
-                    )
-                } else {
-                    Modifier.border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        shape = CircleShape
-                    )
-                }
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(),
-                onClick = onClick
-            )
-            .semantics {
-                contentDescription = contentDesc
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        when (targetMode) {
-            AppThemeMode.FOLLOW_SYSTEM -> {
-                Icon(
-                    painter = painterResource(R.drawable.sync),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            AppThemeMode.USE_THEME_COLOR -> {
-                Icon(
-                    painter = painterResource(R.drawable.palette),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            AppThemeMode.PURE_BLACK -> {
-                Icon(
-                    painter = painterResource(R.drawable.bedtime),
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
 }
