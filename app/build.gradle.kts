@@ -262,7 +262,6 @@ dependencies {
 
     implementation(libs.hilt)
     implementation(libs.jsoup)
-    implementation(libs.haze)
     ksp(libs.hilt.compiler)
 
     implementation(project(":innertube"))
