@@ -73,24 +73,10 @@ fun AppNavigationRail(
     val containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
-    val blurEnabled = isBlurEnabled()
-
-    // Apply Material 3 Expressive style blur background when enabled
-    val backgroundModifier = if (blurEnabled) {
-        Modifier
-            .background(Color.Transparent)
-            .blur(BackdropBlurRadius)
-            .background(
-                if (pureBlack) Color.Black.copy(alpha = 0.85f) 
-                else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f)
-            )
-    } else {
-        Modifier
-    }
 
     NavigationRail(
-        modifier = modifier.then(backgroundModifier),
-        containerColor = if (blurEnabled) Color.Transparent else containerColor
+        modifier = modifier,
+        containerColor = containerColor
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
@@ -168,24 +154,10 @@ fun AppNavigationBar(
     val contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
-    val blurEnabled = isBlurEnabled()
-
-    // Apply Material 3 Expressive style blur background when enabled
-    val backgroundModifier = if (blurEnabled) {
-        Modifier
-            .background(Color.Transparent)
-            .blur(BackdropBlurRadius)
-            .background(
-                if (pureBlack) Color.Black.copy(alpha = 0.85f) 
-                else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f)
-            )
-    } else {
-        Modifier
-    }
 
     NavigationBar(
-        modifier = modifier.then(backgroundModifier),
-        containerColor = if (blurEnabled) Color.Transparent else containerColor,
+        modifier = modifier,
+        containerColor = containerColor,
         contentColor = contentColor
     ) {
         navigationItems.forEach { screen ->
