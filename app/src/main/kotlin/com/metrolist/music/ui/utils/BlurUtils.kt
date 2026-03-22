@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -21,33 +20,34 @@ import com.metrolist.music.constants.EnableBlurEffectKey
 import com.metrolist.music.utils.rememberPreference
 
 /**
- * Default blur radius used throughout the app
+ * Default blur radius for backdrop blur effects (Material 3 Expressive)
  */
-val DefaultBlurRadius = 20.dp
+val BackdropBlurRadius = 20.dp
 
 /**
- * Light blur radius for subtle effects
+ * Subtle blur radius for light blur effects
  */
-val LightBlurRadius = 10.dp
+val SubtleBlurRadius = 10.dp
 
 /**
- * Heavy blur radius for strong blur effects
+ * Strong blur radius for prominent blur effects
  */
-val HeavyBlurRadius = 30.dp
+val ProminentBlurRadius = 30.dp
 
 /**
- * Check if blur effect is currently enabled in settings
- * Also checks Android version since native blur requires API 31+
+ * Check if backdrop blur effect is enabled in user preferences.
+ * Native blur requires Android 12+ (API 31+)
+ *
+ * @return true if blur is enabled and device supports it
  */
 @Composable
 fun isBlurEnabled(): Boolean {
     val (blurEnabled, _) = rememberPreference(EnableBlurEffectKey, defaultValue = true)
-    // Native blur is only available on Android 12+ (API 31+)
     return blurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 }
 
 /**
- * Composable that conditionally applies blur effect based on user preference.
+ * Apply backdrop blur effect to content based on user preference.
  * Uses native Android 12+ blur when available and enabled.
  *
  * @param enabled Whether to apply blur (independent of user setting)
@@ -56,9 +56,9 @@ fun isBlurEnabled(): Boolean {
  * @param content The content to potentially apply blur to
  */
 @Composable
-fun BlurredContent(
+fun BackdropBlurContent(
     enabled: Boolean = true,
-    radius: Dp = DefaultBlurRadius,
+    radius: Dp = BackdropBlurRadius,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -78,13 +78,13 @@ fun BlurredContent(
 }
 
 /**
- * Extension modifier to apply blur conditionally based on user settings.
- * Usage: Modifier.blurIfEnabled(radius = 20.dp)
+ * Extension modifier to apply backdrop blur conditionally based on user settings.
+ * Usage: Modifier.withBackdropBlur(radius = 20.dp)
  */
 @Composable
-fun Modifier.blurIfEnabled(
+fun Modifier.withBackdropBlur(
     enabled: Boolean = true,
-    radius: Dp = DefaultBlurRadius
+    radius: Dp = BackdropBlurRadius
 ): Modifier {
     val blurAvailable = isBlurEnabled()
     return if (blurAvailable && enabled) {
@@ -95,13 +95,17 @@ fun Modifier.blurIfEnabled(
 }
 
 /**
- * Background modifier that applies blur and optional overlay color.
- * Useful for creating glassmorphism backgrounds on overlays.
+ * Glass-like background modifier that applies blur and optional overlay color.
+ * Creates Material 3 Expressive glassmorphism effect on overlays.
+ *
+ * @param enabled Whether to apply the effect
+ * @param blurRadius The radius of the blur effect
+ * @param overlayColor The color overlay to apply over the blurred content
  */
 @Composable
-fun Modifier.glassBackground(
+fun Modifier.glassLikeBackground(
     enabled: Boolean = true,
-    blurRadius: Dp = DefaultBlurRadius,
+    blurRadius: Dp = BackdropBlurRadius,
     overlayColor: Color = Color.Black.copy(alpha = 0.45f)
 ): Modifier {
     val blurAvailable = isBlurEnabled()
