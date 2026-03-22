@@ -1005,29 +1005,6 @@ fun AppearanceSettings(
                         onClick = { navController.navigate("settings/appearance/theme") }
                     )
                 )
-                add(
-                    Material3SettingsItem(
-                        icon = painterResource(R.drawable.gradient),
-                        title = { Text(stringResource(R.string.enable_blur_effect)) },
-                        description = { Text(stringResource(R.string.enable_blur_effect_desc)) },
-                        trailingContent = {
-                            Switch(
-                                checked = blurEffectEnabled,
-                                onCheckedChange = onBlurEffectEnabledChange,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (blurEffectEnabled) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
-                            )
-                        },
-                        onClick = { onBlurEffectEnabledChange(!blurEffectEnabled) }
-                    )
-                )
             }
         )
 

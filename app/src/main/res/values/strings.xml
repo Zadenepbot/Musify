@@ -246,6 +246,7 @@
     <string name="dark_theme_off">Off</string>
     <string name="dark_theme_follow_system">Follow system</string>
     <string name="pure_black">Pure black</string>
+    <string name="blur_effect">Blur Effect</string>
     <string name="enable_blur_effect">Enable blur effect</string>
     <string name="enable_blur_effect_desc">Apply blur to backgrounds and overlays</string>
     <string name="customize_navigation_tabs">Customize navigation tabs</string>

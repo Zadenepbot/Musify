@@ -46,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -75,6 +76,7 @@ import com.materialkolor.rememberDynamicColorScheme
 import com.metrolist.music.R
 import com.metrolist.music.constants.DarkModeKey
 import com.metrolist.music.constants.DynamicThemeKey
+import com.metrolist.music.constants.EnableBlurEffectKey
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.constants.PureBlackMiniPlayerKey
 import com.metrolist.music.constants.SelectedThemeColorKey
@@ -132,6 +134,7 @@ fun ThemeScreen(
         DefaultThemeColor.toArgb()
     )
     val (_, onDynamicThemeChange) = rememberPreference(DynamicThemeKey, defaultValue = true)
+    val (blurEnabled, onBlurEnabledChange) = rememberPreference(EnableBlurEffectKey, defaultValue = true)
 
     val selectedThemeColor = Color(selectedThemeColorInt)
     val configuration = LocalConfiguration.current
@@ -154,7 +157,9 @@ fun ThemeScreen(
             pureBlack = pureBlack,
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
-            onSelectedThemeColorChange = handleColorSelection
+            onSelectedThemeColorChange = handleColorSelection,
+            blurEnabled = blurEnabled,
+            onBlurEnabledChange = onBlurEnabledChange
         )
     } else {
         PortraitThemeLayout(
@@ -164,7 +169,9 @@ fun ThemeScreen(
             pureBlack = pureBlack,
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
-            onSelectedThemeColorChange = handleColorSelection
+            onSelectedThemeColorChange = handleColorSelection,
+            blurEnabled = blurEnabled,
+            onBlurEnabledChange = onBlurEnabledChange
         )
     }
 
@@ -189,7 +196,9 @@ fun PortraitThemeLayout(
     pureBlack: Boolean,
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
-    onSelectedThemeColorChange: (Color) -> Unit
+    onSelectedThemeColorChange: (Color) -> Unit,
+    blurEnabled: Boolean,
+    onBlurEnabledChange: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -220,7 +229,9 @@ fun PortraitThemeLayout(
             pureBlack = pureBlack,
             onPureBlackChange = onPureBlackChange,
             selectedThemeColor = selectedThemeColor,
-            onSelectedThemeColorChange = onSelectedThemeColorChange
+            onSelectedThemeColorChange = onSelectedThemeColorChange,
+            blurEnabled = blurEnabled,
+            onBlurEnabledChange = onBlurEnabledChange
         )
 
         Spacer(modifier = Modifier.height(120.dp))
@@ -235,7 +246,9 @@ fun LandscapeThemeLayout(
     pureBlack: Boolean,
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
-    onSelectedThemeColorChange: (Color) -> Unit
+    onSelectedThemeColorChange: (Color) -> Unit,
+    blurEnabled: Boolean,
+    onBlurEnabledChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -277,7 +290,9 @@ fun LandscapeThemeLayout(
                 pureBlack = pureBlack,
                 onPureBlackChange = onPureBlackChange,
                 selectedThemeColor = selectedThemeColor,
-                onSelectedThemeColorChange = onSelectedThemeColorChange
+                onSelectedThemeColorChange = onSelectedThemeColorChange,
+                blurEnabled = blurEnabled,
+                onBlurEnabledChange = onBlurEnabledChange
             )
 
             Spacer(modifier = Modifier.height(80.dp))
@@ -292,7 +307,9 @@ fun ThemeControls(
     pureBlack: Boolean,
     onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
-    onSelectedThemeColorChange: (Color) -> Unit
+    onSelectedThemeColorChange: (Color) -> Unit,
+    blurEnabled: Boolean,
+    onBlurEnabledChange: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -407,6 +424,32 @@ fun ThemeControls(
                             }
                         )
                     }
+                }
+            }
+
+            // Blur effect toggle
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = stringResource(R.string.blur_effect),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.enable_blur_effect),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Switch(
+                        checked = blurEnabled,
+                        onCheckedChange = onBlurEnabledChange
+                    )
                 }
             }
         }
