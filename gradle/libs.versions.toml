@@ -35,7 +35,8 @@ kuromojiIpadic = "0.9.0"
 newpipeextractor = "v0.26.0"
 tinypinyin = "2.0.3"
 protobuf = "4.34.0"
-haze = "0.7.0"
+haze = "1.7.2"
+
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
@@ -116,7 +117,7 @@ tinypinyin = { module = "com.github.promeG:tinypinyin", version.ref = "tinypinyi
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
 protobuf-kotlin-lite = { module = "com.google.protobuf:protobuf-kotlin-lite", version.ref = "protobuf" }
 
-haze = { module = "dev.chrisbanes.haze:haze-jetpack-compose", version.ref = "haze" }
+haze = { module = "dev.chrisbanes.haze:haze-android", version.ref = "haze" }
 
 [plugins]
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
