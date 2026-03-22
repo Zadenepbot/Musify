@@ -376,19 +376,25 @@ fun ThemeControls(
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ModeCircle(
+                    BackgroundStyleCircle(
                         isSelected = playerBackgroundStyle == PlayerBackgroundStyle.DEFAULT,
                         showIcon = true,
+                        styleColor = MaterialTheme.colorScheme.surface,
+                        iconRes = R.drawable.sync,
                         onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.DEFAULT) }
                     )
-                    ModeCircle(
+                    BackgroundStyleCircle(
                         isSelected = playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT,
                         showIcon = false,
+                        styleColor = MaterialTheme.colorScheme.primary,
+                        iconRes = R.drawable.gradient,
                         onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.GRADIENT) }
                     )
-                    ModeCircle(
+                    BackgroundStyleCircle(
                         isSelected = playerBackgroundStyle == PlayerBackgroundStyle.BLUR,
                         showIcon = false,
+                        styleColor = Color.Black.copy(alpha = 0.5f),
+                        iconRes = R.drawable.bedtime,
                         onClick = { onPlayerBackgroundStyleChange(PlayerBackgroundStyle.BLUR) }
                     )
                 }
@@ -626,6 +632,83 @@ fun ModeCircle(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BackgroundStyleCircle(
+    isSelected: Boolean,
+    showIcon: Boolean,
+    styleColor: Color,
+    iconRes: Int,
+    onClick: () -> Unit
+) {
+    val borderWidth by animateDpAsState(
+        targetValue = if (isSelected) 3.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "borderWidth"
+    )
+    
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scale"
+    )
+    
+    val interactionSource = remember { MutableInteractionSource() }
+    
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CircleShape)
+            .background(styleColor)
+            .then(
+                if (borderWidth > 0.dp) {
+                    Modifier.border(
+                        width = borderWidth,
+                        color = MaterialTheme.colorScheme.inversePrimary,
+                        shape = CircleShape
+                    )
+                } else {
+                    Modifier.border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = CircleShape
+                    )
+                }
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (showIcon) {
+            Icon(
+                painter = painterResource(R.drawable.sync),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
+        } else {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -966,5 +1049,4 @@ fun ThemeMockupPortrait(
             }
         }
     }
-}
 }
