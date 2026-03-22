@@ -242,6 +242,7 @@ private fun NewMiniPlayer(
         }
 
     LaunchedEffect(mediaMetadata?.id, miniPlayerBackground) {
+        gradientColors = emptyList()
         if (miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT) {
             val url = mediaMetadata?.thumbnailUrl
             if (url != null) {
@@ -267,10 +268,12 @@ private fun NewMiniPlayer(
                         withContext(Dispatchers.Main) {
                             gradientColors = extracted
                         }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            gradientColors = emptyList()
+                        }
                     }
                 }
-            } else {
-                gradientColors = emptyList()
             }
         } else {
             gradientColors = emptyList()
@@ -281,8 +284,8 @@ private fun NewMiniPlayer(
     val backgroundColor = when (miniPlayerBackground) {
         MiniPlayerBackgroundStyle.DEFAULT    -> MaterialTheme.colorScheme.surfaceContainer
         MiniPlayerBackgroundStyle.TRANSPARENT -> Color.Black.copy(alpha = 0.25f)
-        MiniPlayerBackgroundStyle.BLUR       -> Color.Transparent
-        MiniPlayerBackgroundStyle.GRADIENT   -> Color.Transparent
+        MiniPlayerBackgroundStyle.BLUR       -> MaterialTheme.colorScheme.surfaceContainer
+        MiniPlayerBackgroundStyle.GRADIENT   -> MaterialTheme.colorScheme.surfaceContainer
         MiniPlayerBackgroundStyle.PURE_BLACK -> Color.Black
     }
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -1069,6 +1072,7 @@ private fun AddToPlaylistButton(
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val contentDescription = stringResource(R.string.add_to_playlist_desc)
 
     Box(
         contentAlignment = Alignment.Center,
@@ -1088,7 +1092,7 @@ private fun AddToPlaylistButton(
     ) {
         Icon(
             painter = painterResource(R.drawable.add),
-            contentDescription = null,
+            contentDescription = contentDescription,
             tint = onSurfaceColor.copy(alpha = 0.7f),
             modifier = Modifier.size(20.dp),
         )
