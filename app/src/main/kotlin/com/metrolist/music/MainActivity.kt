@@ -144,6 +144,8 @@ import com.metrolist.music.constants.PauseSearchHistoryKey
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.constants.SYSTEM_DEFAULT
 import com.metrolist.music.constants.SelectedThemeColorKey
+import com.metrolist.music.constants.AppThemeModeKey
+import com.metrolist.music.constants.AppThemeMode
 import com.metrolist.music.constants.SlimNavBarHeight
 import com.metrolist.music.constants.SlimNavBarKey
 import com.metrolist.music.constants.StopMusicOnTaskClearKey
@@ -517,6 +519,9 @@ class MainActivity : ComponentActivity() {
         val (selectedThemeColorInt) = rememberPreference(SelectedThemeColorKey, defaultValue = DefaultThemeColor.toArgb())
         val selectedThemeColor = Color(selectedThemeColorInt)
 
+        // App theme mode for NavBar, NavRail and background
+        val (appThemeMode) = rememberEnumPreference(AppThemeModeKey, defaultValue = AppThemeMode.FOLLOW_SYSTEM)
+
         val showChangelog = rememberSaveable { mutableStateOf(false) }
 
         var themeColor by rememberSaveable(stateSaver = ColorSaver) {
@@ -573,7 +578,13 @@ class MainActivity : ComponentActivity() {
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface),
+                        .background(
+                            when (appThemeMode) {
+                                AppThemeMode.FOLLOW_SYSTEM -> if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
+                                AppThemeMode.USE_THEME_COLOR -> themeColor
+                                AppThemeMode.PURE_BLACK -> Color.Black
+                            }
+                        ),
             ) {
                 val focusManager = LocalFocusManager.current
                 val density = LocalDensity.current
@@ -869,6 +880,13 @@ class MainActivity : ComponentActivity() {
 
                 val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
 
+                // Compute override background based on appThemeMode for NavBar, NavRail and background
+                val overrideBg = when (appThemeMode) {
+                    AppThemeMode.FOLLOW_SYSTEM -> baseBg
+                    AppThemeMode.USE_THEME_COLOR -> themeColor
+                    AppThemeMode.PURE_BLACK -> Color.Black
+                }
+
                 CompositionLocalProvider(
                     LocalDatabase provides database,
                     LocalContentColor provides if (pureBlack) Color.White else contentColorFor(MaterialTheme.colorScheme.surface),
@@ -951,8 +969,8 @@ class MainActivity : ComponentActivity() {
                                         scrollBehavior = topAppBarScrollBehavior,
                                         colors =
                                             TopAppBarDefaults.topAppBarColors(
-                                                containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                                scrolledContainerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                                containerColor = if (appThemeMode != AppThemeMode.FOLLOW_SYSTEM) overrideBg else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                                scrolledContainerColor = if (appThemeMode != AppThemeMode.FOLLOW_SYSTEM) overrideBg else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                                                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                                                 actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1022,6 +1040,7 @@ class MainActivity : ComponentActivity() {
                                         pureBlack = pureBlack,
                                         slimNav = slimNav,
                                         onSearchLongClick = onSearchLongClick,
+                                        overrideBackgroundColor = if (appThemeMode != AppThemeMode.FOLLOW_SYSTEM) overrideBg else null,
                                         modifier =
                                             Modifier
                                                 .align(Alignment.BottomCenter)
@@ -1136,6 +1155,7 @@ class MainActivity : ComponentActivity() {
                                     onItemClick = onRailItemClick,
                                     pureBlack = pureBlack,
                                     onSearchLongClick = onRailSearchLongClick,
+                                    overrideBackgroundColor = if (appThemeMode != AppThemeMode.FOLLOW_SYSTEM) overrideBg else null,
                                 )
                             }
                             Box(Modifier.weight(1f)) {

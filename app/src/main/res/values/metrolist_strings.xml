@@ -91,6 +91,8 @@
     <string name="player_background_solid">Solid</string>
     <string name="follow_theme">Follow theme</string>
     <string name="gradient">Gradient</string>
+    <string name="app_theme_mode">App theme mode</string>
+    <string name="use_theme_color">Use theme color</string>
     <string name="new_player_design">New player design</string>
     <string name="new_mini_player_design">New mini player design</string>
     <string name="player_background_blur">Blur</string>

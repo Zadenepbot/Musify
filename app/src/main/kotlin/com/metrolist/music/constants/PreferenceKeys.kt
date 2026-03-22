@@ -31,6 +31,14 @@ enum class MiniPlayerBackgroundStyle {
     PURE_BLACK,
 }
 
+enum class AppThemeMode {
+    FOLLOW_SYSTEM,
+    USE_THEME_COLOR,
+    PURE_BLACK,
+}
+
+val AppThemeModeKey = stringPreferencesKey("appThemeMode")
+
 val DensityScaleKey = floatPreferencesKey("density_scale_factor")
 val CustomDensityScaleKey = floatPreferencesKey("custom_density_scale_value")
 
