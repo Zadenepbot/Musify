@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -34,6 +35,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.metrolist.music.ui.screens.Screens
+import com.metrolist.music.ui.utils.BackdropBlurRadius
 import com.metrolist.music.ui.utils.isBlurEnabled
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -70,10 +72,23 @@ fun AppNavigationRail(
     val containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
+    val blurEnabled = isBlurEnabled()
+
+    // Apply blur background when enabled
+    val backgroundModifier = if (blurEnabled) {
+        Modifier
+            .background(Color.Transparent)
+            .blur(BackdropBlurRadius)
+            .background(
+                if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f)
+            )
+    } else {
+        Modifier
+    }
 
     NavigationRail(
-        modifier = modifier,
-        containerColor = containerColor
+        modifier = modifier.then(backgroundModifier),
+        containerColor = if (blurEnabled) Color.Transparent else containerColor
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
@@ -153,27 +168,23 @@ fun AppNavigationBar(
     val viewConfiguration = LocalViewConfiguration.current
     val blurEnabled = isBlurEnabled()
 
+    // Apply blur background when enabled
+    val backgroundModifier = if (blurEnabled) {
+        Modifier
+            .background(Color.Transparent)
+            .blur(BackdropBlurRadius)
+            .background(
+                if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f)
+            )
+    } else {
+        Modifier
+    }
+
     NavigationBar(
-        modifier = modifier.then(
-            if (blurEnabled) {
-                Modifier.background(Color.Transparent)
-            } else {
-                Modifier
-            }
-        ),
+        modifier = modifier.then(backgroundModifier),
         containerColor = if (blurEnabled) Color.Transparent else containerColor,
         contentColor = contentColor
     ) {
-        // Apply blur background when enabled
-        if (blurEnabled) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f)
-                    )
-            )
-        }
         navigationItems.forEach { screen ->
             val isSelected = remember(currentRoute, screen.route) {
                 isRouteSelected(currentRoute, screen.route, navigationItems)
