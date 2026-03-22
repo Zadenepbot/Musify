@@ -5,9 +5,13 @@
 
 package com.metrolist.music.ui.component
 
+import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -21,13 +25,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.metrolist.music.ui.screens.Screens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -54,16 +63,50 @@ fun AppNavigationRail(
     modifier: Modifier = Modifier,
     pureBlack: Boolean = false,
     onSearchLongClick: (() -> Unit)? = null,
-    overrideBackgroundColor: Color? = null
+    overrideBackgroundColor: Color? = null,
+    useBlurBackground: Boolean = false,
+    useGradientBackground: Boolean = false,
+    gradientColors: List<Color> = emptyList(),
+    thumbnailUrl: String? = null
 ) {
     val containerColor = overrideBackgroundColor ?: if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
     
-    NavigationRail(
-        modifier = modifier,
-        containerColor = containerColor
-    ) {
+    Box(modifier = modifier) {
+        // Blur background effect (Material 3 Expressive)
+        if (useBlurBackground && thumbnailUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(60.dp)
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
+        
+        // Gradient background effect
+        if (useGradientBackground && gradientColors.isNotEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(gradientColors)
+                    )
+                    .background(Color.Black.copy(alpha = 0.15f))
+            )
+        }
+        
+        NavigationRail(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent
+        ) {
         Spacer(modifier = Modifier.weight(1f))
         
         navigationItems.forEach { screen ->
@@ -134,19 +177,53 @@ fun AppNavigationBar(
     pureBlack: Boolean = false,
     slimNav: Boolean = false,
     onSearchLongClick: (() -> Unit)? = null,
-    overrideBackgroundColor: Color? = null
+    overrideBackgroundColor: Color? = null,
+    useBlurBackground: Boolean = false,
+    useGradientBackground: Boolean = false,
+    gradientColors: List<Color> = emptyList(),
+    thumbnailUrl: String? = null
 ) {
     val containerColor = overrideBackgroundColor ?: if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
+
+    Box(modifier = modifier) {
+        // Blur background effect (Material 3 Expressive)
+        if (useBlurBackground && thumbnailUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(60.dp)
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
+        
+        // Gradient background effect
+        if (useGradientBackground && gradientColors.isNotEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(gradientColors)
+                    )
+                    .background(Color.Black.copy(alpha = 0.15f))
+            )
+        }
     
-    NavigationBar(
-        modifier = modifier,
-        containerColor = containerColor,
-        contentColor = contentColor
-    ) {
-        navigationItems.forEach { screen ->
+        NavigationBar(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentColor = contentColor
+        ) {
+            navigationItems.forEach { screen ->
             val isSelected = remember(currentRoute, screen.route) {
                 isRouteSelected(currentRoute, screen.route, navigationItems)
             }

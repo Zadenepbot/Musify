@@ -114,6 +114,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.CachePolicy
@@ -179,7 +182,9 @@ import com.metrolist.music.ui.screens.settings.NavigationTab
 import com.metrolist.music.ui.theme.ColorSaver
 import com.metrolist.music.ui.theme.DefaultThemeColor
 import com.metrolist.music.ui.theme.MetrolistTheme
+import com.metrolist.music.ui.theme.PlayerColorExtractor
 import com.metrolist.music.ui.theme.extractThemeColor
+import androidx.palette.graphics.Palette
 import com.metrolist.music.ui.utils.appBarScrollBehavior
 import com.metrolist.music.ui.utils.resetHeightOffset
 import com.metrolist.music.utils.SyncUtils
@@ -522,6 +527,55 @@ class MainActivity : ComponentActivity() {
         // Player background style for NavBar, NavRail and background
         val (playerBackgroundStyle) = rememberEnumPreference(PlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.DEFAULT)
 
+        // Gradient colors for background (like MiniPlayer)
+        var gradientColors by remember { mutableStateOf(listOf<Color>()) }
+
+        LaunchedEffect(playerConnection, playerBackgroundStyle) {
+            if (playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT) {
+                val connection = playerConnection
+                if (connection != null) {
+                    connection.service.currentMediaMetadata.collectLatest { song ->
+                        if (song?.thumbnailUrl != null) {
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    val request = ImageRequest.Builder(this@MainActivity)
+                                        .data(song.thumbnailUrl)
+                                        .size(100, 100)
+                                        .allowHardware(false)
+                                        .build()
+                                    val result = imageLoader.execute(request)
+                                    val bitmap = result.image?.toBitmap()
+                                    if (bitmap != null) {
+                                        val palette = withContext(Dispatchers.Default) {
+                                            Palette.from(bitmap)
+                                                .maximumColorCount(8)
+                                                .resizeBitmapArea(100 * 100)
+                                                .generate()
+                                        }
+                                        val extracted = PlayerColorExtractor.extractGradientColors(
+                                            palette = palette,
+                                            fallbackColor = 0xFF000000.toInt(),
+                                        )
+                                        withContext(Dispatchers.Main) {
+                                            gradientColors = extracted
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                                }
+                            }
+                        } else {
+                            gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                } else {
+                    gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                }
+            } else {
+                gradientColors = listOf()
+            }
+        }
+
         val showChangelog = rememberSaveable { mutableStateOf(false) }
 
         var themeColor by rememberSaveable(stateSaver = ColorSaver) {
@@ -581,11 +635,43 @@ class MainActivity : ComponentActivity() {
                         .background(
                             when (playerBackgroundStyle) {
                                 PlayerBackgroundStyle.DEFAULT -> if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
-                                PlayerBackgroundStyle.GRADIENT -> themeColor
+                                PlayerBackgroundStyle.GRADIENT -> Color.Transparent
                                 PlayerBackgroundStyle.BLUR -> Color.Transparent
                             }
                         ),
             ) {
+                // Gradient background effect
+                if (playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT && gradientColors.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.horizontalGradient(gradientColors)
+                            )
+                            .background(Color.Black.copy(alpha = 0.15f))
+                    )
+                }
+                
+                // Blur background effect
+                if (playerBackgroundStyle == PlayerBackgroundStyle.BLUR && playerConnection != null) {
+                    val thumbnailUrl = playerConnection?.service?.currentMediaMetadata?.value?.thumbnailUrl
+                    if (thumbnailUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        AsyncImage(
+                            model = thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .blur(60.dp)
+                        )
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.45f))
+                        )
+                    }
+                }
+
                 val focusManager = LocalFocusManager.current
                 val density = LocalDensity.current
                 val configuration = LocalWindowInfo.current
@@ -883,7 +969,7 @@ class MainActivity : ComponentActivity() {
                 // Compute override background based on playerBackgroundStyle for NavBar, NavRail and background
                 val overrideBg = when (playerBackgroundStyle) {
                     PlayerBackgroundStyle.DEFAULT -> baseBg
-                    PlayerBackgroundStyle.GRADIENT -> themeColor
+                    PlayerBackgroundStyle.GRADIENT -> if (gradientColors.isNotEmpty()) gradientColors.first() else themeColor
                     PlayerBackgroundStyle.BLUR -> Color.Transparent
                 }
 
@@ -910,7 +996,40 @@ class MainActivity : ComponentActivity() {
                                 enter = fadeIn(animationSpec = tween(durationMillis = 300)),
                                 exit = fadeOut(animationSpec = tween(durationMillis = 200)),
                             ) {
-                                Row {
+                                Box {
+                                    // Blur background effect for TopAppBar
+                                    if (playerBackgroundStyle == PlayerBackgroundStyle.BLUR && playerConnection?.service?.currentMediaMetadata?.value?.thumbnailUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        val thumbnailUrl = playerConnection?.service?.currentMediaMetadata?.value?.thumbnailUrl
+                                        if (thumbnailUrl != null) {
+                                            AsyncImage(
+                                                model = thumbnailUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .blur(60.dp)
+                                            )
+                                            Box(
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color.Black.copy(alpha = 0.45f))
+                                            )
+                                        }
+                                    }
+                                    
+                                    // Gradient background effect for TopAppBar
+                                    if (playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT && gradientColors.isNotEmpty()) {
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.horizontalGradient(gradientColors)
+                                                )
+                                                .background(Color.Black.copy(alpha = 0.15f))
+                                        )
+                                    }
+                                    
+                                    Row {
                                     TopAppBar(
                                         title = {
                                             Text(
@@ -969,8 +1088,8 @@ class MainActivity : ComponentActivity() {
                                         scrollBehavior = topAppBarScrollBehavior,
                                         colors =
                                             TopAppBarDefaults.topAppBarColors(
-                                                containerColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) overrideBg else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                                scrolledContainerColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) overrideBg else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                                containerColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) Color.Transparent else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                                scrolledContainerColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) Color.Transparent else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                                                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                                                 actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1040,7 +1159,10 @@ class MainActivity : ComponentActivity() {
                                         pureBlack = pureBlack,
                                         slimNav = slimNav,
                                         onSearchLongClick = onSearchLongClick,
-                                        overrideBackgroundColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) overrideBg else null,
+                                        useBlurBackground = playerBackgroundStyle == PlayerBackgroundStyle.BLUR,
+                                        useGradientBackground = playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT,
+                                        gradientColors = gradientColors,
+                                        thumbnailUrl = playerConnection?.service?.currentMediaMetadata?.value?.thumbnailUrl,
                                         modifier =
                                             Modifier
                                                 .align(Alignment.BottomCenter)
@@ -1155,7 +1277,10 @@ class MainActivity : ComponentActivity() {
                                     onItemClick = onRailItemClick,
                                     pureBlack = pureBlack,
                                     onSearchLongClick = onRailSearchLongClick,
-                                    overrideBackgroundColor = if (playerBackgroundStyle != PlayerBackgroundStyle.DEFAULT) overrideBg else null,
+                                    useBlurBackground = playerBackgroundStyle == PlayerBackgroundStyle.BLUR,
+                                    useGradientBackground = playerBackgroundStyle == PlayerBackgroundStyle.GRADIENT,
+                                    gradientColors = gradientColors,
+                                    thumbnailUrl = playerConnection?.service?.currentMediaMetadata?.value?.thumbnailUrl,
                                 )
                             }
                             Box(Modifier.weight(1f)) {
