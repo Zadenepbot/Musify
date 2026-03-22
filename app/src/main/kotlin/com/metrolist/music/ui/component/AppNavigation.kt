@@ -33,13 +33,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.chrisbanes.haze.HazeEffect
-import com.chrisbanes.haze.HazeState
-import com.chrisbanes.haze.haze
 import com.metrolist.music.ui.screens.Screens
-import com.metrolist.music.ui.utils.isBlurEnabled
-import com.metrolist.music.ui.utils.rememberBlurState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -75,26 +69,10 @@ fun AppNavigationRail(
     val containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
-    val blurEnabled = isBlurEnabled()
-    val hazeState = rememberBlurState()
-
-    // Apply Haze blur background when enabled
-    val backgroundModifier = if (blurEnabled) {
-        Modifier.haze(
-            state = hazeState,
-            effect = HazeEffect(
-                intensity = 0.6f,
-                blurRadius = 20.dp,
-                tint = if (pureBlack) Color.Black.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-            )
-        )
-    } else {
-        Modifier
-    }
 
     NavigationRail(
-        modifier = modifier.then(backgroundModifier),
-        containerColor = if (blurEnabled) Color.Transparent else containerColor
+        modifier = modifier,
+        containerColor = containerColor
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
@@ -172,26 +150,10 @@ fun AppNavigationBar(
     val contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
-    val blurEnabled = isBlurEnabled()
-    val hazeState = rememberBlurState()
-
-    // Apply Haze blur background when enabled
-    val backgroundModifier = if (blurEnabled) {
-        Modifier.haze(
-            state = hazeState,
-            effect = HazeEffect(
-                intensity = 0.6f,
-                blurRadius = 20.dp,
-                tint = if (pureBlack) Color.Black.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-            )
-        )
-    } else {
-        Modifier
-    }
 
     NavigationBar(
-        modifier = modifier.then(backgroundModifier),
-        containerColor = if (blurEnabled) Color.Transparent else containerColor,
+        modifier = modifier,
+        containerColor = containerColor,
         contentColor = contentColor
     ) {
         navigationItems.forEach { screen ->
