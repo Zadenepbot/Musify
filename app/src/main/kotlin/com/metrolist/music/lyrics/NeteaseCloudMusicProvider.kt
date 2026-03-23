@@ -4,6 +4,7 @@ import android.content.Context
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
 import com.metrolist.music.utils.dataStore
 import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 object NeteaseCloudMusicProvider : LyricsProvider {
