@@ -15,9 +15,12 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.math.abs
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -41,8 +44,6 @@ private val client = HttpClient {
  * Netease Cloud Music Lyrics Provider (Direct API)
  * Uses eapi encryption to call Netease Cloud Music API directly
  * No separate backend service required
- *
- * Based on NeteaseCloudMusicApiEnhanced eapi implementation
  */
 object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     override val name = "NeteaseCloudMusic"
@@ -106,7 +107,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
 
         return try {
-            val response = eapiRequest<NeteaseSearchResponse>(
+            val json = eapiRequest(
                 path = "/api/cloudsearch/pc",
                 data = mapOf(
                     "s" to searchQuery,
@@ -116,12 +117,28 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                 )
             )
 
-            if (response.code == 200 && response.result.songs.isNotEmpty()) {
-                val bestMatch = response.result.songs
+            val code = json.jsonObject["code"]?.jsonPrimitive?.intOrNull ?: 0
+            if (code == 200) {
+                val result = json.jsonObject["result"]?.jsonObject ?: return null
+                val songs = result["songs"]?.jsonArray ?: return null
+
+                val songList = songs.mapNotNull { songObj ->
+                    val song = songObj.jsonObject
+                    val id = song["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                    val name = song["name"]?.jsonPrimitive?.content ?: ""
+                    val artists = song["artists"]?.jsonArray?.map { it.jsonObject["name"]?.jsonPrimitive?.content ?: "" } ?: emptyList()
+                    val album = song["album"]?.jsonObject
+                    val albumName = album?.get("name")?.jsonPrimitive?.content
+                    val durationMs = song["duration"]?.jsonPrimitive?.intOrNull ?: 0
+
+                    NeteaseSong(id, name, artists, albumName, durationMs)
+                }
+
+                val bestMatch = songList
                     .filter { abs(it.duration - duration) <= DURATION_TOLERANCE }
                     .minByOrNull { abs(it.duration - duration) }
 
-                bestMatch ?: response.result.songs.first()
+                bestMatch?.id ?: songList.firstOrNull()?.id
             } else {
                 null
             }
@@ -131,7 +148,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     }
 
     private suspend fun fetchLyrics(songId: String): String {
-        val response = eapiRequest<NeteaseLyricResponse>(
+        val json = eapiRequest(
             path = "/api/song/lyric/v1",
             data = mapOf(
                 "id" to songId,
@@ -146,15 +163,20 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
             )
         )
 
-        return when (response.body.code) {
-            200 -> {
-                response.body.lyric ?: throw IllegalStateException("No lyric content")
-            }
-            else -> throw IllegalStateException("Failed to fetch lyrics: code ${response.body.code}")
+        val jsonObj = json.jsonObject
+        val status = jsonObj["status"]?.jsonPrimitive?.intOrNull ?: 0
+        val body = jsonObj["body"]?.jsonObject ?: throw IllegalStateException("No body in response")
+
+        val code = body["code"]?.jsonPrimitive?.intOrNull ?: 0
+        if (code == 200) {
+            return body["lyric"]?.jsonPrimitive?.content
+                ?: throw IllegalStateException("No lyric content")
+        } else {
+            throw IllegalStateException("Failed to fetch lyrics: code $code")
         }
     }
 
-    private suspend inline fun <reified T> eapiRequest(path: String, data: Map<String, Any>): EapiResponse<T> {
+    private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
         val url = "$apiBaseUrl/eapi$path"
 
         // Build eapi encrypted params
@@ -164,19 +186,14 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
 
-        // Send request as raw body (application/x-www-form-urlencoded)
+        // Send request as raw body
         val response = client.post(url) {
             userAgent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.0.18.203152")
             setBody(encryptedParams)
         }
 
         val responseBody = response.body<String>()
-        return try {
-            val baseResponse = Json.decodeFromString<NetBaseResponse<T>>(responseBody)
-            EapiResponse(baseResponse.code, baseResponse.body)
-        } catch (e: Exception) {
-            throw IllegalStateException("Failed to parse response: ${e.message}")
-        }
+        return Json.parseToJsonElement(responseBody)
     }
 
     private companion object {
@@ -209,62 +226,11 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     }
 }
 
-// Response wrappers
-private data class EapiResponse<T>(
-    val code: Int,
-    val body: T,
-)
-
-private data class NetBaseResponse<T>(
-    val code: Int,
-    val body: T,
-)
-
-@Serializable
-private data class NeteaseSearchResponse(
-    val code: Int,
-    val result: NeteaseSearchResult,
-)
-
-@Serializable
-private data class NeteaseSearchResult(
-    val songs: List<NeteaseSong>,
-)
-
-@Serializable
+// Data class for song parsing
 private data class NeteaseSong(
     val id: String,
     val name: String,
-    val artists: List<NeteaseArtist>,
-    val album: NeteaseAlbum?,
-    @SerialName("duration")
-    val durationMs: Int,
-) {
-    val duration: Int get() = durationMs
-}
-
-@Serializable
-private data class NeteaseArtist(
-    val name: String,
-)
-
-@Serializable
-private data class NeteaseAlbum(
-    val name: String?,
-)
-
-@Serializable
-private data class NeteaseLyricResponse(
-    val status: Int,
-    val body: NeteaseLyricBody,
-)
-
-@Serializable
-private data class NeteaseLyricBody(
-    val code: Int,
-    val lyric: String?,
-    @SerialName("klyric")
-    val kLyric: String? = null,
-    @SerialName("tlyric")
-    val tLyric: String? = null,
+    val artists: List<String>,
+    val album: String?,
+    val duration: Int,
 )
