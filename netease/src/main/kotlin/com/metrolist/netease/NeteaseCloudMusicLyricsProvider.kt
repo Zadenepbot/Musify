@@ -1,10 +1,6 @@
 package com.metrolist.netease
 
-import android.content.Context
-import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
 import com.metrolist.music.lyrics.LyricsProvider
-import com.metrolist.music.utils.dataStore
-import com.metrolist.music.utils.dataStore
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -12,6 +8,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -21,9 +18,12 @@ import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
 object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     override val name = "NeteaseCloudMusic"
+
+    // isEnabled 由 wrapper 控制，这里总是返回 true
+    override fun isEnabled(context: android.content.Context): Boolean = true
 
     private const val OFFICIAL_API_BASE_URL = "https://interface.music.163.com"
     private const val EAPI_KEY = "e82ckenh8dichen8"
@@ -41,11 +41,6 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
             }
             json(json)
         }
-    }
-
-    override fun isEnabled(context: Context): Boolean {
-        val settings = runBlocking { context.dataStore.data.first() }
-        return settings[EnableNeteaseCloudMusicKey] ?: true
     }
 
     override suspend fun getLyrics(
