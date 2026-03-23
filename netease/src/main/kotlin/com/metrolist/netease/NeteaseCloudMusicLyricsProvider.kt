@@ -1,6 +1,5 @@
 package com.metrolist.netease
 
-import com.metrolist.music.lyrics.LyricsProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -19,11 +18,9 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 @OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
-object NeteaseCloudMusicLyricsProvider : LyricsProvider {
-    override val name = "NeteaseCloudMusic"
-
-    // isEnabled 由 wrapper 控制，这里总是返回 true
-    override fun isEnabled(context: android.content.Context): Boolean = true
+object NeteaseCloudMusicLyricsProvider {
+    // 提供获取歌词的功能，不实现 LyricsProvider 接口
+    // 由 app 模块的 wrapper 负责接口适配
 
     private const val OFFICIAL_API_BASE_URL = "https://interface.music.163.com"
     private const val EAPI_KEY = "e82ckenh8dichen8"
@@ -43,7 +40,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
     }
 
-    override suspend fun getLyrics(
+    suspend fun getLyrics(
         id: String,
         title: String,
         artist: String,
@@ -61,7 +58,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
     }
 
-    override suspend fun getAllLyrics(
+    suspend fun getAllLyrics(
         id: String,
         title: String,
         artist: String,
@@ -81,6 +78,11 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                     }
                 }
                 callback(combined)
+            }
+        } catch (e: Exception) {
+            // Ignore and continue
+        }
+    }
             }
         } catch (e: Exception) {
             // Ignore and continue
