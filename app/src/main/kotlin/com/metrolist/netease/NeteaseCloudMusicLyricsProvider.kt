@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -51,6 +52,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     private const val DEFAULT_API_BASE_URL = "https://interface.music.163.com"
     private const val EAPI_KEY = "e82ckenh8dichen8"
     private const val EAPI_MAGIC = "36cd479b6b5"
+    private const val DURATION_TOLERANCE = 8000
 
     private var initialized = false
     private lateinit var apiBaseUrl: String
@@ -117,9 +119,10 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                 )
             )
 
-            val code = json.jsonObject["code"]?.jsonPrimitive?.intOrNull ?: 0
+            val jsonObj = json.jsonObject
+            val code = jsonObj["code"]?.jsonPrimitive?.intOrNull ?: 0
             if (code == 200) {
-                val result = json.jsonObject["result"]?.jsonObject ?: return null
+                val result = jsonObj["result"]?.jsonObject ?: return null
                 val songs = result["songs"]?.jsonArray ?: return null
 
                 val songList = songs.mapNotNull { songObj ->
@@ -196,33 +199,29 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         return Json.parseToJsonElement(responseBody)
     }
 
-    private companion object {
-        const val DURATION_TOLERANCE = 8000 // 8 seconds
+    private fun aesEncrypt(input: String, key: String): String {
+        val secretKey = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "AES")
+        val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        val encrypted = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
+        return bytesToHex(encrypted)
+    }
 
-        fun aesEncrypt(input: String, key: String): String {
-            val secretKey = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "AES")
-            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            val encrypted = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
-            return bytesToHex(encrypted)
-        }
+    private fun md5(input: String): String {
+        val md = MessageDigest.getInstance("MD5")
+        val digest = md.digest(input.toByteArray(Charsets.UTF_8))
+        return bytesToHex(digest)
+    }
 
-        fun md5(input: String): String {
-            val md = MessageDigest.getInstance("MD5")
-            val digest = md.digest(input.toByteArray(Charsets.UTF_8))
-            return bytesToHex(digest)
+    private fun bytesToHex(bytes: ByteArray): String {
+        val hexArray = "0123456789abcdef".toCharArray()
+        val hexChars = CharArray(bytes.size * 2)
+        for (j in bytes.indices) {
+            val v = bytes[j].toInt() and 0xFF
+            hexChars[j * 2] = hexArray[v ushr 4]
+            hexChars[j * 2 + 1] = hexArray[v and 0x0F]
         }
-
-        fun bytesToHex(bytes: ByteArray): String {
-            val hexArray = "0123456789abcdef".toCharArray()
-            val hexChars = CharArray(bytes.size * 2)
-            for (j in bytes.indices) {
-                val v = bytes[j].toInt() and 0xFF
-                hexChars[j * 2] = hexArray[v ushr 4]
-                hexChars[j * 2 + 1] = hexArray[v and 0x0F]
-            }
-            return String(hexChars)
-        }
+        return String(hexChars)
     }
 }
 
