@@ -62,7 +62,6 @@ import com.metrolist.music.constants.EnableBetterLyricsKey
 import com.metrolist.music.constants.EnableKugouKey
 import com.metrolist.music.constants.EnableLrcLibKey
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
-import com.metrolist.music.constants.NeteaseCloudMusicApiUrlKey
 import com.metrolist.music.constants.EnableSimpMusicKey
 import com.metrolist.music.constants.EnableLyricsPlus
 import com.metrolist.music.constants.HideExplicitKey
@@ -124,7 +123,6 @@ fun ContentSettings(
     val (enableSimpMusic, onEnableSimpMusicChange) = rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
     val (enableLyricsPlus, onEnableLyricsPlusChange) = rememberPreference(key = EnableLyricsPlus, defaultValue = false)
     val (enableNeteaseCloudMusic, onEnableNeteaseCloudMusicChange) = rememberPreference(key = EnableNeteaseCloudMusicKey, defaultValue = false)
-    val (neteaseCloudMusicApiUrl, onNeteaseCloudMusicApiUrlChange) = rememberPreference(key = NeteaseCloudMusicApiUrlKey, defaultValue = "http://localhost:3000")
     val (lyricsProviderOrder, onLyricsProviderOrderChange) = rememberPreference(
         key = LyricsProviderOrderKey,
         defaultValue = LyricsProviderRegistry.serializeProviderOrder(LyricsProviderRegistry.getDefaultProviderOrder())
@@ -605,45 +603,6 @@ fun ContentSettings(
         mutableStateOf(false)
     }
 
-    var showNeteaseApiUrlDialog by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    if (showNeteaseApiUrlDialog) {
-        var tempApiUrl by rememberSaveable { mutableStateOf(neteaseCloudMusicApiUrl) }
-
-        AlertDialog(
-            onDismissRequest = { showNeteaseApiUrlDialog = false },
-            title = { Text("网易云音乐 API 地址") },
-            text = {
-                OutlinedTextField(
-                    value = tempApiUrl,
-                    onValueChange = { tempApiUrl = it },
-                    label = { Text("API URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onNeteaseCloudMusicApiUrlChange(tempApiUrl)
-                        showNeteaseApiUrlDialog = false
-                    }
-                ) {
-                    Text("保存")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showNeteaseApiUrlDialog = false }
-                ) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
     if (showProviderPriorityDialog) {
         val currentOrder = LyricsProviderRegistry.deserializeProviderOrder(lyricsProviderOrder)
         val enabledProviders = setOf(
@@ -965,12 +924,6 @@ fun ContentSettings(
                     icon = painterResource(R.drawable.language_korean_latin),
                     title = { Text(stringResource(R.string.lyrics_romanization)) },
                     onClick = { navController.navigate("settings/content/romanization") }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.settings),
-                    title = { Text("网易云音乐 API 地址") },
-                    description = { Text(neteaseCloudMusicApiUrl) },
-                    onClick = { showNeteaseApiUrlDialog = true }
                 )
             )
         )

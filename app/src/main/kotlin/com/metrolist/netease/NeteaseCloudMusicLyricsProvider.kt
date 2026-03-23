@@ -2,7 +2,6 @@ package com.metrolist.netease
 
 import android.content.Context
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
-import com.metrolist.music.constants.NeteaseCloudMusicApiUrlKey
 import com.metrolist.music.lyrics.LyricsProvider
 import com.metrolist.music.utils.dataStore
 import io.ktor.client.HttpClient
@@ -18,8 +17,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import java.security.MessageDigest
@@ -27,47 +24,28 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 @OptIn(ExperimentalSerializationApi::class)
-private val client = HttpClient {
-    expectSuccess = false
-
-    install(ContentNegotiation) {
-        val json = Json {
-            ignoreUnknownKeys = true
-            explicitNulls = false
-            encodeDefaults = false
-        }
-        json(json)
-    }
-}
-
-/**
- * Netease Cloud Music Lyrics Provider (Direct API)
- * Uses eapi encryption to call Netease Cloud Music API directly
- * No separate backend service required
- */
 object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     override val name = "NeteaseCloudMusic"
 
-    private const val DEFAULT_API_BASE_URL = "https://interface.music.163.com"
+    private const val OFFICIAL_API_BASE_URL = "https://interface.music.163.com"
     private const val EAPI_KEY = "e82ckenh8dichen8"
     private const val EAPI_MAGIC = "36cd479b6b5"
     private const val DURATION_TOLERANCE = 8000
 
-    private var initialized = false
-    private lateinit var apiBaseUrl: String
+    private val client = HttpClient {
+        expectSuccess = false
 
-    private fun ensureInitialized(context: Context) {
-        if (!initialized) {
-            runBlocking {
-                val settings = context.dataStore.data.first()
-                apiBaseUrl = settings[NeteaseCloudMusicApiUrlKey]?.takeIf { it.isNotBlank() } ?: DEFAULT_API_BASE_URL
+        install(ContentNegotiation) {
+            val json = Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+                encodeDefaults = false
             }
-            initialized = true
+            json(json)
         }
     }
 
     override fun isEnabled(context: Context): Boolean {
-        ensureInitialized(context)
         val settings = runBlocking { context.dataStore.data.first() }
         return settings[EnableNeteaseCloudMusicKey] ?: true
     }
@@ -80,7 +58,14 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         album: String?,
     ): Result<String> = runCatching {
         val songId = findSongId(title, artist, duration) ?: throw IllegalStateException("No matching song found on Netease")
-        fetchLyrics(songId)
+        val result = fetchLyrics(songId)
+        buildString {
+            append(result.lyric)
+            if (!result.tlyric.isNullOrBlank()) {
+                append("\n\n[translate]\n")
+                append(result.tlyric)
+            }
+        }
     }
 
     override suspend fun getAllLyrics(
@@ -94,12 +79,33 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         try {
             val songId = findSongId(title, artist, duration)
             if (songId != null) {
-                fetchLyrics(songId).let(callback)
+                val result = fetchLyrics(songId)
+                val combined = buildString {
+                    append(result.lyric)
+                    if (!result.tlyric.isNullOrBlank()) {
+                        append("\n\n[translate]\n")
+                        append(result.tlyric)
+                    }
+                }
+                callback(combined)
             }
         } catch (e: Exception) {
             // Ignore and continue
         }
     }
+
+    private data class NeteaseLyricsResult(
+        val lyric: String,
+        val tlyric: String? = null,
+    )
+
+    private data class NeteaseSong(
+        val id: String,
+        val name: String,
+        val artists: List<String>,
+        val album: String?,
+        val duration: Int,
+    )
 
     private suspend fun findSongId(title: String, artist: String, duration: Int): String? {
         val searchQuery = buildString {
@@ -150,7 +156,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
     }
 
-    private suspend fun fetchLyrics(songId: String): String {
+    private suspend fun fetchLyrics(songId: String): NeteaseLyricsResult {
         val json = eapiRequest(
             path = "/api/song/lyric/v1",
             data = mapOf(
@@ -172,15 +178,17 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
 
         val code = body.get("code")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
         if (code == 200) {
-            return body.get("lyric")?.jsonPrimitive?.content
+            val lyric = body.get("lyric")?.jsonPrimitive?.content
                 ?: throw IllegalStateException("No lyric content")
+            val tlyric = body.get("tlyric")?.jsonPrimitive?.content
+            return NeteaseLyricsResult(lyric, tlyric)
         } else {
             throw IllegalStateException("Failed to fetch lyrics: code $code")
         }
     }
 
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
-        val url = "$apiBaseUrl/eapi$path"
+        val url = "$OFFICIAL_API_BASE_URL/eapi$path"
 
         // Build eapi encrypted params
         val jsonData = Json.encodeToString(data)
@@ -224,12 +232,3 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         return String(hexChars)
     }
 }
-
-// Data class for song parsing
-private data class NeteaseSong(
-    val id: String,
-    val name: String,
-    val artists: List<String>,
-    val album: String?,
-    val duration: Int,
-)
