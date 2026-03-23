@@ -5,6 +5,8 @@
 
 package com.metrolist.music.lyrics
 
+import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
+
 object LyricsProviderRegistry {
     private val providerMap = mapOf(
         "BetterLyrics" to BetterLyricsProvider,
@@ -14,6 +16,7 @@ object LyricsProviderRegistry {
         "LyricsPlus" to LyricsPlusProvider,
         "YouTubeSubtitle" to YouTubeSubtitleLyricsProvider,
         "YouTube" to YouTubeLyricsProvider,
+        "NeteaseCloudMusic" to NeteaseCloudMusicLyricsProvider,
     )
 
     val providerNames = providerMap.keys.toList()
@@ -40,6 +43,7 @@ object LyricsProviderRegistry {
         "LrcLib",
         "KuGou",
         "LyricsPlus",
+        "NeteaseCloudMusic",
         "YouTubeSubtitle",
         "YouTube",
     )

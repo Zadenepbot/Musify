@@ -61,6 +61,7 @@ import com.metrolist.music.constants.CountryCodeToName
 import com.metrolist.music.constants.EnableBetterLyricsKey
 import com.metrolist.music.constants.EnableKugouKey
 import com.metrolist.music.constants.EnableLrcLibKey
+import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
 import com.metrolist.music.constants.EnableSimpMusicKey
 import com.metrolist.music.constants.EnableLyricsPlus
 import com.metrolist.music.constants.HideExplicitKey
@@ -121,6 +122,8 @@ fun ContentSettings(
     val (enableBetterLyrics, onEnableBetterLyricsChange) = rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
     val (enableSimpMusic, onEnableSimpMusicChange) = rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
     val (enableLyricsPlus, onEnableLyricsPlusChange) = rememberPreference(key = EnableLyricsPlus, defaultValue = false)
+    val (enableNeteaseCloudMusic, onEnableNeteaseCloudMusicChange) = rememberPreference(key = EnableNeteaseCloudMusicKey, defaultValue = false)
+    val (neteaseCloudMusicApiUrl, onNeteaseCloudMusicApiUrlChange) = rememberPreference(key = NeteaseCloudMusicApiUrlKey, defaultValue = "http://localhost:3000")
     val (lyricsProviderOrder, onLyricsProviderOrderChange) = rememberPreference(
         key = LyricsProviderOrderKey,
         defaultValue = LyricsProviderRegistry.serializeProviderOrder(LyricsProviderRegistry.getDefaultProviderOrder())
@@ -140,6 +143,7 @@ fun ContentSettings(
             "LrcLib" to "LrcLib",
             "KuGou" to "KuGou",
             "LyricsPlus" to "LyricsPlus",
+            "NeteaseCloudMusic" to "网易云音乐",
             "YouTubeSubtitle" to "YouTube Subtitles",
             "YouTube" to "YouTube",
         )
@@ -487,6 +491,35 @@ fun ContentSettings(
                             }
                         )
                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("网易云音乐")
+                            Text(
+                                text = "从网易云音乐获取歌词 (需要自建 API 服务)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enableNeteaseCloudMusic,
+                            onCheckedChange = onEnableNeteaseCloudMusicChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (enableNeteaseCloudMusic) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    }
                     Column(modifier = Modifier.padding(2.dp)) {
                         Text(
                             text = stringResource(R.string.youtube_music_lyrics_note),
@@ -579,11 +612,12 @@ fun ContentSettings(
             "BetterLyrics".takeIf { enableBetterLyrics },
             "SimpMusic".takeIf { enableSimpMusic },
             "LyricsPlus".takeIf { enableLyricsPlus },
+            "NeteaseCloudMusic".takeIf { enableNeteaseCloudMusic },
         ).filterNotNull().toSet()
         val lyricsIcon = painterResource(R.drawable.lyrics)
         val draggableItems = remember { mutableStateListOf<DraggableLyricsProviderItem>() }
 
-        LaunchedEffect(currentOrder, enableLrclib, enableKugou, enableBetterLyrics, enableSimpMusic, enableLyricsPlus) {
+        LaunchedEffect(currentOrder, enableLrclib, enableKugou, enableBetterLyrics, enableSimpMusic, enableLyricsPlus, enableNeteaseCloudMusic) {
             val orderedEnabledProviders = currentOrder.filter { it in enabledProviders }
             draggableItems.clear()
             draggableItems.addAll(
@@ -891,6 +925,44 @@ fun ContentSettings(
                     icon = painterResource(R.drawable.language_korean_latin),
                     title = { Text(stringResource(R.string.lyrics_romanization)) },
                     onClick = { navController.navigate("settings/content/romanization") }
+                ),
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.settings),
+                    title = { Text("网易云音乐 API 地址") },
+                    description = { Text(neteaseCloudMusicApiUrl) },
+                    onClick = {
+                        // Show dialog to edit API URL
+                        val tempUrl = mutableStateOf(neteaseCloudMusicApiUrl)
+                        AlertDialog(
+                            onDismissRequest = { },
+                            title = { Text("网易云音乐 API 地址") },
+                            text = {
+                                OutlinedTextField(
+                                    value = tempUrl.value,
+                                    onValueChange = { tempUrl.value = it },
+                                    label = { Text("API URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        onNeteaseCloudMusicApiUrlChange(tempUrl.value)
+                                    }
+                                ) {
+                                    Text("保存")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = { /* Do nothing */ }
+                                ) {
+                                    Text("取消")
+                                }
+                            }
+                        )
+                    }
                 )
             )
         )

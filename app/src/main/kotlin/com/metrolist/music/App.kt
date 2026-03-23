@@ -30,6 +30,8 @@ import com.metrolist.music.constants.*
 import com.metrolist.music.di.ApplicationScope
 import com.metrolist.music.extensions.toEnum
 import com.metrolist.music.extensions.toInetSocketAddress
+import com.metrolist.music.lyrics.LyricsProviderRegistry
+import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
 import com.metrolist.music.utils.CrashHandler
 import com.metrolist.music.utils.cipher.CipherDeobfuscator
 import com.metrolist.music.utils.dataStore
@@ -98,6 +100,9 @@ class App :
         if (languageTag == "zh-TW") {
             KuGou.useTraditionalChinese = true
         }
+
+        // Initialize Netease Cloud Music Lyrics Provider
+        NeteaseCloudMusicLyricsProvider.initialize(this)
 
         // Initialize LastFM with API keys from BuildConfig (GitHub Secrets)
         LastFM.initialize(
