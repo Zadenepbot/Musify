@@ -15,8 +15,7 @@ import com.metrolist.music.extensions.toEnum
 import com.metrolist.music.models.MediaMetadata
 import com.metrolist.music.utils.NetworkConnectivityObserver
 import com.metrolist.music.utils.dataStore
-import com.metrolist.music.utils.reportException
-import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
+import com.metrolist.music.lyrics.NeteaseCloudMusicProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -49,7 +48,7 @@ constructor(
             LrcLibLyricsProvider,
             KuGouLyricsProvider,
             LyricsPlusProvider,
-            NeteaseCloudMusicLyricsProvider,
+            NeteaseCloudMusicProvider,
             YouTubeSubtitleLyricsProvider,
             YouTubeLyricsProvider
         )
@@ -72,7 +71,7 @@ constructor(
                             SimpMusicLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
-                            NeteaseCloudMusicLyricsProvider,
+                            NeteaseCloudMusicProvider,
                             YouTubeSubtitleLyricsProvider,
                             YouTubeLyricsProvider
                         )
@@ -82,7 +81,7 @@ constructor(
                             SimpMusicLyricsProvider,
                             LrcLibLyricsProvider,
                             LyricsPlusProvider,
-                            NeteaseCloudMusicLyricsProvider,
+                            NeteaseCloudMusicProvider,
                             YouTubeSubtitleLyricsProvider,
                             YouTubeLyricsProvider
                         )
@@ -92,7 +91,7 @@ constructor(
                             LrcLibLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
-                            NeteaseCloudMusicLyricsProvider,
+                            NeteaseCloudMusicProvider,
                             YouTubeSubtitleLyricsProvider,
                             YouTubeLyricsProvider
                         )
@@ -102,12 +101,12 @@ constructor(
                             LrcLibLyricsProvider,
                             KuGouLyricsProvider,
                             LyricsPlusProvider,
-                            NeteaseCloudMusicLyricsProvider,
+                            NeteaseCloudMusicProvider,
                             YouTubeSubtitleLyricsProvider,
                             YouTubeLyricsProvider
                         )
                         PreferredLyricsProvider.NETEASE_CLOUD_MUSIC -> listOf(
-                            NeteaseCloudMusicLyricsProvider,
+                            NeteaseCloudMusicProvider,
                             BetterLyricsProvider,
                             SimpMusicLyricsProvider,
                             LrcLibLyricsProvider,

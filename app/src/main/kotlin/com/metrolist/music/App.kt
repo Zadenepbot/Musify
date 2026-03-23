@@ -31,7 +31,6 @@ import com.metrolist.music.di.ApplicationScope
 import com.metrolist.music.extensions.toEnum
 import com.metrolist.music.extensions.toInetSocketAddress
 import com.metrolist.music.lyrics.LyricsProviderRegistry
-import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
 import com.metrolist.music.utils.CrashHandler
 import com.metrolist.music.utils.cipher.CipherDeobfuscator
 import com.metrolist.music.utils.dataStore
