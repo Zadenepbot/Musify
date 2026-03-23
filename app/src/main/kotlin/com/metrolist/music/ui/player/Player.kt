@@ -186,6 +186,8 @@ import androidx.datastore.preferences.core.edit
 import com.metrolist.music.constants.SleepTimerFadeOutKey
 import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
 import com.metrolist.music.ui.menu.AddToPlaylistDialog
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1121,33 +1123,33 @@ fun BottomSheetPlayer(
                             }
                         }
 
-                        AnimatedContent(targetState = showInlineLyrics, label = "AddToPlaylistButton") { showLyrics ->
-                            if (!showLyrics) {
-                                FilledIconButton(
-                                    onClick = {
-                                        menuState.show {
-                                            AddToPlaylistDialog(
-                                                isVisible = true,
-                                                onGetSong = { listOf(mediaMetadata.id) },
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                                    shape = middleShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.add),
-                                        contentDescription = stringResource(R.string.add_to_playlist),
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                }
-                            } else {
-                                Spacer(modifier = Modifier.size(42.dp))
+                        AnimatedVisibility(
+                            visible = !showInlineLyrics,
+                            enter = expandHorizontally() + fadeIn(),
+                            exit = shrinkHorizontally() + fadeOut(),
+                        ) {
+                            FilledIconButton(
+                                onClick = {
+                                    menuState.show {
+                                        AddToPlaylistDialog(
+                                            isVisible = true,
+                                            onGetSong = { listOf(mediaMetadata.id) },
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    }
+                                },
+                                shape = middleShape,
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = textButtonColor,
+                                    contentColor = iconButtonColor,
+                                ),
+                                modifier = Modifier.size(42.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.add),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                )
                             }
                         }
 
@@ -1272,34 +1274,35 @@ fun BottomSheetPlayer(
 
                     Spacer(modifier = Modifier.size(12.dp))
 
-                    AnimatedContent(targetState = showInlineLyrics, label = "AddToPlaylistButton") { showLyrics ->
-                        if (!showLyrics) {
-                            Box(
+                    AnimatedVisibility(
+                        visible = !showInlineLyrics,
+                        enter = expandHorizontally() + fadeIn(),
+                        exit = shrinkHorizontally() + fadeOut(),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(textButtonColor)
+                                .clickable {
+                                    menuState.show {
+                                        AddToPlaylistDialog(
+                                            isVisible = true,
+                                            onGetSong = { listOf(mediaMetadata.id) },
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    }
+                                },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.add),
+                                contentDescription = null,
+                                tint = iconButtonColor,
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor)
-                                    .clickable {
-                                        menuState.show {
-                                            AddToPlaylistDialog(
-                                                isVisible = true,
-                                                onGetSong = { listOf(mediaMetadata.id) },
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.add),
-                                    contentDescription = stringResource(R.string.add_to_playlist),
-                                    tint = iconButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp),
-                                )
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.size(40.dp))
+                                    .align(Alignment.Center)
+                                    .size(24.dp),
+                            )
                         }
                     }
 
