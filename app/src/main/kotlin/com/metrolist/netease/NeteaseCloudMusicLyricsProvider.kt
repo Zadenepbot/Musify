@@ -1,27 +1,24 @@
 package com.metrolist.netease
 
-import android.content.Context
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
 import com.metrolist.music.utils.dataStore
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.forms.FormDataContent
-import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.post
-import io.ktor.http.HttpHeaders
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.Parameters
 import io.ktor.http.contentType
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlin.math.abs
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -29,13 +26,17 @@ import javax.crypto.spec.SecretKeySpec
 
 @OptIn(ExperimentalSerializationApi::class)
 private val client = HttpClient {
+    expectSuccess = false
+
     install(ContentNegotiation) {
         val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
+            encodeDefaults = false
         }
         json(json)
     }
+
     install(ContentEncoding) {
         gzip()
         deflate()
@@ -111,7 +112,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
 
         return try {
-            val response = eapiRequest(
+            val response = eapiRequest<NeteaseSearchResponse>(
                 path = "/api/cloudsearch/pc",
                 data = mapOf(
                     "s" to searchQuery,
@@ -119,7 +120,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                     "limit" to "30",
                     "offset" to "0"
                 )
-            ).body<NeteaseSearchResponse>()
+            )
 
             if (response.code == 200 && response.result.songs.isNotEmpty()) {
                 val bestMatch = response.result.songs
@@ -136,7 +137,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
     }
 
     private suspend fun fetchLyrics(songId: String): String {
-        val response = eapiRequest(
+        val response = eapiRequest<NeteaseLyricResponse>(
             path = "/api/song/lyric/v1",
             data = mapOf(
                 "id" to songId,
@@ -149,7 +150,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                 "ytv" to "0",
                 "yrv" to "0"
             )
-        ).body<NeteaseLyricResponse>()
+        )
 
         return when (response.body.code) {
             200 -> {
@@ -159,7 +160,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
     }
 
-    private suspend fun eapiRequest(path: String, data: Map<String, Any>): EapiResponse {
+    private suspend inline fun <reified T> eapiRequest(path: String, data: Map<String, Any>): EapiResponse<T> {
         val url = "$apiBaseUrl/eapi$path"
 
         // Build eapi encrypted params
@@ -169,27 +170,19 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
 
-        // Send request as application/x-www-form-urlencoded with params={encrypted}
+        // Send request as application/x-www-form-urlencoded
         val response = client.post(url) {
             userAgent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.0.18.203152")
-            contentType(io.ktor.http.ContentType.Application.FormUrlEncoded)
-            setBody(
-                FormDataContent(
-                    Parameters.build {
-                        append("params", encryptedParams)
-                    }
-                )
-            )
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody(encryptedParams)
         }
 
         val responseBody = response.body<String>()
         return try {
-            Json.decodeFromString<NetBaseResponse<*>>(responseBody).let {
-                @Suppress("UNCHECKED_CAST")
-                EapiResponse(it.code, it.body as JsonElement)
-            }
+            val baseResponse = Json.decodeFromString<NetBaseResponse<T>>(responseBody)
+            EapiResponse(baseResponse.code, baseResponse.body)
         } catch (e: Exception) {
-            throw IllegalStateException("Failed to parse response: ${e.message} body: $responseBody")
+            throw IllegalStateException("Failed to parse response: ${e.message}")
         }
     }
 
@@ -197,7 +190,6 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         const val DURATION_TOLERANCE = 8000 // 8 seconds
 
         fun aesEncrypt(input: String, key: String): String {
-            // PKCS7Padding = PKCS5Padding in Java
             val secretKey = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "AES")
             val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
@@ -225,9 +217,9 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
 }
 
 // Response wrappers
-private data class EapiResponse(
+private data class EapiResponse<T>(
     val code: Int,
-    val body: JsonElement,
+    val body: T,
 )
 
 private data class NetBaseResponse<T>(

@@ -101,9 +101,6 @@ class App :
             KuGou.useTraditionalChinese = true
         }
 
-        // Initialize Netease Cloud Music Lyrics Provider
-        NeteaseCloudMusicLyricsProvider.initialize(this)
-
         // Initialize LastFM with API keys from BuildConfig (GitHub Secrets)
         LastFM.initialize(
             apiKey = BuildConfig.LASTFM_API_KEY.takeIf { it.isNotEmpty() } ?: "",

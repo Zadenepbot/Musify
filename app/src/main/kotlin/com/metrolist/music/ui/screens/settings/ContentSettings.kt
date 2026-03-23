@@ -62,6 +62,7 @@ import com.metrolist.music.constants.EnableBetterLyricsKey
 import com.metrolist.music.constants.EnableKugouKey
 import com.metrolist.music.constants.EnableLrcLibKey
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
+import com.metrolist.music.constants.NeteaseCloudMusicApiUrlKey
 import com.metrolist.music.constants.EnableSimpMusicKey
 import com.metrolist.music.constants.EnableLyricsPlus
 import com.metrolist.music.constants.HideExplicitKey
@@ -604,6 +605,45 @@ fun ContentSettings(
         mutableStateOf(false)
     }
 
+    var showNeteaseApiUrlDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    if (showNeteaseApiUrlDialog) {
+        var tempApiUrl by rememberSaveable { mutableStateOf(neteaseCloudMusicApiUrl) }
+
+        AlertDialog(
+            onDismissRequest = { showNeteaseApiUrlDialog = false },
+            title = { Text("网易云音乐 API 地址") },
+            text = {
+                OutlinedTextField(
+                    value = tempApiUrl,
+                    onValueChange = { tempApiUrl = it },
+                    label = { Text("API URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onNeteaseCloudMusicApiUrlChange(tempApiUrl)
+                        showNeteaseApiUrlDialog = false
+                    }
+                ) {
+                    Text("保存")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showNeteaseApiUrlDialog = false }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     if (showProviderPriorityDialog) {
         val currentOrder = LyricsProviderRegistry.deserializeProviderOrder(lyricsProviderOrder)
         val enabledProviders = setOf(
@@ -930,39 +970,7 @@ fun ContentSettings(
                     icon = painterResource(R.drawable.settings),
                     title = { Text("网易云音乐 API 地址") },
                     description = { Text(neteaseCloudMusicApiUrl) },
-                    onClick = {
-                        // Show dialog to edit API URL
-                        val tempUrl = mutableStateOf(neteaseCloudMusicApiUrl)
-                        AlertDialog(
-                            onDismissRequest = { },
-                            title = { Text("网易云音乐 API 地址") },
-                            text = {
-                                OutlinedTextField(
-                                    value = tempUrl.value,
-                                    onValueChange = { tempUrl.value = it },
-                                    label = { Text("API URL") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true
-                                )
-                            },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        onNeteaseCloudMusicApiUrlChange(tempUrl.value)
-                                    }
-                                ) {
-                                    Text("保存")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    onClick = { /* Do nothing */ }
-                                ) {
-                                    Text("取消")
-                                }
-                            }
-                        )
-                    }
+                    onClick = { showNeteaseApiUrlDialog = true }
                 )
             )
         )
