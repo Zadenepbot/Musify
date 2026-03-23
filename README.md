@@ -4,8 +4,8 @@
 <p>YouTube Music client for Android</p>
 
 <div style="padding: 16px; margin: 16px 0; background-color: #FFFBE5; border-left: 6px solid #FFC107; border-radius: 4px;">
-<h2 style="margin: 0;"><strong>⚠Warning</strong></h2>
-If you're in a region where YouTube Music is not supported, you won't be able to use this app <strong>unless</strong> you have a proxy or VPN to connect to a YTM-supported region.
+<h2 style="margin: 0;"><strong>⚠ Warning</strong></h2>
+If you're in a region where YouTube Music is not supported, you won't be able to use this app <strong>unless</strong> you have a proxy or VPN to connect to a region where YouTube Music is supported.
 </div>
 
 <h1>Screenshots</h1>
@@ -19,7 +19,7 @@ If you're in a region where YouTube Music is not supported, you won't be able to
 <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" width="30%" />
 
 <div align="center">
-<h1>Release numbers</h1>
+<h1>Release Numbers</h1>
 </div>
 
 [![Latest release](https://img.shields.io/github/v/release/MetrolistGroup/Metrolist?style=for-the-badge)](https://github.com/MetrolistGroup/Metrolist/releases)
@@ -67,34 +67,48 @@ If you're in a region where YouTube Music is not supported, you won't be able to
 - [Development Setup](./development_guide.md)
 - [Translations](#translations)
 - [Support Me](#support-me)
-- [Join our community](#join-our-community)
+- [Join Our Community](#join-our-community)
 - [Contributors](#thanks-to-all-contributors)
 
 <div align="center">
 <h1>Features</h1>
 </div>
 
-- Play any song or video from YT Music
-- Background playback
-- Personalized quick picks
-- Library management
-- Listen together with friends
+**Playback**
+- Play any song or video from YouTube Music
+- Continue playback in the background
 - Download and cache songs for offline playback
-- Search for songs, albums, artists, videos and playlists
-- Live lyrics
-- YouTube Music account login support
-- Syncing of songs, artists, albums and playlists, from and to your account
+- Normalize audio levels
+- Adjust tempo and pitch
+- Adjust the equalizer
 - Skip silence
+- Set a sleep timer
+
+**Lyrics**
+- View live lyrics
+- Translate lyrics with AI
+
+**Discovery & Search**
+- Get personalized quick picks
+- Search for songs, albums, artists, videos, and playlists
+
+**Library & Playlists**
+- Manage your library
+- Manage local playlists
 - Import playlists
-- Audio normalization
-- Adjust tempo/pitch
-- Local playlist management
-- Reorder songs in playlist or queue
-- Home screen widget with playback controls
-- Light - Dark - black - Dynamic theme
-- Sleep timer
-- Material 3
-- etc.
+- Reorder songs in a playlist or queue
+
+**Account & Sync**
+- Log in with your YouTube Music account
+- Sync songs, artists, albums, and playlists to and from your account
+
+**Social**
+- Listen together with friends
+
+**Interface**
+- Control playback from a home screen widget
+- Choose from Light, Dark, Black, and Dynamic themes
+- Built with Material 3
 
 <div align="center">
 <h1>Translations</h1>
@@ -115,11 +129,11 @@ Thank you very much for helping to make Metrolist accessible to many people worl
 <h1>FAQ</h1>
 </div>
 
-### Q: Why Metrolist isn't showing in Android Auto?
+### Q: Why isn't Metrolist showing in Android Auto?
 
-1. Go to Android Auto's settings and tap multiple times on the version in the bottom to enable
+1. Go to Android Auto's settings and tap the version number at the bottom repeatedly to enable
    developer settings
-2. In the three dots menu at the top-right of the screen, click "Developer settings"
+2. In the three-dot menu at the top-right of the screen, click "Developer settings"
 3. Enable "Unknown sources"
 
 <div align="center">
@@ -133,14 +147,14 @@ Or scan this QR code:
 
 <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/XMR.png" alt="QR Code" width="200" height="200" />
 
-Or other
+Or donate through another platform:
 
 <a href="https://www.buymeacoffee.com/mostafaalagamy">
 <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/buymeacoffee.png?raw=true" alt="Buy Me a Coffee" width="150" height="150" />
 </a>
 
 <div align="center">
-<h1>Join our community</h1>
+<h1>Join Our Community</h1>
 
 [![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=1c1917)](https://dsc.gg/metrolist)
 [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1c1917)](https://t.me/metrolistapp)
@@ -148,7 +162,7 @@ Or other
 </div>
 
 <div align="center">
-<h1>Special thanks</h1>
+<h1>Special Thanks</h1>
 
 **InnerTune**
 [Zion Huang](https://github.com/z-huang) • [Malopieds](https://github.com/Malopieds)
@@ -164,18 +178,18 @@ Credits:
 
 [**SimpMusic Lyrics**](https://github.com/maxrave-dev/SimpMusic) – for providing lyrics data through the SimpMusic Lyrics API.
 
-[**metroserver**](https://github.com/MetrolistGroup/metroserver) – for providing us with the listen together implementation.
+[**metroserver**](https://github.com/MetrolistGroup/metroserver) – for providing us with the listen-together implementation.
 
 [**MusicRecognizer**](https://github.com/aleksey-saenko/MusicRecognizer) – for the music recognition feature implementation and Shazam API integration.
 
-The open-source community for tools, libraries, and APIs that make this project possible.
+We also thank the open-source community for the tools, libraries, and APIs that make this project possible.
 
 <sub>Thank you to all the amazing developers who made this project possible!</sub>
 
 </div>
 
 <div align="center">
-<h1>Thanks to all contributors</h1>
+<h1>Thanks to All Contributors</h1>
 
 <a href = "https://github.com/MetrolistGroup/Metrolist/graphs/contributors">
 <img src = "https://contrib.rocks/image?repo=MetrolistGroup/Metrolist" width="600"/>
@@ -187,7 +201,7 @@ The open-source community for tools, libraries, and APIs that make this project 
 <h1>Disclaimer</h1>
 </div>
 
-This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, Metrolist Group LLC or any of its affiliates and subsidiaries.
+This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, Metrolist Group LLC, or any of its affiliates and subsidiaries.
 
 Any trademark, service mark, trade name, or other intellectual property rights used in this project are owned by the respective owners.
 
