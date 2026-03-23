@@ -16,12 +16,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -120,7 +118,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
             )
 
             val jsonObj = json.jsonObject
-            val code = jsonObj["code"]?.jsonPrimitive?.intOrNull ?: 0
+            val code = jsonObj["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             if (code == 200) {
                 val result = jsonObj["result"]?.jsonObject ?: return null
                 val songs = result["songs"]?.jsonArray ?: return null
@@ -132,7 +130,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
                     val artists = song["artists"]?.jsonArray?.map { it.jsonObject["name"]?.jsonPrimitive?.content ?: "" } ?: emptyList()
                     val album = song["album"]?.jsonObject
                     val albumName = album?.get("name")?.jsonPrimitive?.content
-                    val durationMs = song["duration"]?.jsonPrimitive?.intOrNull ?: 0
+                    val durationMs = song["duration"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
 
                     NeteaseSong(id, name, artists, albumName, durationMs)
                 }
@@ -167,10 +165,10 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         )
 
         val jsonObj = json.jsonObject
-        val status = jsonObj["status"]?.jsonPrimitive?.intOrNull ?: 0
+        val status = jsonObj["status"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
         val body = jsonObj["body"]?.jsonObject ?: throw IllegalStateException("No body in response")
 
-        val code = body["code"]?.jsonPrimitive?.intOrNull ?: 0
+        val code = body["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
         if (code == 200) {
             return body["lyric"]?.jsonPrimitive?.content
                 ?: throw IllegalStateException("No lyric content")

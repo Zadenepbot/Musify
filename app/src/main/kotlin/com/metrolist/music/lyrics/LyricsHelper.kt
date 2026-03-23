@@ -16,14 +16,6 @@ import com.metrolist.music.models.MediaMetadata
 import com.metrolist.music.utils.NetworkConnectivityObserver
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.reportException
-import com.metrolist.music.lyrics.BetterLyricsProvider
-import com.metrolist.music.lyrics.KuGouLyricsProvider
-import com.metrolist.music.lyrics.LastFMLyricsProvider
-import com.metrolist.music.lyrics.LrcLibLyricsProvider
-import com.metrolist.music.lyrics.LyricsPlusProvider
-import com.metrolist.music.lyrics.SimpMusicLyricsProvider
-import com.metrolist.music.lyrics.YouTubeLyricsProvider
-import com.metrolist.music.lyrics.YouTubeSubtitleLyricsProvider
 import com.metrolist.netease.NeteaseCloudMusicLyricsProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
