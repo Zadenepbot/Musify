@@ -1,6 +1,8 @@
 package com.metrolist.netease
 
+import android.content.Context
 import com.metrolist.music.constants.EnableNeteaseCloudMusicKey
+import com.metrolist.music.constants.NeteaseCloudMusicApiUrlKey
 import com.metrolist.music.utils.dataStore
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -9,8 +11,6 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.http.userAgent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.first
@@ -47,12 +47,8 @@ private val client = HttpClient {
  * Netease Cloud Music Lyrics Provider (Direct API)
  * Uses eapi encryption to call Netease Cloud Music API directly
  * No separate backend service required
- *
- * Based on NeteaseCloudMusicApiEnhanced eapi implementation
  */
-object NeteaseCloudMusicLyricsProvider : LyricsProvider {
-    override val name = "NeteaseCloudMusic"
-
+object NeteaseCloudMusicLyricsProvider {
     private const val DEFAULT_API_BASE_URL = "https://interface.music.163.com"
     private const val EAPI_KEY = "e82ckenh8dichen8"
     private const val EAPI_MAGIC = "36cd479b6b5"
@@ -70,12 +66,12 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         }
     }
 
-    override fun isEnabled(context: Context): Boolean {
+    fun isEnabled(context: Context): Boolean {
         ensureInitialized(context)
         return context.dataStore[EnableNeteaseCloudMusicKey] ?: true
     }
 
-    override suspend fun getLyrics(
+    suspend fun getLyrics(
         id: String,
         title: String,
         artist: String,
@@ -86,7 +82,7 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         fetchLyrics(songId)
     }
 
-    override suspend fun getAllLyrics(
+    suspend fun getAllLyrics(
         id: String,
         title: String,
         artist: String,
@@ -173,8 +169,10 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         // Send request as application/x-www-form-urlencoded
         val response = client.post(url) {
             userAgent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.0.18.203152")
-            contentType(ContentType.Application.FormUrlEncoded)
             setBody(encryptedParams)
+            headers {
+                append("Content-Type", "application/x-www-form-urlencoded")
+            }
         }
 
         val responseBody = response.body<String>()
