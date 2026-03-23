@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.player
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -1121,33 +1122,29 @@ fun BottomSheetPlayer(
                             }
                         }
 
-                        AnimatedContent(targetState = showInlineLyrics, label = "AddToPlaylistButton") { showLyrics ->
-                            if (!showLyrics) {
-                                FilledIconButton(
-                                    onClick = {
-                                        menuState.show {
-                                            AddToPlaylistDialog(
-                                                isVisible = true,
-                                                onGetSong = { listOf(mediaMetadata.id) },
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                                    shape = middleShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.add),
-                                        contentDescription = stringResource(R.string.add_to_playlist),
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                }
-                            } else {
-                                Spacer(modifier = Modifier.size(42.dp))
+                        if (!showInlineLyrics) {
+                            FilledIconButton(
+                                onClick = {
+                                    menuState.show {
+                                        AddToPlaylistDialog(
+                                            isVisible = true,
+                                            onGetSong = { listOf(mediaMetadata.id) },
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    }
+                                },
+                                shape = middleShape,
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = textButtonColor,
+                                    contentColor = iconButtonColor,
+                                ),
+                                modifier = Modifier.size(42.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.add),
+                                    contentDescription = stringResource(R.string.add_to_playlist),
+                                    modifier = Modifier.size(24.dp),
+                                )
                             }
                         }
 
@@ -1270,40 +1267,32 @@ fun BottomSheetPlayer(
                         }
                     }
 
-                    Spacer(modifier = Modifier.size(12.dp))
-
-                    AnimatedContent(targetState = showInlineLyrics, label = "AddToPlaylistButton") { showLyrics ->
-                        if (!showLyrics) {
-                            Box(
+                    if (!showInlineLyrics) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(textButtonColor)
+                                .clickable {
+                                    menuState.show {
+                                        AddToPlaylistDialog(
+                                            isVisible = true,
+                                            onGetSong = { listOf(mediaMetadata.id) },
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    }
+                                },
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.add),
+                                contentDescription = stringResource(R.string.add_to_playlist),
+                                tint = iconButtonColor,
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor)
-                                    .clickable {
-                                        menuState.show {
-                                            AddToPlaylistDialog(
-                                                isVisible = true,
-                                                onGetSong = { listOf(mediaMetadata.id) },
-                                                onDismiss = menuState::dismiss,
-                                            )
-                                        }
-                                    },
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.add),
-                                    contentDescription = stringResource(R.string.add_to_playlist),
-                                    tint = iconButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp),
-                                )
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.size(40.dp))
+                                    .align(Alignment.Center)
+                                    .size(24.dp),
+                            )
                         }
                     }
-
-                    Spacer(modifier = Modifier.size(12.dp))
 
                     AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                         if (showLyrics) {
