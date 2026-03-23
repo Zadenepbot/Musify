@@ -24,7 +24,7 @@
     <string name="filter_uploaded">Uploaded</string>
     <string name="sync_playlist">Sync playlist</string>
     <string name="sync_disabled">Sync disabled</string>
-    <string name="allows_for_sync_witch_youtube">NOTE: This option enables syncing with YouTube Music. This option CANNOT be changed later.</string>
+    <string name="allows_for_sync_witch_youtube">NOTE: This option enables syncing with YouTube Music and CANNOT be changed later.</string>
     <string name="generating_image">Generating image…</string>
     <string name="please_wait">Please wait</string>
     <string name="cancel">Cancel</string>
@@ -83,7 +83,7 @@
     <string name="seek_forward_dynamic">+%1$d seconds forward</string>
     <string name="seek_backward_dynamic">-%1$d seconds backward</string>
     <string name="seek_seconds_addup">Progressive seek</string>
-    <string name="seek_seconds_addup_description">If enabled, adds 5 extra seconds incrementally with each seek.</string>
+    <string name="seek_seconds_addup_description">When enabled, adds 5 extra seconds incrementally with each seek.</string>
 
     <string name="similar_content">Similar content</string>
 
@@ -135,7 +135,7 @@
     <string name="shuffle_playlist_first">Shuffle playlist or album first</string>
     <string name="shuffle_playlist_first_desc">When shuffling, play all songs from the current playlist or album before moving to similar content.</string>
     <string name="prevent_duplicate_tracks_in_queue">Prevent duplicate tracks in queue</string>
-    <string name="prevent_duplicate_tracks_in_queue_desc">When adding a track that\'s already in the queue, it will be moved from its previous position rather than duplicated.</string>
+    <string name="prevent_duplicate_tracks_in_queue_desc">When adding a track that\'s already in the queue, it will be moved from its previous position rather than added again.</string>
     <string name="show_wrapped_card">Show Wrapped card</string>
     <string name="skip_silence_desc">Fast-forward through silent parts of songs.</string>
     <string name="skip_silence_instant">Instantly skip silence</string>
@@ -144,7 +144,7 @@
     <string name="advanced_login">Log in with token</string>
     <string name="token_hidden">Tap to show token</string>
     <string name="token_shown">Tap again to copy or edit</string>
-    <string name="token_adv_login_description">This is an ADVANCED login method. Instead of using the web portal, you can enter or update your login token directly. This can be useful for signing in across multiple devices quickly. Note that tokens in an unrecognized format will be rejected.</string>
+    <string name="token_adv_login_description">This is an ADVANCED login method. Instead of using the web portal, you can enter or update your login token directly. This can be useful for signing in across multiple devices quickly. Tokens in an unrecognized format will be rejected.</string>
     <string name="yt_sync">Auto-sync with account</string>
     <string name="more_content">More content</string>
 
@@ -313,7 +313,7 @@
     <string name="keep_screen_on_when_player_is_expanded">Keep screen on when player is expanded</string>
 
     <string name="crossfade">Crossfade</string>
-    <string name="crossfade_desc">Smoothly blend audio between songs.</string>
+    <string name="crossfade_desc">Fades out the current song as the next one fades in.</string>
     <string name="crossfade_duration">Crossfade duration</string>
     <string name="crossfade_gapless">Disable for gapless albums</string>
     <string name="crossfade_gapless_desc">Skip crossfade for albums designed to play without gaps.</string>
@@ -336,7 +336,7 @@
     <string name="lyrics_romanize_serbian">Romanize Serbian lyrics</string>
     <string name="lyrics_romanize_bulgarian">Romanize Bulgarian lyrics</string>
     <string name="line_by_line_option_title">Detect language line by line</string>
-    <string name="line_by_line_option_desc">The Cyrillic script will be detected line by line rather than the entire song.</string>
+    <string name="line_by_line_option_desc">Cyrillic script will be detected line by line rather than across the entire song.</string>
     <string name="line_by_line_dialog_title">Are you sure?</string>
     <string name="line_by_line_dialog_desc">This is a hit-or-miss experimental feature.\n\nBy default, the language is detected from the whole song. With this option on, it will be detected line by line instead. This allows multi-language songs to work, BUT the detected language may not always be correct. For example, a Ukrainian line without any Ukrainian-specific characters might be romanized as Russian.\n\nIf you are not experiencing any issues, it is recommended to keep this option off.</string>
     <string name="romanize_current_track">Romanize current track</string>
@@ -379,14 +379,14 @@
     <string name="lastfm_integration">Last.fm Integration</string>
     <string name="enable_scrobbling">Enable scrobbling</string>
     <string name="lastfm_now_playing">Send Now Playing status</string>
-    <string name="last_fm_send_likes">Sync likes and unlikes</string>
+    <string name="last_fm_send_likes">Sync loved and unloved</string>
     <string name="last_fm_send_likes_description">Love or unlove songs in Last.fm when you like or unlike them in Metrolist.</string>
     <string name="logging_in">Logging in…</string>
 
     <string name="scrobbling_configuration">Scrobbling Configuration</string>
     <string name="scrobble_min_track_duration">Scrobble songs longer than</string>
-    <string name="scrobble_delay_percent">Scrobble delay (by percent)</string>
-    <string name="scrobble_delay_minutes">Scrobble delay (by minute)</string>
+    <string name="scrobble_delay_percent">Scrobble delay (percentage)</string>
+    <string name="scrobble_delay_minutes">Scrobble delay (minutes)</string>
     <string name="hide_video_songs">Hide video songs</string>
     <string name="hide_youtube_shorts">Hide YouTube Shorts</string>
 
