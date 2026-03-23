@@ -186,8 +186,6 @@ import androidx.datastore.preferences.core.edit
 import com.metrolist.music.constants.SleepTimerFadeOutKey
 import com.metrolist.music.constants.SleepTimerStopAfterCurrentSongKey
 import com.metrolist.music.ui.menu.AddToPlaylistDialog
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1123,11 +1121,7 @@ fun BottomSheetPlayer(
                             }
                         }
 
-                        AnimatedVisibility(
-                            visible = !showInlineLyrics,
-                            enter = expandHorizontally() + fadeIn(),
-                            exit = shrinkHorizontally() + fadeOut(),
-                        ) {
+                        if (!showInlineLyrics) {
                             FilledIconButton(
                                 onClick = {
                                     menuState.show {
@@ -1274,11 +1268,7 @@ fun BottomSheetPlayer(
 
                     Spacer(modifier = Modifier.size(12.dp))
 
-                    AnimatedVisibility(
-                        visible = !showInlineLyrics,
-                        enter = expandHorizontally() + fadeIn(),
-                        exit = shrinkHorizontally() + fadeOut(),
-                    ) {
+                    if(!showInlineLyrics) {
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = 12.dp)
