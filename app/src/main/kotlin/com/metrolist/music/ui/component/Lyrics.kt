@@ -1620,7 +1620,7 @@ fun Lyrics(
                                                 scaleY = bounceScale
                                             },
                                 )
-                            } else if (isActiveLine && !lyricsGlowEffect) {
+                            } else if (!lyricsGlowEffect) {
                                 // Active line without glow effect - just bold text (and also an inactive line)
                                 Text(
                                     text = mainText,
