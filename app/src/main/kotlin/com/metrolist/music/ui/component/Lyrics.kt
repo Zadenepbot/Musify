@@ -1621,26 +1621,17 @@ fun Lyrics(
                                             },
                                 )
                             } else if (isActiveLine && !lyricsGlowEffect) {
-                                // Active line without glow effect - just bold text
+                                // Active line without glow effect - just bold text (and also an inactive line)
                                 Text(
                                     text = mainText,
                                     fontSize = lyricsTextSize.sp,
-                                    color = expressiveAccent,
+                                    color = if (isActiveLine) expressiveAccent else lineColor,
                                     textAlign = alignment,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    lineHeight = (lyricsTextSize * lyricsLineSpacing).sp,
-                                )
-                            } else {
-                                // Inactive line
-                                Text(
-                                    text = mainText,
-                                    fontSize = lyricsTextSize.sp,
-                                    color = lineColor,
-                                    textAlign = alignment,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = if (isActiveLine) FontWeight.ExtraBold else FontWeight.Bold,
                                     lineHeight = (lyricsTextSize * lyricsLineSpacing).sp,
                                 )
                             }
+                            
                             if (currentSong?.romanizeLyrics == true && enabledLanguages.isNotEmpty()) {
                                 // Show secondary text (romanized or original) if available
                                 subText?.let { text ->
