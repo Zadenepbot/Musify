@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -118,19 +119,19 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
             )
 
             val jsonObj = json.jsonObject
-            val code = jsonObj["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            val code = jsonObj.get("code")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             if (code == 200) {
-                val result = jsonObj["result"]?.jsonObject ?: return null
-                val songs = result["songs"]?.jsonArray ?: return null
+                val result = jsonObj.get("result")?.jsonObject ?: return null
+                val songs = result.get("songs")?.jsonArray ?: return null
 
                 val songList = songs.mapNotNull { songObj ->
                     val song = songObj.jsonObject
-                    val id = song["id"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                    val name = song["name"]?.jsonPrimitive?.content ?: ""
-                    val artists = song["artists"]?.jsonArray?.map { it.jsonObject["name"]?.jsonPrimitive?.content ?: "" } ?: emptyList()
-                    val album = song["album"]?.jsonObject
+                    val id = song.get("id")?.jsonPrimitive?.content ?: return@mapNotNull null
+                    val name = song.get("name")?.jsonPrimitive?.content ?: ""
+                    val artists = song.get("artists")?.jsonArray?.map { it.jsonObject.get("name")?.jsonPrimitive?.content ?: "" } ?: emptyList()
+                    val album = song.get("album")?.jsonObject
                     val albumName = album?.get("name")?.jsonPrimitive?.content
-                    val durationMs = song["duration"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val durationMs = song.get("duration")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
 
                     NeteaseSong(id, name, artists, albumName, durationMs)
                 }
@@ -165,12 +166,12 @@ object NeteaseCloudMusicLyricsProvider : LyricsProvider {
         )
 
         val jsonObj = json.jsonObject
-        val status = jsonObj["status"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-        val body = jsonObj["body"]?.jsonObject ?: throw IllegalStateException("No body in response")
+        val status = jsonObj.get("status")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        val body = jsonObj.get("body")?.jsonObject ?: throw IllegalStateException("No body in response")
 
-        val code = body["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        val code = body.get("code")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
         if (code == 200) {
-            return body["lyric"]?.jsonPrimitive?.content
+            return body.get("lyric")?.jsonPrimitive?.content
                 ?: throw IllegalStateException("No lyric content")
         } else {
             throw IllegalStateException("Failed to fetch lyrics: code $code")
