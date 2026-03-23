@@ -139,6 +139,10 @@ val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
 val EnableSongCacheKey = booleanPreferencesKey("enableSongCache")
 
+// Custom download path
+val CustomDownloadPathEnabledKey = booleanPreferencesKey("customDownloadPathEnabled")
+val CustomDownloadPathUriKey = stringPreferencesKey("customDownloadPathUri")
+
 val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
 val DisableScreenshotKey = booleanPreferencesKey("disableScreenshot")

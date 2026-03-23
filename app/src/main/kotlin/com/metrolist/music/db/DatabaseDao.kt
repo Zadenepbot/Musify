@@ -1136,6 +1136,12 @@ interface DatabaseDao {
     @Query("SELECT playbackPosition FROM song WHERE id = :songId")
     fun playbackPositionFlow(songId: String): Flow<Long?>
 
+    @Query("UPDATE song SET downloadUri = :uri WHERE id = :songId")
+    fun updateDownloadUri(songId: String, uri: String?)
+
+    @Query("SELECT downloadUri FROM song WHERE id = :songId")
+    fun getDownloadUri(songId: String): String?
+
     @Transaction
     @Query("SELECT * FROM song WHERE isUploaded = 1 ORDER BY dateDownload")
     fun uploadedSongsByCreateDateAsc(): Flow<List<Song>>

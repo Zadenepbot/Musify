@@ -137,9 +137,42 @@ fun YouTubeSongMenu(
         onDismiss = { showChoosePlaylistDialog = false }
     )  
 
-    var showSelectArtistDialog by rememberSaveable {  
-        mutableStateOf(false)  
-    }  
+    var showSelectArtistDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    // Download format picker state
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<com.metrolist.music.utils.YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    val downloadUtil = LocalDownloadUtil.current
+
+    if (showDownloadFormatDialog) {
+        com.metrolist.music.ui.component.DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                Timber.tag("YouTubeSongMenu").d("Format selected: ${format.displayName} (itag=${format.itag})")
+                showDownloadFormatDialog = false
+                // Set target itag and start download (song already inserted when formats were fetched)
+                downloadUtil.setTargetItag(song.id, format.itag)
+                val downloadRequest = DownloadRequest
+                    .Builder(song.id, song.id.toUri())
+                    .setCustomCacheKey(song.id)
+                    .setData(song.title.toByteArray())
+                    .build()
+                DownloadService.sendAddDownload(
+                    context,
+                    ExoDownloadService::class.java,
+                    downloadRequest,
+                    false,
+                )
+            },
+            onDismiss = {
+                showDownloadFormatDialog = false
+            }
+        )
+    }
 
     if (showSelectArtistDialog) {  
         ListDialog(  
@@ -568,10 +601,10 @@ fun YouTubeSongMenu(
 
         item {
             Material3MenuGroup(
-                items = listOf(
+                items = buildList {
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            add(Material3MenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -591,10 +624,43 @@ fun YouTubeSongMenu(
                                         false,
                                     )
                                 }
-                            )
+                            ))
+                            // Swap download option (re-download with different format)
+                            add(Material3MenuItemData(
+                                title = { Text(text = stringResource(R.string.swap_download)) },
+                                description = { Text(text = stringResource(R.string.swap_download_desc)) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.sync),
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    Timber.tag("YouTubeSongMenu").d("Swap download clicked for: ${song.id}")
+                                    showDownloadFormatDialog = true
+                                    isLoadingFormats = true
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        // First remove existing download
+                                        DownloadService.sendRemoveDownload(
+                                            context,
+                                            ExoDownloadService::class.java,
+                                            song.id,
+                                            false,
+                                        )
+                                        val result = com.metrolist.music.utils.YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+                                        result.onSuccess { formats ->
+                                            availableFormats = formats
+                                            isLoadingFormats = false
+                                        }.onFailure {
+                                            availableFormats = emptyList()
+                                            isLoadingFormats = false
+                                        }
+                                    }
+                                }
+                            ))
                         }
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            add(Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -610,10 +676,10 @@ fun YouTubeSongMenu(
                                         false,
                                     )
                                 }
-                            )
+                            ))
                         }
                         else -> {
-                            Material3MenuItemData(
+                            add(Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
@@ -623,25 +689,30 @@ fun YouTubeSongMenu(
                                     )
                                 },
                                 onClick = {
-                                    database.transaction {
-                                        insert(song.toMediaMetadata())
+                                    // Show format picker dialog
+                                    showDownloadFormatDialog = true
+                                    isLoadingFormats = true
+                                    availableFormats = emptyList()
+
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        try {
+                                            // Insert song to database first (needed for metadata embedding)
+                                            database.transaction {
+                                                insert(song.toMediaMetadata())
+                                            }
+                                            val formats = com.metrolist.music.utils.YTPlayerUtils.getAllAvailableAudioFormats(song.id).getOrNull() ?: emptyList()
+                                            availableFormats = formats
+                                        } catch (e: Exception) {
+                                            Timber.tag("YouTubeSongMenu").e(e, "Failed to fetch formats")
+                                        } finally {
+                                            isLoadingFormats = false
+                                        }
                                     }
-                                    val downloadRequest = DownloadRequest
-                                        .Builder(song.id, song.id.toUri())
-                                        .setCustomCacheKey(song.id)
-                                        .setData(song.title.toByteArray())
-                                        .build()
-                                    DownloadService.sendAddDownload(
-                                        context,
-                                        ExoDownloadService::class.java,
-                                        downloadRequest,
-                                        false,
-                                    )
                                 }
-                            )
+                            ))
                         }
                     }
-                )
+                }
             )
         }
 
