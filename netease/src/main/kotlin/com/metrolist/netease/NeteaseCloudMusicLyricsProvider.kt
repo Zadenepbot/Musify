@@ -83,11 +83,6 @@ object NeteaseCloudMusicLyricsProvider {
             // Ignore and continue
         }
     }
-            }
-        } catch (e: Exception) {
-            // Ignore and continue
-        }
-    }
 
     private data class NeteaseLyricsResult(
         val lyric: String,
