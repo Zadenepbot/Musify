@@ -128,7 +128,7 @@ jobs:
 
       - name: Restore Persistent Keystore
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ./app/persistent-debug.keystore
+          echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ./persistent-debug.keystore
 
       - name: Build Debug APK and Run Lint
         run: ./gradlew --console=plain assemble${{ matrix.variantName }}Debug :app:lint${{ matrix.variantName }}Debug --warning-mode summary
