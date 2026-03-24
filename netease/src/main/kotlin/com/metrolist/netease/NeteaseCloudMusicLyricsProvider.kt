@@ -13,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import kotlin.math.abs
+import timber.log.Timber
 import java.security.MessageDigest
 import java.util.Random
 import javax.crypto.Cipher
@@ -48,7 +49,9 @@ object NeteaseCloudMusicLyricsProvider {
         duration: Int,
         album: String?,
     ): Result<String> = runCatching {
+        Timber.tag("NeteaseProvider").i("getLyrics called: title='$title', artist='$artist', duration=$duration, album=$album")
         val songId = findSongId(title, artist, duration) ?: throw IllegalStateException("No matching song found on Netease")
+        Timber.tag("NeteaseProvider").i("Found songId: $songId")
         val result = fetchLyrics(songId)
         buildString {
             append(result.lyric)
@@ -56,6 +59,8 @@ object NeteaseCloudMusicLyricsProvider {
                 append("\n\n[translate]\n")
                 append(result.tlyric)
             }
+        }.also { combined ->
+            Timber.tag("NeteaseProvider").i("Returning lyrics: length=${combined.length}")
         }
     }
 
@@ -67,9 +72,11 @@ object NeteaseCloudMusicLyricsProvider {
         album: String?,
         callback: (String) -> Unit,
     ) {
+        Timber.tag("NeteaseProvider").i("getAllLyrics called: title='$title', artist='$artist', duration=$duration")
         try {
             val songId = findSongId(title, artist, duration)
             if (songId != null) {
+                Timber.tag("NeteaseProvider").i("Found songId: $songId")
                 val result = fetchLyrics(songId)
                 val combined = buildString {
                     append(result.lyric)
@@ -78,9 +85,13 @@ object NeteaseCloudMusicLyricsProvider {
                         append(result.tlyric)
                     }
                 }
+                Timber.tag("NeteaseProvider").i("Calling callback with lyrics: length=${combined.length}")
                 callback(combined)
+            } else {
+                Timber.tag("NeteaseProvider").w("No songId found")
             }
         } catch (e: Exception) {
+            Timber.tag("NeteaseProvider").e(e, "getAllLyrics failed")
             // Ignore and continue
         }
     }
@@ -104,6 +115,7 @@ object NeteaseCloudMusicLyricsProvider {
             append(" ")
             append(artist)
         }
+        Timber.tag("NeteaseProvider").d("Searching for song: query='$searchQuery', duration=$duration")
 
         return try {
             val json = eapiRequest(
@@ -118,6 +130,8 @@ object NeteaseCloudMusicLyricsProvider {
 
             val jsonObj = json.jsonObject
             val code = (jsonObj.get("code") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            Timber.tag("NeteaseProvider").d("Search response code: $code")
+            
             if (code == 200) {
                 val result = jsonObj.get("result")?.jsonObject ?: return null
                 val songs = result.get("songs")?.jsonArray ?: return null
@@ -136,20 +150,26 @@ object NeteaseCloudMusicLyricsProvider {
                     NeteaseSong(id, name, artists, albumName, durationMs)
                 }
 
+                Timber.tag("NeteaseProvider").d("Found ${songList.size} songs")
                 val bestMatch = songList
                     .filter { abs(it.duration - duration) <= DURATION_TOLERANCE }
                     .minByOrNull { abs(it.duration - duration) }
 
-                bestMatch?.id ?: songList.firstOrNull()?.id
+                val chosen = bestMatch ?: songList.firstOrNull()
+                Timber.tag("NeteaseProvider").d("Selected songId: ${chosen?.id}, name='${chosen?.name}', duration=${chosen?.duration}")
+                chosen?.id
             } else {
+                Timber.tag("NeteaseProvider").w("Search failed with code: $code")
                 null
             }
         } catch (e: Exception) {
+            Timber.tag("NeteaseProvider").e(e, "Search exception")
             null
         }
     }
 
     private suspend fun fetchLyrics(songId: String): NeteaseLyricsResult {
+        Timber.tag("NeteaseProvider").d("Fetching lyrics for songId: $songId")
         val json = eapiRequest(
             path = "/api/song/lyric/v1",
             data = mapOf(
@@ -167,6 +187,7 @@ object NeteaseCloudMusicLyricsProvider {
 
         val jsonObj = json.jsonObject
         val status = (jsonObj.get("status") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+        Timber.tag("NeteaseProvider").d("Lyrics response status: $status")
         val body = jsonObj.get("body")?.jsonObject ?: throw IllegalStateException("No body in response")
 
         val code = (body.get("code") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
@@ -174,26 +195,41 @@ object NeteaseCloudMusicLyricsProvider {
             val lyric = (body.get("lyric") as? JsonPrimitive)?.content
                 ?: throw IllegalStateException("No lyric content")
             val tlyric = (body.get("tlyric") as? JsonPrimitive)?.content
+            val lyricPreview = lyric.take(200).replace("\n", "\\n")
+            Timber.tag("NeteaseProvider").d("Lyrics fetched successfully, length=${lyric.length}, tlyric=${tlyric?.length ?: 0}, preview: $lyricPreview")
             return NeteaseLyricsResult(lyric, tlyric)
         } else {
+            Timber.tag("NeteaseProvider").w("Failed to fetch lyrics: code $code")
             throw IllegalStateException("Failed to fetch lyrics: code $code")
         }
     }
 
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
         val url = "$OFFICIAL_API_BASE_URL/eapi$path"
+        Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
 
         // Build eapi encrypted params with header (matching api-enhanced)
         // Construct header as required by Netease eapi protocol
         val header = buildEapiHeader()
+        Timber.tag("NeteaseProvider").d("Constructed header: $header")
+
         val dataWithHeader = LinkedHashMap<String, Any>(data)
         dataWithHeader["header"] = header
 
         val jsonData = Json.encodeToString(dataWithHeader)
+        Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
+
         val message = "nobody${path}use${jsonData}md5forencrypt"
+        Timber.tag("NeteaseProvider").d("Sign message: $message")
+
         val digest = md5(message)
+        Timber.tag("NeteaseProvider").d("MD5 digest: $digest")
+
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
+        Timber.tag("NeteaseProvider").d("EAPI data before encryption: $eapiData")
+
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
+        Timber.tag("NeteaseProvider").d("Encrypted params (hex, first 100 chars): ${encryptedParams.take(100)}...")
 
         // Send request as raw body
         val response = client.post(url) {
@@ -202,6 +238,8 @@ object NeteaseCloudMusicLyricsProvider {
         }
 
         val responseBody = response.body<String>()
+        Timber.tag("NeteaseProvider").d("Response body (first 200 chars): ${responseBody.take(200)}")
+
         return Json.parseToJsonElement(responseBody)
     }
 
@@ -211,7 +249,7 @@ object NeteaseCloudMusicLyricsProvider {
         val requestId = System.currentTimeMillis().toString() + random.nextInt(1000)
         val buildVer = (System.currentTimeMillis() / 1000).toString().substring(0, 10)
 
-        return linkedMapOf(
+        val header = linkedMapOf(
             "osver" to "14",
             "deviceId" to deviceId,
             "os" to "android",
@@ -224,6 +262,8 @@ object NeteaseCloudMusicLyricsProvider {
             "channel" to "netease",
             "requestId" to requestId
         )
+        Timber.tag("NeteaseProvider").d("Built eapi header: $header")
+        return header
     }
 
     private fun aesEncrypt(input: String, key: String): String {
@@ -231,13 +271,17 @@ object NeteaseCloudMusicLyricsProvider {
         val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
         val encrypted = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
-        return bytesToHex(encrypted)
+        val result = bytesToHex(encrypted)
+        Timber.tag("NeteaseProvider").d("AES-ECB encrypt: inputLen=${input.length}, outputLen=${result.length}")
+        return result
     }
 
     private fun md5(input: String): String {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(input.toByteArray(Charsets.UTF_8))
-        return bytesToHex(digest)
+        val result = bytesToHex(digest)
+        Timber.tag("NeteaseProvider").d("MD5: input='$input' -> $result")
+        return result
     }
 
     private fun bytesToHex(bytes: ByteArray): String {
