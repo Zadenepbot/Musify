@@ -182,9 +182,9 @@ object NeteaseCloudMusicLyricsProvider {
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
         val url = "$OFFICIAL_API_BASE_URL/eapi$path"
 
-        // Build eapi encrypted params
+        // Build eapi encrypted params (matching api-enhanced's format)
         val jsonData = Json.encodeToString(data)
-        val message = "nobody$path$EAPI_MAGIC$jsonData$EAPI_MAGIC"
+        val message = "nobody${path}use${jsonData}md5forencrypt"
         val digest = md5(message)
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
