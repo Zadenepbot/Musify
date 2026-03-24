@@ -14,6 +14,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import kotlin.math.abs
 import java.security.MessageDigest
+import java.util.Random
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -182,8 +183,13 @@ object NeteaseCloudMusicLyricsProvider {
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
         val url = "$OFFICIAL_API_BASE_URL/eapi$path"
 
-        // Build eapi encrypted params (matching api-enhanced's format)
-        val jsonData = Json.encodeToString(data)
+        // Build eapi encrypted params with header (matching api-enhanced)
+        // Construct header as required by Netease eapi protocol
+        val header = buildEapiHeader()
+        val dataWithHeader = LinkedHashMap<String, Any>(data)
+        dataWithHeader["header"] = header
+
+        val jsonData = Json.encodeToString(dataWithHeader)
         val message = "nobody${path}use${jsonData}md5forencrypt"
         val digest = md5(message)
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
@@ -191,12 +197,33 @@ object NeteaseCloudMusicLyricsProvider {
 
         // Send request as raw body
         val response = client.post(url) {
-            userAgent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.0.18.203152")
+            userAgent("NeteaseMusic/9.1.65.240927161425(9001065);Dalvik/2.1.0 (Linux; U; Android 14; 23013RK75C Build/UKQ1.230804.001)")
             setBody(encryptedParams)
         }
 
         val responseBody = response.body<String>()
         return Json.parseToJsonElement(responseBody)
+    }
+
+    private fun buildEapiHeader(): Map<String, String> {
+        val random = java.util.Random()
+        val deviceId = ByteArray(32).apply { random.nextBytes(this) }.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        val requestId = System.currentTimeMillis().toString() + random.nextInt(1000)
+        val buildVer = (System.currentTimeMillis() / 1000).toString().substring(0, 10)
+
+        return linkedMapOf(
+            "osver" to "14",
+            "deviceId" to deviceId,
+            "os" to "android",
+            "appver" to "8.20.20.231215173437",
+            "versioncode" to "140",
+            "mobilename" to "",
+            "buildver" to buildVer,
+            "resolution" to "1920x1080",
+            "__csrf" to "",
+            "channel" to "netease",
+            "requestId" to requestId
+        )
     }
 
     private fun aesEncrypt(input: String, key: String): String {
