@@ -185,9 +185,12 @@ fun AppearanceSettings(
             defaultValue = PlayerBackgroundStyle.DEFAULT,
         )
 
+    val onNavigationItemPositionChange = NavigationScreens.entries.associate {
+        it to it.getPositionSetter()
+    }
     val (defaultOpenTab, onDefaultOpenTabChange) = rememberEnumPreference(
         DefaultOpenTabKey,
-        defaultValue = NavigationTab.HOME
+        defaultValue = NavigationScreens.HOME
     )
     val (playerButtonsStyle, onPlayerButtonsStyleChange) = rememberEnumPreference(
         PlayerButtonsStyleKey,
@@ -555,19 +558,19 @@ fun AppearanceSettings(
         EnumDialog(
             onDismiss = { showDefaultOpenTabDialog = false },
             onSelect = {
+                // Reset the previously selected item to its default position
+                onNavigationItemPositionChange[defaultOpenTab]?.invoke(defaultOpenTab.default_position)
+                // Update defaultOpenTab
                 onDefaultOpenTabChange(it)
+                // Pin newly selected item to navigation bar
+                onNavigationItemPositionChange[it]?.invoke(NavigationItemPosition.NAV_BAR)
+                // Close menu
                 showDefaultOpenTabDialog = false
             },
             title = stringResource(R.string.default_open_tab),
             current = defaultOpenTab,
-            values = NavigationTab.values().toList(),
-            valueText = {
-                when (it) {
-                    NavigationTab.HOME -> stringResource(R.string.home)
-                    NavigationTab.SEARCH -> stringResource(R.string.search)
-                    NavigationTab.LIBRARY -> stringResource(R.string.filter_library)
-                }
-            }
+            values = NavigationScreens.entries.toList(),
+            valueText = { stringResource(it.titleId) }
         )
     }
 
@@ -1365,15 +1368,7 @@ fun AppearanceSettings(
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.nav_bar),
                     title = { Text(stringResource(R.string.default_open_tab)) },
-                    description = {
-                        Text(
-                            when (defaultOpenTab) {
-                                NavigationTab.HOME -> stringResource(R.string.home)
-                                NavigationTab.SEARCH -> stringResource(R.string.search)
-                                NavigationTab.LIBRARY -> stringResource(R.string.filter_library)
-                            }
-                        )
-                    },
+                    description = { Text(stringResource(defaultOpenTab.titleId)) },
                     onClick = { showDefaultOpenTabDialog = true }
                 ),
                 Material3SettingsItem(
@@ -1628,12 +1623,6 @@ enum class DarkMode {
     ON,
     OFF,
     AUTO,
-}
-
-enum class NavigationTab {
-    HOME,
-    SEARCH,
-    LIBRARY,
 }
 
 enum class LyricsPosition {

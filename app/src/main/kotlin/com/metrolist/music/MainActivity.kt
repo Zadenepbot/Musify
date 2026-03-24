@@ -168,11 +168,9 @@ import com.metrolist.music.ui.component.rememberBottomSheetState
 import com.metrolist.music.ui.component.shimmer.ShimmerTheme
 import com.metrolist.music.ui.menu.YouTubeSongMenu
 import com.metrolist.music.ui.player.BottomSheetPlayer
-import com.metrolist.music.ui.screens.Screens
 import com.metrolist.music.ui.screens.navigationBuilder
 import com.metrolist.music.ui.screens.settings.ChangelogScreen
 import com.metrolist.music.ui.screens.settings.DarkMode
-import com.metrolist.music.ui.screens.settings.NavigationTab
 import com.metrolist.music.ui.theme.ColorSaver
 import com.metrolist.music.ui.theme.DefaultThemeColor
 import com.metrolist.music.ui.theme.MetrolistTheme
@@ -579,26 +577,18 @@ class MainActivity : ComponentActivity() {
                 val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
                 val defaultOpenTab =
                     remember {
-                        dataStore[DefaultOpenTabKey].toEnum(defaultValue = NavigationTab.HOME)
+                        dataStore[DefaultOpenTabKey].toEnum(defaultValue = NavigationScreens.HOME)
                     }
                 val tabOpenedFromShortcut =
                     remember {
                         when (intent?.action) {
-                            ACTION_SEARCH -> NavigationTab.LIBRARY
-                            ACTION_LIBRARY -> NavigationTab.SEARCH
+                            ACTION_SEARCH -> NavigationScreens.LIBRARY
+                            ACTION_LIBRARY -> NavigationScreens.SEARCH
                             else -> null
                         }
                     }
 
-                val topLevelScreens =
-                    remember {
-                        listOf(
-                            Screens.Home.route,
-                            Screens.Library.route,
-                            Screens.ListenTogether.route,
-                            "settings",
-                        )
-                    }
+                val topLevelScreens = navigationItems.map{ it.route }
 
                 val (query, onQueryChange) =
                     rememberSaveable(stateSaver = TextFieldValue.Saver) {
@@ -635,10 +625,14 @@ class MainActivity : ComponentActivity() {
                     }
 
                 val shouldShowNavigationBar =
-                    remember(currentRoute, navigationItemRoutes) {
+                    remember(currentRoute, navController.previousBackStackEntry, navigationItemRoutes) {
                         currentRoute == null ||
-                            navigationItemRoutes.contains(currentRoute) ||
+                        navController.previousBackStackEntry == null ||
+                        navigationItemRoutes.contains(currentRoute) ||
+                        (
+                            navigationItemRoutes.contains(NavigationScreens.SEARCH.route) &&
                             currentRoute!!.startsWith("search/")
+                        )
                     }
 
                 val isLandscape = configuration.containerDpSize.width > configuration.containerDpSize.height
@@ -777,7 +771,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(navBackStackEntry, listenTogetherInTopBar) {
                     val currentRoute = navBackStackEntry?.destination?.route
                     val isListenTogetherScreen =
-                        currentRoute == Screens.ListenTogether.route ||
+                        currentRoute == NavigationScreens.LISTEN_TOGETHER.route ||
                             currentRoute == "listen_together_from_topbar"
                     shouldShowTopBar = currentRoute in topLevelScreens &&
                         currentRoute != "settings" &&
@@ -814,13 +808,7 @@ class MainActivity : ComponentActivity() {
 
                 val currentTitleRes =
                     remember(navBackStackEntry) {
-                        when (navBackStackEntry?.destination?.route) {
-                            Screens.Home.route -> R.string.home
-                            Screens.Search.route -> R.string.search
-                            Screens.Library.route -> R.string.filter_library
-                            Screens.ListenTogether.route -> R.string.together
-                            else -> null
-                        }
+                        navigationItems.firstOrNull{ it.route == navBackStackEntry?.destination?.route }?.titleId
                     }
 
                 var showAccountDialog by remember { mutableStateOf(false) }
@@ -1093,12 +1081,7 @@ class MainActivity : ComponentActivity() {
                                 // NavHost with animations (Material 3 Expressive style)
                                 NavHost(
                                     navController = navController,
-                                    startDestination =
-                                        when (tabOpenedFromShortcut ?: defaultOpenTab) {
-                                            NavigationTab.HOME -> Screens.Home
-                                            NavigationTab.LIBRARY -> Screens.Library
-                                            else -> Screens.Home
-                                        }.route,
+                                    startDestination = (tabOpenedFromShortcut ?: defaultOpenTab).route,
                                     // Enter Transition - smoother with smaller offset and longer duration
                                     enterTransition = {
                                         val currentRouteIndex =

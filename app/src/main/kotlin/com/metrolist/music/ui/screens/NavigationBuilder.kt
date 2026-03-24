@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
 import androidx.navigation.navArgument
 import com.metrolist.music.constants.DarkModeKey
+import com.metrolist.music.constants.NavigationScreens
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.ui.screens.artist.ArtistAlbumsScreen
 import com.metrolist.music.ui.screens.artist.ArtistItemsScreen
@@ -71,11 +72,11 @@ fun NavGraphBuilder.navigationBuilder(
     activity: Activity,
     snackbarHostState: SnackbarHostState,
 ) {
-    composable(Screens.Home.route) {
+    composable(NavigationScreens.HOME.route) {
         HomeScreen(navController = navController, snackbarHostState = snackbarHostState)
     }
 
-    composable(Screens.Search.route) {
+    composable(NavigationScreens.SEARCH.route) {
         val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
         val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
         val isSystemInDarkTheme = isSystemInDarkTheme()
@@ -93,11 +94,11 @@ fun NavGraphBuilder.navigationBuilder(
         )
     }
 
-    composable(Screens.Library.route) {
+    composable(NavigationScreens.LIBRARY.route) {
         LibraryScreen(navController)
     }
 
-    composable(Screens.ListenTogether.route) {
+    composable(NavigationScreens.LISTEN_TOGETHER.route) {
         ListenTogetherScreen(navController, showTopBar = false)
     }
 
