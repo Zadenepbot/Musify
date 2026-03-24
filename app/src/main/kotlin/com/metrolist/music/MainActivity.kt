@@ -582,8 +582,8 @@ class MainActivity : ComponentActivity() {
                 val tabOpenedFromShortcut =
                     remember {
                         when (intent?.action) {
-                            ACTION_SEARCH -> NavigationScreens.LIBRARY
-                            ACTION_LIBRARY -> NavigationScreens.SEARCH
+                            ACTION_SEARCH -> NavigationScreens.SEARCH
+                            ACTION_LIBRARY -> NavigationScreens.LIBRARY
                             else -> null
                         }
                     }

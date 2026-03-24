@@ -1455,7 +1455,7 @@ fun AppearanceSettings(
                     trailingContent = {
                         Switch(
                             checked = listenTogetherInTopBar,
-                            onCheckedChange = { checked -> if(checked) NavigationItemPosition.NAV_BAR else NavigationItemPosition.TOP_BAR },
+                            onCheckedChange = { onListenTogetherPositionChange(if(listenTogetherInTopBar) NavigationItemPosition.NAV_BAR else NavigationItemPosition.TOP_BAR) },
                             thumbContent = {
                                 Icon(
                                     painter = painterResource(

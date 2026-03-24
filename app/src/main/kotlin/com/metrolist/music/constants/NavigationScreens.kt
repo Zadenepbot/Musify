@@ -52,7 +52,7 @@ enum class NavigationScreens(
         R.drawable.search,
         R.drawable.search,
         "search_input",
-        stringPreferencesKey("nav_home_position"),
+        stringPreferencesKey("nav_search_position"),
         NavigationItemType.OTHER,
         NavigationItemPosition.AUTOMATIC
     ),
