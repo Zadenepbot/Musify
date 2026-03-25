@@ -242,8 +242,12 @@ object NeteaseCloudMusicLyricsProvider {
             setBody(encryptedParams)
         }
 
+        val responseStatus = response.status.value
+        val responseHeaders = response.headers.toString()
         val responseBody = response.body<String>()
-        Timber.tag("NeteaseProvider").d("Response body (first 200 chars): ${responseBody.take(200)}")
+        Timber.tag("NeteaseProvider").w("Response status: $responseStatus")
+        Timber.tag("NeteaseProvider").d("Response headers: $responseHeaders")
+        Timber.tag("NeteaseProvider").d("Response body (length=${responseBody.length}): ${responseBody.take(500)}")
 
         return Json.parseToJsonElement(responseBody)
     }
