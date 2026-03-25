@@ -206,7 +206,9 @@ object NeteaseCloudMusicLyricsProvider {
     }
 
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
-        val url = "$OFFICIAL_API_BASE_URL/eapi$path"
+        // 转换路径：如果 path 以 "/api/" 开头，则改为 "/eapi/..."（去掉 "/api"）
+        val transformedPath = if (path.startsWith("/api/")) "/eapi${path.substring(5)}" else path
+        val url = "$OFFICIAL_API_BASE_URL$transformedPath"
         Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
 
         // Build eapi encrypted params with header (matching api-enhanced)
