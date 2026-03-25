@@ -97,8 +97,14 @@ private data class CommunityLink(
     val url: String
 )
 
+private val meldDeveloper = Contributor(
+    name = "Francesco Grazioso",
+    roleRes = R.string.credits_developer,
+    githubHandle = "FrancescoGrazioso",
+)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val leadDeveloper = Contributor(
+private val upstreamLeadDeveloper = Contributor(
     name = "Mo Agamy",
     roleRes = R.string.credits_lead_developer,
     githubHandle = "mostafaalagamy",
@@ -107,16 +113,15 @@ private val leadDeveloper = Contributor(
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val collaborators = listOf(
+private val upstreamCollaborators = listOf(
     Contributor(name = "Adriel O'Connel", roleRes = R.string.credits_collaborator, githubHandle = "adrielGGmotion", polygon = MaterialShapes.Cookie4Sided, favoriteSongVideoId = "m2zUrruKjDQ"),
-    Contributor(name = "Nyx", roleRes = R.string.credits_collaborator, githubHandle = "nyxiereal", polygon = MaterialShapes.Cookie12Sided, favoriteSongVideoId = "zselaN6zPXw"), // More mass for face
+    Contributor(name = "Nyx", roleRes = R.string.credits_collaborator, githubHandle = "nyxiereal", polygon = MaterialShapes.Cookie12Sided, favoriteSongVideoId = "zselaN6zPXw"),
 )
 
 private val communityLinks = listOf(
-    CommunityLink(R.string.credits_discord, R.drawable.discord, "https://discord.gg/rJwDxXsf8c"),
-    CommunityLink(R.string.credits_telegram, R.drawable.telegram, "https://t.me/metrolistapp"),
-    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/MetrolistGroup/Metrolist"),
-    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/MetrolistGroup/Metrolist/blob/main/LICENSE")
+    CommunityLink(R.string.credits_discord, R.drawable.discord, "https://discord.gg/sAErRUVbsK"),
+    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/FrancescoGrazioso/Meld"),
+    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/FrancescoGrazioso/Meld/blob/main/LICENSE")
 )
 
 private fun handleEasterEggClick(
@@ -391,34 +396,20 @@ fun AboutScreen(
     
             Spacer(Modifier.height(32.dp))
     
-            SectionHeader(stringResource(R.string.credits_lead_developer))
+            SectionHeader(stringResource(R.string.credits_developer))
     
-            var leadClickCount by remember(leadDeveloper.name) { mutableIntStateOf(0) }
-    
-            // Large Avatar
+            // Meld developer
             ContributorAvatar(
-                avatarUrl = leadDeveloper.avatarUrl,
+                avatarUrl = meldDeveloper.avatarUrl,
                 sizeDp = 180,
-                shape = leadDeveloper.polygon?.toShape() ?: CircleShape,
-                contentDescription = leadDeveloper.name,
-                onClick = {
-                    handleEasterEggClick(
-                        clickCount = leadClickCount,
-                        favoriteSongVideoId = leadDeveloper.favoriteSongVideoId,
-                        coroutineScope = coroutineScope,
-                        snackbarHostState = localSnackbarHostState,
-                        playerConnection = playerConnection,
-                        wannaPlayStr = wannaPlayStr,
-                        yeahStr = yeahStr,
-                        onCountUpdate = { leadClickCount = it }
-                    )
-                }
+                shape = CircleShape,
+                contentDescription = meldDeveloper.name,
             )
     
             Spacer(Modifier.height(24.dp))
     
             Text(
-                text = "MELD",
+                text = meldDeveloper.name,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -426,7 +417,6 @@ fun AboutScreen(
     
             Spacer(Modifier.height(32.dp))
     
-            // Segmented buttons (Website, GitHub, Instagram)
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -436,44 +426,28 @@ fun AboutScreen(
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     SegmentedActionButton(
-                        label = stringResource(R.string.credits_website),
-                        iconRes = R.drawable.language,
-                        iconSize = 24.dp,
-                        onClick = { uriHandler.openUri("https://metrolist.meowery.eu") }
-                    )
-                    
-                    Box(modifier = Modifier.width(1.dp).height(72.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)))
-                    
-                    SegmentedActionButton(
                         label = stringResource(R.string.credits_github),
                         iconRes = R.drawable.github,
                         iconSize = 24.dp,
-                        onClick = { uriHandler.openUri("https://github.com/mostafaalagamy") }
-                    )
-                    
-                    Box(modifier = Modifier.width(1.dp).height(72.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f)))
-                    
-                    SegmentedActionButton(
-                        label = stringResource(R.string.credits_instagram),
-                        iconRes = R.drawable.instagram,
-                        iconSize = 20.dp,
-                        onClick = { uriHandler.openUri("https://www.instagram.com/mostafaalagamy") }
+                        onClick = { uriHandler.openUri(meldDeveloper.githubUrl) }
                     )
                 }
             }
     
-            Spacer(Modifier.height(16.dp))
-    
-            ActionCard(
-                title = stringResource(R.string.like_what_i_do),
-                subtitle = stringResource(R.string.buy_mo_a_coffee),
-                iconRes = R.drawable.buymeacoffee,
-                onClick = { uriHandler.openUri("https://buymeacoffee.com/mostafaalagamy") }
-            )
-    
             Spacer(Modifier.height(48.dp))
     
-            SectionHeader(stringResource(R.string.credits_collaborators_section))
+            SectionHeader(stringResource(R.string.credits_original_project))
+    
+            Text(
+                text = stringResource(R.string.credits_based_on_metrolist),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp),
+                textAlign = TextAlign.Start
+            )
     
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -482,8 +456,9 @@ fun AboutScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
             ) {
+                val allUpstreamContributors = listOf(upstreamLeadDeveloper) + upstreamCollaborators
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    collaborators.forEachIndexed { index, contributor ->
+                    allUpstreamContributors.forEachIndexed { index, contributor ->
                         var clickCount by remember(contributor.name) { mutableIntStateOf(0) }
                         ListItem(
                             headlineContent = {
@@ -494,12 +469,12 @@ fun AboutScreen(
                             },
                             supportingContent = { Text(stringResource(contributor.roleRes)) },
                             leadingContent = {
-                                    ContributorAvatar(
-                                        avatarUrl = contributor.avatarUrl,
-                                        sizeDp = 56,
-                                        shape = contributor.polygon?.toShape() ?: CircleShape,
-                                        contentDescription = contributor.name,
-                                        onClick = {
+                                ContributorAvatar(
+                                    avatarUrl = contributor.avatarUrl,
+                                    sizeDp = 56,
+                                    shape = contributor.polygon?.toShape() ?: CircleShape,
+                                    contentDescription = contributor.name,
+                                    onClick = {
                                         handleEasterEggClick(
                                             clickCount = clickCount,
                                             favoriteSongVideoId = contributor.favoriteSongVideoId,
@@ -524,7 +499,7 @@ fun AboutScreen(
                             modifier = Modifier.clickable { uriHandler.openUri(contributor.githubUrl) }
                         )
                         
-                        if (index < collaborators.lastIndex) {
+                        if (index < allUpstreamContributors.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
