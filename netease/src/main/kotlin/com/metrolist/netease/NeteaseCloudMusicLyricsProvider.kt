@@ -231,7 +231,7 @@ object NeteaseCloudMusicLyricsProvider {
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
-        val message = "nobody${transformedPath}use${jsonData}md5forencrypt"
+        val message = "nobody${path}use${jsonData}md5forencrypt"
         Timber.tag("NeteaseProvider").d("Sign message: $message")
 
         val digest = md5(message)
