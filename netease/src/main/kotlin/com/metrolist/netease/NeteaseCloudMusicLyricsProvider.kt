@@ -4,8 +4,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.post
+import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.setBody
+import io.ktor.http.Parameters
 import io.ktor.http.userAgent
+import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -125,7 +128,8 @@ object NeteaseCloudMusicLyricsProvider {
                     "s" to searchQuery,
                     "type" to "1",
                     "limit" to "30",
-                    "offset" to "0"
+                    "offset" to "0",
+                    "e_r" to false
                 )
             )
 
@@ -182,7 +186,8 @@ object NeteaseCloudMusicLyricsProvider {
                 "kv" to "0",
                 "yv" to "0",
                 "ytv" to "0",
-                "yrv" to "0"
+                "yrv" to "0",
+                "e_r" to false
             )
         )
 
@@ -226,22 +231,22 @@ object NeteaseCloudMusicLyricsProvider {
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
-        val message = "nobody${path}use${jsonData}md5forencrypt"
+        val message = "nobody${transformedPath}use${jsonData}md5forencrypt"
         Timber.tag("NeteaseProvider").d("Sign message: $message")
 
         val digest = md5(message)
         Timber.tag("NeteaseProvider").d("MD5 digest: $digest")
 
-        val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
+        val eapiData = "$transformedPath-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
         Timber.tag("NeteaseProvider").d("EAPI data before encryption: $eapiData")
 
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
         Timber.tag("NeteaseProvider").d("Encrypted params (hex, first 100 chars): ${encryptedParams.take(100)}...")
 
-        // Send request as raw body
+        // Send as form data: params=encryptedParams
         val response = client.post(url) {
             userAgent("NeteaseMusic/9.1.65.240927161425(9001065);Dalvik/2.1.0 (Linux; U; Android 14; 23013RK75C Build/UKQ1.230804.001)")
-            setBody(encryptedParams)
+            setBody(FormDataContent(Parameters.build("params", encryptedParams)))
         }
 
         val responseStatus = response.status.value
