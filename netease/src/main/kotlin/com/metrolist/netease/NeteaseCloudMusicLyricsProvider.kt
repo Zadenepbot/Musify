@@ -246,7 +246,9 @@ object NeteaseCloudMusicLyricsProvider {
         // Send as form data: params=encryptedParams
         val response = client.post(url) {
             userAgent("NeteaseMusic/9.1.65.240927161425(9001065);Dalvik/2.1.0 (Linux; U; Android 14; 23013RK75C Build/UKQ1.230804.001)")
-            setBody(FormDataContent(Parameters.build("params", encryptedParams)))
+            setBody(FormDataContent(Parameters.build {
+                append("params", encryptedParams)
+            }))
         }
 
         val responseStatus = response.status.value
