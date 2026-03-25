@@ -11,8 +11,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlin.math.abs
+import org.json.JSONObject
 import timber.log.Timber
 import java.security.MessageDigest
 import java.util.Random
@@ -212,23 +214,14 @@ object NeteaseCloudMusicLyricsProvider {
         val header = buildEapiHeader()
         Timber.tag("NeteaseProvider").d("Constructed header: $header")
 
-        // Build JSON directly without builder
-        val dataEntries = buildMap<String, JsonElement> {
-            data.forEach { (k, v) ->
-                when (v) {
-                    is String -> put(k, JsonPrimitive(v))
-                    is Number -> put(k, JsonPrimitive(v))
-                    is Boolean -> put(k, JsonPrimitive(v))
-                    else -> throw IllegalArgumentException("Unsupported value type: ${v::class} for key '$k'")
-                }
+        // Build JSON using org.json.JSONObject to avoid Kotlinx serialization builder issues
+        val jsonData = JSONObject().apply {
+            data.forEach { (k, v) -> put(k, v) }
+            val headerObj = JSONObject().apply {
+                header.forEach { (k, v) -> put(k, v) }
             }
-        }
-        val headerEntries = buildMap<String, JsonElement> {
-            header.forEach { (k, v) ->
-                put(k, JsonPrimitive(v))
-            }
-        }
-        val jsonData = JsonObject(dataEntries + mapOf("header" to JsonObject(headerEntries))).toString()
+            put("header", headerObj)
+        }.toString()
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
