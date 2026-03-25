@@ -209,28 +209,20 @@ object NeteaseCloudMusicLyricsProvider {
         Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
 
         // Build eapi encrypted params with header (matching api-enhanced)
-        // Construct header as required by Netease eapi protocol
         val header = buildEapiHeader()
         Timber.tag("NeteaseProvider").d("Constructed header: $header")
 
-        // Build JSON manually to avoid serialization issues with Map<String, Any>
-        val jsonData = buildJsonObject {
-            // Copy all data entries
-            data.forEach { (key, value) ->
-                when (value) {
-                    is String -> add(key, JsonPrimitive(value))
-                    is Number -> add(key, JsonPrimitive(value))
-                    is Boolean -> add(key, JsonPrimitive(value))
-                    else -> throw IllegalArgumentException("Unsupported value type: ${value::class} for key '$key'")
-                }
+        // Build JSON directly without builder to avoid type inference issues
+        val dataEntries = data.mapValues { (_, v) ->
+            when (v) {
+                is String -> JsonPrimitive(v)
+                is Number -> JsonPrimitive(v)
+                is Boolean -> JsonPrimitive(v)
+                else -> throw IllegalArgumentException("Unsupported value type: ${v::class} for key '${_}'")
             }
-            // Add header object
-            add("header", buildJsonObject {
-                header.forEach { (key, value) ->
-                    add(key, JsonPrimitive(value))
-                }
-            })
-        }.toString()
+        }
+        val headerObj = JsonObject(header.mapValues { (_, v) -> JsonPrimitive(v) })
+        val jsonData = JsonObject(dataEntries + mapOf("header" to headerObj)).toString()
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
