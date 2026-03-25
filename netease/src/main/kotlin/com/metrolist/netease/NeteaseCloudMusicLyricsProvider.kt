@@ -212,17 +212,19 @@ object NeteaseCloudMusicLyricsProvider {
         val header = buildEapiHeader()
         Timber.tag("NeteaseProvider").d("Constructed header: $header")
 
-        // Build JSON directly without builder to avoid type inference issues
-        val dataEntries = data.mapValues { (_, v) ->
-            when (v) {
+        // Build JSON directly without builder
+        val dataEntries: Map<String, JsonElement> = data.entries.associate { (k, v) ->
+            k to when (v) {
                 is String -> JsonPrimitive(v)
                 is Number -> JsonPrimitive(v)
                 is Boolean -> JsonPrimitive(v)
-                else -> throw IllegalArgumentException("Unsupported value type: ${v::class} for key '${_}'")
+                else -> throw IllegalArgumentException("Unsupported value type: ${v::class} for key '$k'")
             }
         }
-        val headerObj = JsonObject(header.mapValues { (_, v) -> JsonPrimitive(v) })
-        val jsonData = JsonObject(dataEntries + mapOf("header" to headerObj)).toString()
+        val headerEntries: Map<String, JsonElement> = header.entries.associate { (k, v) ->
+            k to JsonPrimitive(v)
+        }
+        val jsonData = JsonObject(dataEntries + mapOf("header" to JsonObject(headerEntries))).toString()
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
