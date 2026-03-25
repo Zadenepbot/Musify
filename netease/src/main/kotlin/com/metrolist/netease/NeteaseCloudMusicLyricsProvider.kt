@@ -213,10 +213,25 @@ object NeteaseCloudMusicLyricsProvider {
         val header = buildEapiHeader()
         Timber.tag("NeteaseProvider").d("Constructed header: $header")
 
-        val dataWithHeader = LinkedHashMap<String, Any>(data)
-        dataWithHeader["header"] = header
+        // Build JSON manually to avoid serialization issues with Map<String, Any>
+        val jsonData = buildJsonObject {
+            // Copy all data entries
+            data.forEach { (key, value) ->
+                when (value) {
+                    is String -> add(key, JsonPrimitive(value))
+                    is Number -> add(key, JsonPrimitive(value))
+                    is Boolean -> add(key, JsonPrimitive(value))
+                    else -> throw IllegalArgumentException("Unsupported value type: ${value::class} for key '$key'")
+                }
+            }
+            // Add header object
+            add("header", buildJsonObject {
+                header.forEach { (key, value) ->
+                    add(key, JsonPrimitive(value))
+                }
+            })
+        }.toString()
 
-        val jsonData = Json.encodeToString(dataWithHeader)
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
         val message = "nobody${path}use${jsonData}md5forencrypt"
