@@ -115,7 +115,7 @@ object NeteaseCloudMusicLyricsProvider {
             append(" ")
             append(artist)
         }
-        Timber.tag("NeteaseProvider").d("Searching for song: query='$searchQuery', duration=$duration")
+        Timber.tag("NeteaseProvider").w("FIND_SONG_ID: title='$title', artist='$artist', duration=$duration, query='$searchQuery'")
 
         return try {
             val json = eapiRequest(
