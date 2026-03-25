@@ -144,8 +144,8 @@ Output MUST be a JSON array with EXACTLY $lineCount strings."""
                         }
                     }
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("HTTP-Referer", "https://github.com/MetrolistGroup/Metrolist")
-                    .addHeader("X-Title", "Metrolist")
+                    .addHeader("HTTP-Referer", "https://github.com/FrancescoGrazioso/Meld")
+                    .addHeader("X-Title", "Meld")
                     .post(jsonBody.toString().toRequestBody(JSON))
                     .build()
 

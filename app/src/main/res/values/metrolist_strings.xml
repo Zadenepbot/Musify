@@ -241,7 +241,7 @@
     <string name="release_notes">Release notes</string>
     <string name="changelog">Changelog</string>
     <string name="changelog_empty">No changelogs available</string>
-    <string name="github_releases_url">https://github.com/MetrolistGroup/Metrolist/releases</string>
+    <string name="github_releases_url">https://github.com/FrancescoGrazioso/Meld/releases</string>
     <string name="list_bullet">•</string>
     <string name="view_on_github">View on GitHub</string>
     <string name="current_version">Current version</string>
@@ -886,9 +886,12 @@
     <string name="logout_keep">Keep</string>
     <string name="logout_clear">Clear</string>
     <!-- Credits / About Screen -->
+    <string name="credits_developer">Developer</string>
     <string name="credits_lead_developer">Lead Developer</string>
     <string name="credits_collaborator">Collaborator</string>
     <string name="credits_collaborators_section">Collaborators</string>
+    <string name="credits_original_project">Original Project</string>
+    <string name="credits_based_on_metrolist">Meld is based on Metrolist, an open-source YouTube Music client.</string>
     <string name="credits_license_name">GNU General Public License v3.0</string>
     <string name="credits_license_desc">Free, open-source software. You may use, study, share and improve it.</string>
     <string name="credits_discord">Discord Server</string>
@@ -901,7 +904,7 @@
     <string name="like_what_i_do">Like what I do?</string>
     <string name="buy_mo_a_coffee">Buy me a coffee</string>
     <string name="community_and_info">Community &amp; Info</string>
-    <string name="metrolist">METROLIST</string>
+    <string name="metrolist">MELD</string>
     <string name="wanna_play_favorite_song">Wanna play their favorite song?</string>
     <string name="yeah">Yeah</string>
     <string name="stands_with_palestine">This project stands with Palestine 🇵🇸</string>

@@ -59,10 +59,10 @@ class DiscordRPC(
         }
         if (button2Visible) {
             val resolvedText = resolveVariables(
-                button2Text.ifEmpty { "Visit Metrolist" },
+                button2Text.ifEmpty { "Visit Meld" },
                 song
             )
-            buttonsList.add(resolvedText to "https://github.com/MetrolistGroup/Metrolist")
+            buttonsList.add(resolvedText to "https://github.com/FrancescoGrazioso/Meld")
         }
 
         val type = when (activityType) {
