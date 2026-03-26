@@ -97,7 +97,7 @@
 ### Interface
 - Home screen widget
 - Light / Dark / Black / Dynamic theme modes
-- 19 color palettes
+- Dynamic / 19 color palettes
 - Built with Material 3
 
 </td>
@@ -116,13 +116,13 @@
 
 <table>
   <tr>
-    <th align="center">GitHub</th>
+    <th align="center">Obtainium</th>
     <th align="center">IzzyOnDroid</th>
   </tr>
   <tr>
     <td align="center">
-      <a href="https://github.com/MetrolistGroup/Metrolist/releases/latest/download/Metrolist.apk">
-        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
+      <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MetrolistGroup/Metrolist/">
+        <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" alt="Download from Obtainium" height="50">
       </a>
     </td>
     <td align="center">
@@ -132,12 +132,12 @@
     </td>
   </tr>
   <tr>
-    <th align="center" colspan="2">Obtainium</th>
+    <th align="center" colspan="2">GitHub</th>
   </tr>
   <tr>
     <td align="center" colspan="2">
-      <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MetrolistGroup/Metrolist/">
-        <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" alt="Download from Obtainium" height="45">
+      <a href="https://github.com/MetrolistGroup/Metrolist/releases/latest/download/Metrolist.apk">
+        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
       </a>
     </td>
   </tr>
@@ -171,7 +171,7 @@
     <tr>
       <td align="center">
         <a href="https://nightly.link/MetrolistGroup/Metrolist/workflows/build/main/app-with-Google-Cast.zip">
-          <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="65">
+          <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
         </a>
       </td>
     </tr>
