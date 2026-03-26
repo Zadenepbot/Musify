@@ -45,44 +45,48 @@
 <h2>Stable Release</h2>
 
 <table>
-  <thead>
-    <tr>
-      <th align="center">GitHub</th>
-      <th align="center">Obtainium</th>
-      <th align="center">IzzyOnDroid</th>
-      <th align="center">OpenAPK</th>
-      <th align="center">Belberi</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center">
-        <a href="https://github.com/MetrolistGroup/Metrolist/releases/latest/download/Metrolist.apk">
-          <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" height="75">
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MetrolistGroup/Metrolist/">
-          <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" height="55">
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://apt.izzysoft.de/fdroid/index/apk/com.metrolist.music">
-          <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="75">
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://www.openapk.net/metrolist/com.metrolist.music/">
-          <img src="https://www.openapk.net/images/openapk-badge.png" height="75">
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://belberi.com/metrolist/">
-          <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/belberi_github.png" height="75">
-        </a>
-      </td>
-    </tr>
-  </tbody>
+  <tr>
+    <th align="center">GitHub</th>
+    <th align="center">IzzyOnDroid</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/MetrolistGroup/Metrolist/releases/latest/download/Metrolist.apk">
+        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" height="75">
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://apt.izzysoft.de/fdroid/index/apk/com.metrolist.music">
+        <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="75">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <th align="center" colspan="2">Obtainium</th>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MetrolistGroup/Metrolist/">
+        <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" height="45">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <th align="center">OpenAPK</th>
+    <th align="center">Belberi</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://www.openapk.net/metrolist/com.metrolist.music/">
+        <img src="https://www.openapk.net/images/openapk-badge.png" height="75">
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://belberi.com/metrolist/">
+        <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/belberi_github.png" height="75">
+      </a>
+    </td>
+  </tr>
 </table>
 
 <h2>Nightly Build</h2>
@@ -114,7 +118,7 @@
 
 <table>
   <tr>
-    <td width="30%" valign="top">
+    <td width="50%" valign="top">
 
 ### Playback
 - Stream any song or video from YouTube Music
@@ -124,7 +128,7 @@
 - Sleep timer
 
 </td>
-    <td width="30%" valign="top">
+    <td width="50%" valign="top">
 
 ### Audio
 - Audio normalization
@@ -132,7 +136,9 @@
 - Equalizer
 
 </td>
-    <td width="30%" valign="top">
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
 
 ### Lyrics & Discovery
 - Live synced lyrics
@@ -141,9 +147,7 @@
 - Search songs, albums, artists, videos, and playlists
 
 </td>
-  </tr>
-  <tr>
-    <td width="30%" valign="top">
+    <td width="50%" valign="top">
 
 ### Library & Account
 - Full library management
@@ -154,13 +158,15 @@
 - Sync songs, artists, albums, and playlists
 
 </td>
-    <td width="30%" valign="top">
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
 
 ### Social
 - Listen together with friends in real-time
 
 </td>
-    <td width="30%" valign="top">
+    <td width="50%" valign="top">
 
 ### Interface
 - Home screen widget
@@ -221,9 +227,7 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 
 <h3>Metrolist is free and open-source. If it brings you joy, consider supporting its development!</h3>
 
-<table>
-  <tr>
-    <td align="center">
+<div align="center">
 
 ### Monero (XMR)
 
@@ -233,22 +237,13 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 44XjSELSWcgJTZiCKzjpCQWyXhokrH9RqH3rpp35FkSKi57T25hniHWHQNhLeXyFn3DDYqufmfRB1iEtENerZpJc7xJCcqt
 ```
 
-<br/>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-
 ### Buy Me a Coffee
 
 <a href="https://www.buymeacoffee.com/mostafaalagamy">
   <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/buymeacoffee.png?raw=true" width="150" />
 </a>
 
-<br/><br/>
-    </td>
-  </tr>
-</table>
+</div>
 
 </div>
 
