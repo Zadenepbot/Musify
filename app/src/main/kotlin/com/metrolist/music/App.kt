@@ -69,7 +69,9 @@ class App :
         // Initialize cipher deobfuscator for WEB_REMIX streaming
         CipherDeobfuscator.initialize(this)
 
-        Timber.plant(Timber.DebugTree())
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
 
         // تهيئة إعدادات التطبيق عند الإقلاع
         applicationScope.launch {
