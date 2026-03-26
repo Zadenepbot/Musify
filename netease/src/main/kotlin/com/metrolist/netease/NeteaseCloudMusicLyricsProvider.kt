@@ -23,6 +23,38 @@ import java.util.Random
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
+private fun convertNeteaseJsonLyric(lyricJson: String): String {
+    // Try to parse {"t":0,"c":[{"tx":"text"},...]} structure
+    return try {
+        val json = JSONObject(lyricJson)
+        val t = json.optLong("t", 0)
+        val cArray = json.optJSONArray("c") ?: return lyricJson // Not expected format, return raw
+
+        // Build lyric text from c array's tx fields
+        val sb = StringBuilder()
+        for (i in 0 until cArray.length()) {
+            val obj = cArray.optJSONObject(i) ?: continue
+            val tx = obj.optString("tx", "")
+            if (tx.isNotEmpty()) {
+                if (sb.isNotEmpty()) sb.append(" ") // Separate words with space
+                sb.append(tx)
+            }
+        }
+
+        // Convert time t (ms) to LRC tag [MM:SS.xx]
+        val totalMs = t
+        val minutes = totalMs / 60000
+        val seconds = (totalMs % 60000) / 1000
+        val centis = (totalMs % 1000) / 10
+        val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
+
+        "$timeTag$sb"
+    } catch (e: Exception) {
+        Timber.tag("NeteaseProvider").w(e, "Failed to parse Netease JSON lyric, returning raw")
+        lyricJson
+    }
+}
+
 @OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
 object NeteaseCloudMusicLyricsProvider {
     // 提供获取歌词的功能，不实现 LyricsProvider 接口
@@ -208,20 +240,27 @@ object NeteaseCloudMusicLyricsProvider {
             val lyric = when (lyricElement) {
                 is JsonPrimitive -> lyricElement.content
                 is JsonObject -> {
-                    Timber.tag("NeteaseProvider").w("lyric is JsonObject, converting to string")
-                    lyricElement.toString()
+                    val jsonStr = lyricElement.toString()
+                    // Try to convert Netease JSON lyric ({"t":..., "c":[...]}) to LRC format
+                    convertNeteaseJsonLyric(jsonStr)
                 }
                 null -> throw IllegalStateException("lyric field missing in lrc")
                 else -> throw IllegalStateException("Unexpected lyric type: ${lyricElement::class.simpleName}")
             }
 
-            // tlyric may be at top level, also handle primitive/object
+            // tlyric may be at top level, also handle primitive/object and convert if needed
             val tlyricElement = jsonObj.get("tlyric")
             val tlyric = when (tlyricElement) {
                 is JsonPrimitive -> tlyricElement.content
                 is JsonObject -> {
-                    Timber.tag("NeteaseProvider").w("tlyric is JsonObject, converting to string")
-                    tlyricElement.toString()
+                    val jsonStr = tlyricElement.toString()
+                    // Try to convert Netease JSON lyric (similar structure) to LRC format
+                    try {
+                        convertNeteaseJsonLyric(jsonStr)
+                    } catch (e: Exception) {
+                        Timber.tag("NeteaseProvider").w(e, "Failed to convert tlyric, using raw string")
+                        jsonStr
+                    }
                 }
                 null -> null
                 else -> null
