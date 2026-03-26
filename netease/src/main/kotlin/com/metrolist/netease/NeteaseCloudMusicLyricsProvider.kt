@@ -186,21 +186,28 @@ object NeteaseCloudMusicLyricsProvider {
                 "kv" to "0",
                 "yv" to "0",
                 "ytv" to "0",
-                "yrv" to "0",
-                "e_r" to "false"
+                "yrv" to "0"
+                // Note: e_r parameter omitted (default false, plaintext response)
             )
         )
 
         val jsonObj = json.jsonObject
-        val status = (jsonObj.get("status") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
-        Timber.tag("NeteaseProvider").d("Lyrics response status: $status")
-        val body = jsonObj.get("body")?.jsonObject ?: throw IllegalStateException("No body in response")
+        // Response code can be in 'code' or 'status' field
+        val code = (jsonObj.get("code") as? JsonPrimitive)?.content?.toIntOrNull()
+            ?: (jsonObj.get("status") as? JsonPrimitive)?.content?.toIntOrNull()
+            ?: 0
+        Timber.tag("NeteaseProvider").d("Lyrics response code: $code")
 
-        val code = (body.get("code") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
         if (code == 200) {
-            val lyric = (body.get("lyric") as? JsonPrimitive)?.content
-                ?: throw IllegalStateException("No lyric content")
-            val tlyric = (body.get("tlyric") as? JsonPrimitive)?.content
+            // Parse lrc object
+            val lrc = jsonObj.get("lrc")?.jsonObject
+                ?: throw IllegalStateException("No lrc in response")
+            val lyric = lrc.get("lyric")?.jsonPrimitive?.content
+                ?: throw IllegalStateException("No lyric content in lrc")
+
+            // tlyric may be at top level
+            val tlyric = jsonObj.get("tlyric")?.jsonPrimitive?.content
+
             val lyricPreview = lyric.take(200).replace("\n", "\\n")
             Timber.tag("NeteaseProvider").d("Lyrics fetched successfully, length=${lyric.length}, tlyric=${tlyric?.length ?: 0}, preview: $lyricPreview")
             return NeteaseLyricsResult(lyric, tlyric)
