@@ -24,35 +24,42 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 private fun convertNeteaseJsonLyric(lyricJson: String): String {
-    // Try to parse {"t":0,"c":[{"tx":"text"},...]} structure
-    return try {
-        val json = JSONObject(lyricJson)
-        val t = json.optLong("t", 0)
-        val cArray = json.optJSONArray("c") ?: return lyricJson // Not expected format, return raw
+    // The lyricJson may contain multiple JSON objects separated by newlines.
+    // Each object is like {"t":0,"c":[{"tx":"text"},...]}
+    val lines = lyricJson.split("\n").filter { it.trim().isNotEmpty() }
+    val result = StringBuilder()
+    lines.forEach { line ->
+        try {
+            val json = JSONObject(line)
+            val t = json.optLong("t", 0)
+            val cArray = json.optJSONArray("c") ?: return@forEach
 
-        // Build lyric text from c array's tx fields
-        val sb = StringBuilder()
-        for (i in 0 until cArray.length()) {
-            val obj = cArray.optJSONObject(i) ?: continue
-            val tx = obj.optString("tx", "")
-            if (tx.isNotEmpty()) {
-                if (sb.isNotEmpty()) sb.append(" ") // Separate words with space
-                sb.append(tx)
+            // Build lyric text from c array's tx fields
+            val sb = StringBuilder()
+            for (i in 0 until cArray.length()) {
+                val obj = cArray.optJSONObject(i) ?: continue
+                val tx = obj.optString("tx", "")
+                if (tx.isNotEmpty()) {
+                    if (sb.isNotEmpty()) sb.append(" ")
+                    sb.append(tx)
+                }
             }
+
+            if (sb.isNotEmpty()) {
+                // Convert time t (ms) to LRC tag [MM:SS.xx]
+                val totalMs = t
+                val minutes = totalMs / 60000
+                val seconds = (totalMs % 60000) / 1000
+                val centis = (totalMs % 1000) / 10
+                val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
+                result.append(timeTag).append(sb).append("\n")
+            }
+        } catch (e: Exception) {
+            // If parsing fails for a line, skip it
+            Timber.tag("NeteaseProvider").w(e, "Failed to parse lyric line: $line")
         }
-
-        // Convert time t (ms) to LRC tag [MM:SS.xx]
-        val totalMs = t
-        val minutes = totalMs / 60000
-        val seconds = (totalMs % 60000) / 1000
-        val centis = (totalMs % 1000) / 10
-        val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
-
-        "$timeTag$sb"
-    } catch (e: Exception) {
-        Timber.tag("NeteaseProvider").w(e, "Failed to parse Netease JSON lyric, returning raw")
-        lyricJson
     }
+    return result.toString().trim()
 }
 
 @OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
