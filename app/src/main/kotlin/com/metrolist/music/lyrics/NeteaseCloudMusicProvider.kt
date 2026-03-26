@@ -11,7 +11,7 @@ object NeteaseCloudMusicProvider : LyricsProvider {
     override val name = "NeteaseCloudMusic"
 
     override fun isEnabled(context: Context): Boolean =
-        runBlocking { context.dataStore.data.first() }[EnableNeteaseCloudMusicKey] ?: true
+        runBlocking { context.dataStore.data.first() }[EnableNeteaseCloudMusicKey] ?: false
 
     override suspend fun getLyrics(
         id: String,
