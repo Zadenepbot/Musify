@@ -1,5 +1,6 @@
 package com.metrolist.netease
 
+import com.metrolist.music.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -19,6 +20,7 @@ import kotlin.math.abs
 import org.json.JSONObject
 import timber.log.Timber
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.Random
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
@@ -54,12 +56,14 @@ private fun convertNeteaseJsonLyric(lyricJson: String): String {
                     val minutes = totalMs / 60000
                     val seconds = (totalMs % 60000) / 1000
                     val centis = (totalMs % 1000) / 10
-                    val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
+                    val timeTag = String.format(Locale.ROOT, "[%02d:%02d.%02d]", minutes, seconds, centis)
                     result.append(timeTag).append(sb).append("\n")
                 }
             } catch (e: Exception) {
                 // If parsing fails, keep original line
-                Timber.tag("NeteaseProvider").w(e, "Failed to parse JSON lyric line, keeping raw: $trimmed")
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").w(e, "Failed to parse JSON lyric line")
+                }
                 result.append(line).append("\n")
             }
         } else {
@@ -100,9 +104,13 @@ object NeteaseCloudMusicLyricsProvider {
         duration: Int,
         album: String?,
     ): Result<String> = runCatching {
-        Timber.tag("NeteaseProvider").i("getLyrics called: title='$title', artist='$artist', duration=$duration, album=$album")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").i("getLyrics called")
+        }
         val songId = findSongId(title, artist, duration) ?: throw IllegalStateException("No matching song found on Netease")
-        Timber.tag("NeteaseProvider").i("Found songId: $songId")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").i("Found songId")
+        }
         val result = fetchLyrics(songId)
         buildString {
             append(result.lyric)
@@ -111,7 +119,9 @@ object NeteaseCloudMusicLyricsProvider {
                 append(result.tlyric)
             }
         }.also { combined ->
-            Timber.tag("NeteaseProvider").i("Returning lyrics: length=${combined.length}")
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").i("Returning lyrics: length=${combined.length}")
+            }
         }
     }
 
@@ -123,11 +133,15 @@ object NeteaseCloudMusicLyricsProvider {
         album: String?,
         callback: (String) -> Unit,
     ) {
-        Timber.tag("NeteaseProvider").i("getAllLyrics called: title='$title', artist='$artist', duration=$duration")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").i("getAllLyrics called")
+        }
         try {
             val songId = findSongId(title, artist, duration)
             if (songId != null) {
-                Timber.tag("NeteaseProvider").i("Found songId: $songId")
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").i("Found songId")
+                }
                 val result = fetchLyrics(songId)
                 val combined = buildString {
                     append(result.lyric)
@@ -136,13 +150,19 @@ object NeteaseCloudMusicLyricsProvider {
                         append(result.tlyric)
                     }
                 }
-                Timber.tag("NeteaseProvider").i("Calling callback with lyrics: length=${combined.length}")
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").i("Calling callback with lyrics: length=${combined.length}")
+                }
                 callback(combined)
             } else {
-                Timber.tag("NeteaseProvider").w("No songId found")
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").w("No songId found")
+                }
             }
         } catch (e: Exception) {
-            Timber.tag("NeteaseProvider").e(e, "getAllLyrics failed")
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").e(e, "getAllLyrics failed")
+            }
             // Ignore and continue
         }
     }
@@ -166,7 +186,9 @@ object NeteaseCloudMusicLyricsProvider {
             append(" ")
             append(artist)
         }
-        Timber.tag("NeteaseProvider").w("FIND_SONG_ID: title='$title', artist='$artist', duration=$duration, query='$searchQuery'")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").w("FIND_SONG_ID")
+        }
 
         return try {
             val json = eapiRequest(
@@ -182,7 +204,9 @@ object NeteaseCloudMusicLyricsProvider {
 
             val jsonObj = json.jsonObject
             val code = (jsonObj.get("code") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
-            Timber.tag("NeteaseProvider").d("Search response code: $code")
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").d("Search response code: $code")
+            }
             
             if (code == 200) {
                 val result = jsonObj.get("result")?.jsonObject ?: return null
@@ -202,26 +226,36 @@ object NeteaseCloudMusicLyricsProvider {
                     NeteaseSong(id, name, artists, albumName, durationMs)
                 }
 
-                Timber.tag("NeteaseProvider").d("Found ${songList.size} songs")
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").d("Found ${songList.size} songs")
+                }
                 val bestMatch = songList
                     .filter { abs(it.duration - duration) <= DURATION_TOLERANCE }
                     .minByOrNull { abs(it.duration - duration) }
 
-                val chosen = bestMatch ?: songList.firstOrNull()
-                Timber.tag("NeteaseProvider").d("Selected songId: ${chosen?.id}, name='${chosen?.name}', duration=${chosen?.duration}")
-                chosen?.id
+                val chosen = bestMatch
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").d("Selected match: ${chosen != null}, duration=${chosen?.duration}")
+                }
+                return chosen?.id
             } else {
-                Timber.tag("NeteaseProvider").w("Search failed with code: $code")
-                null
+                if (BuildConfig.DEBUG) {
+                    Timber.tag("NeteaseProvider").w("Search failed with code: $code")
+                }
+                return null
             }
         } catch (e: Exception) {
-            Timber.tag("NeteaseProvider").e(e, "Search exception")
-            null
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").e(e, "Search exception")
+            }
+            return null
         }
     }
 
     private suspend fun fetchLyrics(songId: String): NeteaseLyricsResult {
-        Timber.tag("NeteaseProvider").d("Fetching lyrics for songId: $songId")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Fetching lyrics")
+        }
         val json = eapiRequest(
             path = "/api/song/lyric/v1",
             data = mapOf(
@@ -243,7 +277,9 @@ object NeteaseCloudMusicLyricsProvider {
         val code = (jsonObj.get("code") as? JsonPrimitive)?.content?.toIntOrNull()
             ?: (jsonObj.get("status") as? JsonPrimitive)?.content?.toIntOrNull()
             ?: 0
-        Timber.tag("NeteaseProvider").d("Lyrics response code: $code")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Lyrics response code: $code")
+        }
 
         if (code == 200) {
             // Parse lrc object
@@ -271,11 +307,14 @@ object NeteaseCloudMusicLyricsProvider {
             }
             val tlyric = tlyricRaw?.let { convertNeteaseJsonLyric(it) }
 
-            val lyricPreview = lyric.take(200).replace("\n", "\\n")
-            Timber.tag("NeteaseProvider").d("Lyrics fetched successfully, length=${lyric.length}, tlyric=${tlyric?.length ?: 0}, preview: $lyricPreview")
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").d("Lyrics fetched: length=${lyric.length}, hasTranslation=${tlyric != null}")
+            }
             return NeteaseLyricsResult(lyric, tlyric)
         } else {
-            Timber.tag("NeteaseProvider").w("Failed to fetch lyrics: code $code")
+            if (BuildConfig.DEBUG) {
+                Timber.tag("NeteaseProvider").w("Failed to fetch lyrics: code $code")
+            }
             throw IllegalStateException("Failed to fetch lyrics: code $code")
         }
     }
@@ -285,11 +324,15 @@ object NeteaseCloudMusicLyricsProvider {
         // 只有最终请求 URL 才使用转换后的路径
         val transformedPath = if (path.startsWith("/api/")) "/eapi/${path.substring(5)}" else path
         val url = "$OFFICIAL_API_BASE_URL$transformedPath"
-        Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
+        }
 
         // Build eapi encrypted params with header (matching api-enhanced)
         val header = buildEapiHeader()
-        Timber.tag("NeteaseProvider").d("Constructed header: $header")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Constructed header: $header")
+        }
 
         // Build JSON using org.json.JSONObject to avoid Kotlinx serialization builder issues
         val jsonData = JSONObject().apply {
@@ -300,20 +343,30 @@ object NeteaseCloudMusicLyricsProvider {
             put("header", headerObj)
         }.toString()
 
-        Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
+        }
 
         // 关键修复：签名和加密数据使用原始 path（不是 transformedPath）
         val message = "nobody${path}use${jsonData}md5forencrypt"
-        Timber.tag("NeteaseProvider").d("Sign message: $message")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Sign message: $message")
+        }
 
         val digest = md5(message)
-        Timber.tag("NeteaseProvider").d("MD5 digest: $digest")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("MD5 digest: $digest")
+        }
 
         val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
-        Timber.tag("NeteaseProvider").d("EAPI data before encryption: $eapiData")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("EAPI data before encryption: $eapiData")
+        }
 
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
-        Timber.tag("NeteaseProvider").d("Encrypted params (hex, first 100 chars): ${encryptedParams.take(100)}...")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Encrypted params (hex, first 100 chars): ${encryptedParams.take(100)}...")
+        }
 
         // Send as form data: params=encryptedParams
         val response = client.post(url) {
@@ -326,9 +379,11 @@ object NeteaseCloudMusicLyricsProvider {
         val responseStatus = response.status.value
         val responseHeaders = response.headers.toString()
         val responseBody = response.body<String>()
-        Timber.tag("NeteaseProvider").w("Response status: $responseStatus")
-        Timber.tag("NeteaseProvider").d("Response headers: $responseHeaders")
-        Timber.tag("NeteaseProvider").d("Response body (length=${responseBody.length}): ${responseBody.take(500)}")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").w("Response status: $responseStatus")
+            Timber.tag("NeteaseProvider").d("Response headers: $responseHeaders")
+            Timber.tag("NeteaseProvider").d("Response body (length=${responseBody.length}): ${responseBody.take(500)}")
+        }
 
         return Json.parseToJsonElement(responseBody)
     }
@@ -352,7 +407,9 @@ object NeteaseCloudMusicLyricsProvider {
             "channel" to "netease",
             "requestId" to requestId
         )
-        Timber.tag("NeteaseProvider").d("Built eapi header: $header")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("Built eapi header: $header")
+        }
         return header
     }
 
@@ -362,7 +419,9 @@ object NeteaseCloudMusicLyricsProvider {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
         val encrypted = cipher.doFinal(input.toByteArray(Charsets.UTF_8))
         val result = bytesToHex(encrypted)
-        Timber.tag("NeteaseProvider").d("AES-ECB encrypt: inputLen=${input.length}, outputLen=${result.length}")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("AES-ECB encrypt: inputLen=${input.length}, outputLen=${result.length}")
+        }
         return result
     }
 
@@ -370,7 +429,9 @@ object NeteaseCloudMusicLyricsProvider {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(input.toByteArray(Charsets.UTF_8))
         val result = bytesToHex(digest)
-        Timber.tag("NeteaseProvider").d("MD5: input='$input' -> $result")
+        if (BuildConfig.DEBUG) {
+            Timber.tag("NeteaseProvider").d("MD5: inputLen=${input.length}, output=$result")
+        }
         return result
     }
 
