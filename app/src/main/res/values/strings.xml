@@ -347,7 +347,4 @@
     <string name="translation_models">Translation Models</string>
     <string name="clear_translation_models">Clear translation models</string>
 
-    <!-- Netease Cloud Music -->
-    <string name="netease_cloud_music">NetEase Cloud Music</string>
-    <string name="netease_lyrics_provider_description">Get lyrics from NetEase Cloud Music</string>
 </resources>
