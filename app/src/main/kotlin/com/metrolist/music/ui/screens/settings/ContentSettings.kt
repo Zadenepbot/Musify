@@ -142,7 +142,7 @@ fun ContentSettings(
             "LrcLib" to "LrcLib",
             "KuGou" to "KuGou",
             "LyricsPlus" to "LyricsPlus",
-            "NeteaseCloudMusic" to "网易云音乐",
+            "NeteaseCloudMusic" to stringResource(R.string.netease_cloud_music),
             "YouTubeSubtitle" to "YouTube Subtitles",
             "YouTube" to "YouTube",
         )
