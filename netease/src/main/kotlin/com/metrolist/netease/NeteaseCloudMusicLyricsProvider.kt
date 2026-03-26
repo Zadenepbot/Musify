@@ -129,7 +129,7 @@ object NeteaseCloudMusicLyricsProvider {
                     "type" to "1",
                     "limit" to "30",
                     "offset" to "0",
-                    "e_r" to false
+                    "e_r" to "false"
                 )
             )
 
@@ -187,7 +187,7 @@ object NeteaseCloudMusicLyricsProvider {
                 "yv" to "0",
                 "ytv" to "0",
                 "yrv" to "0",
-                "e_r" to false
+                "e_r" to "false"
             )
         )
 
@@ -211,7 +211,8 @@ object NeteaseCloudMusicLyricsProvider {
     }
 
     private suspend fun eapiRequest(path: String, data: Map<String, Any>): JsonElement {
-        // 转换路径：如果 path 以 "/api/" 开头，则改为 "/eapi/..."（去掉 "/api"）
+        // 重要：加密和签名必须使用原始 path（例如 /api/cloudsearch/pc）
+        // 只有最终请求 URL 才使用转换后的路径
         val transformedPath = if (path.startsWith("/api/")) "/eapi/${path.substring(5)}" else path
         val url = "$OFFICIAL_API_BASE_URL$transformedPath"
         Timber.tag("NeteaseProvider").d("EAPI Request URL: $url")
@@ -231,13 +232,14 @@ object NeteaseCloudMusicLyricsProvider {
 
         Timber.tag("NeteaseProvider").d("Data with header (JSON): $jsonData")
 
+        // 关键修复：签名和加密数据使用原始 path（不是 transformedPath）
         val message = "nobody${path}use${jsonData}md5forencrypt"
         Timber.tag("NeteaseProvider").d("Sign message: $message")
 
         val digest = md5(message)
         Timber.tag("NeteaseProvider").d("MD5 digest: $digest")
 
-        val eapiData = "$transformedPath-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
+        val eapiData = "$path-$EAPI_MAGIC-$jsonData-$EAPI_MAGIC-$digest"
         Timber.tag("NeteaseProvider").d("EAPI data before encryption: $eapiData")
 
         val encryptedParams = aesEncrypt(eapiData, EAPI_KEY)
