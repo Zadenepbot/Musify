@@ -95,7 +95,6 @@ import com.metrolist.music.constants.DisableLoadMoreWhenRepeatAllKey
 import com.metrolist.music.constants.DiscordActivityNameKey
 import com.metrolist.music.constants.DiscordActivityTypeKey
 import com.metrolist.music.constants.DiscordAdvancedModeKey
-import com.metrolist.music.constants.DiscordAvatarKey
 import com.metrolist.music.constants.DiscordButton1TextKey
 import com.metrolist.music.constants.DiscordButton1VisibleKey
 import com.metrolist.music.constants.DiscordButton2TextKey
@@ -104,6 +103,13 @@ import com.metrolist.music.constants.DiscordStatusKey
 import com.metrolist.music.constants.DiscordTokenKey
 import com.metrolist.music.constants.DiscordUseDetailsKey
 import com.metrolist.music.constants.EnableDiscordRPCKey
+import com.metrolist.music.constants.EnableMatrixRPCKey
+import com.metrolist.music.constants.MatrixAccountsKey
+import com.metrolist.music.constants.MatrixStatusFormatKey
+import com.metrolist.music.constants.MatrixUpdateIntervalKey
+import com.metrolist.music.constants.MatrixClearStatusKey
+import com.metrolist.music.models.MatrixAccount
+import kotlinx.serialization.json.Json
 import com.metrolist.music.constants.EnableLastFMScrobblingKey
 import com.metrolist.music.constants.EnableSongCacheKey
 import com.metrolist.music.constants.HideExplicitKey
@@ -137,7 +143,6 @@ import com.metrolist.music.constants.SkipSilenceKey
 import com.metrolist.music.db.entities.Event
 import com.metrolist.music.db.entities.FormatEntity
 import com.metrolist.music.db.entities.LyricsEntity
-import com.metrolist.music.db.entities.PlaylistEntity
 import com.metrolist.music.db.entities.RelatedSongMap
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.db.MusicDatabase
@@ -176,6 +181,10 @@ import com.metrolist.music.R
 import com.metrolist.music.utils.CoilBitmapLoader
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.DiscordRPC
+import com.metrolist.music.utils.MatrixRPC
+import com.metrolist.music.utils.MatrixTokenStore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.metrolist.music.utils.get
 import com.metrolist.music.utils.NetworkConnectivityObserver
 import com.metrolist.music.utils.reportException
@@ -372,9 +381,17 @@ class MusicService :
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
     private var discordRpc: DiscordRPC? = null
+    private var matrixRpcClients = mutableListOf<MatrixRPC>()
+    private val matrixRpcClientsMutex = Mutex()
+    private val matrixRpcUpdateMutex = Mutex()
     private var lastPlaybackSpeed = 1.0f
     private var discordUpdateJob: kotlinx.coroutines.Job? = null
+    private var matrixUpdateJob: kotlinx.coroutines.Job? = null
+    private var matrixToastJob: kotlinx.coroutines.Job? = null
 
+    private val matrixJsonConfig = Json { ignoreUnknownKeys = true }
+
+    // MediaSession components
     private var scrobbleManager: ScrobbleManager? = null
 
     val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
@@ -413,6 +430,7 @@ class MusicService :
                     if (!player.isPlaying) {
                         scope.launch(Dispatchers.IO) {
                             discordRpc?.closeRPC()
+                            clearMatrixRPC()
                         }
                     }
                 }
@@ -422,6 +440,7 @@ class MusicService :
                         scope.launch {
                             currentSong.value?.let { song ->
                                 updateDiscordRPC(song)
+                                updateMatrixRPC(song)
                             }
                         }
                     }
@@ -635,6 +654,14 @@ class MusicService :
                         }
                     }
                 }
+                if (isConnected && matrixRpcClientsMutex.withLock { matrixRpcClients.isNotEmpty() } && player.isPlaying) {
+                    val mediaId = player.currentMetadata?.id
+                    if (mediaId != null) {
+                        database.song(mediaId).first()?.let { song ->
+                            updateMatrixRPC(song)
+                        }
+                    }
+                }
             }
         }
 
@@ -807,6 +834,76 @@ class MusicService :
                             updateDiscordRPC(it, true)
                         }
                     }
+                }
+            }
+
+        // Matrix Account Sync: Always keep clients loaded regardless of toggle
+        dataStore.data
+            .map { it[MatrixAccountsKey] }
+            .distinctUntilChanged()
+            .collect(scope) { accountsJson ->
+                val actualAccountsJson = accountsJson ?: "[]"
+                matrixRpcClientsMutex.withLock {
+                    matrixRpcClients.clear()
+                    val accounts = try {
+                        matrixJsonConfig.decodeFromString<List<MatrixAccount>>(actualAccountsJson)
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e(e, "Failed to decode Matrix accounts (JSON: $actualAccountsJson)")
+                        emptyList()
+                    }
+
+                    accounts.forEach { account ->
+                        val token = MatrixTokenStore.getToken(this@MusicService, account.homeserver, account.userId)
+                        if (!token.isNullOrEmpty()) {
+                            matrixRpcClients.add(
+                                MatrixRPC(
+                                    homeserver = account.homeserver,
+                                    userId = account.userId,
+                                    accessToken = token,
+                                    listeningPrefix = getString(R.string.matrix_listening_prefix),
+                                    pausedPrefix = getString(R.string.matrix_paused_prefix)
+                                )
+                            )
+                        }
+                    }
+                }
+                // Trigger update/clear based on current state
+                if (dataStore.get(EnableMatrixRPCKey, false) == true) {
+                    updateMatrixRPC(currentSong.value)
+                } else {
+                    clearMatrixRPC()
+                }
+            }
+
+        // Matrix Toggle: Gate network calls
+        dataStore.data
+            .map { it[EnableMatrixRPCKey] ?: false }
+            .distinctUntilChanged()
+            .collect(scope) { enabled ->
+                if (enabled) {
+                    updateMatrixRPC(currentSong.value)
+                } else {
+                    clearMatrixRPC()
+                }
+            }
+
+        dataStore.data
+            .map { it[MatrixStatusFormatKey] }
+            .debounce(300)
+            .distinctUntilChanged()
+            .collect(scope) {
+                if (player.playbackState == Player.STATE_READY && player.playWhenReady) {
+                    updateMatrixRPC(currentSong.value)
+                }
+            }
+
+        dataStore.data
+            .map { it[MatrixClearStatusKey] ?: false }
+            .distinctUntilChanged()
+            .collect(scope) { clearRequested ->
+                if (clearRequested) {
+                    clearMatrixRPC(showToast = true)
+                    dataStore.edit { it[MatrixClearStatusKey] = false }
                 }
             }
 
@@ -1832,7 +1929,7 @@ class MusicService :
             }
         }
     }
-    
+
     private suspend fun toggleEpisodeSaveForLater(songEntity: com.metrolist.music.db.entities.SongEntity) {
         val isCurrentlySaved = songEntity.inLibrary != null
         val shouldBeSaved = !isCurrentlySaved
@@ -2137,6 +2234,7 @@ class MusicService :
 
         if (playbackState == Player.STATE_IDLE || playbackState == Player.STATE_ENDED) {
             scrobbleManager?.onSongStop()
+            clearMatrixRPC()
         }
     }
 
@@ -2211,6 +2309,7 @@ class MusicService :
             ) {
                 scope.launch {
                     discordRpc?.close()
+                    updateMatrixRPC(currentSong.value)
                 }
             }
         }
@@ -2227,6 +2326,7 @@ class MusicService :
                     // Fetch song from database to get full info
                     database.song(mediaId).first()?.let { song ->
                         updateDiscordRPC(song)
+                        updateMatrixRPC(song)
                     }
                 }
             }
@@ -2338,6 +2438,7 @@ class MusicService :
                 if (player.playWhenReady && player.playbackState == Player.STATE_READY) {
                     currentSong.value?.let { song ->
                         updateDiscordRPC(song)
+                        updateMatrixRPC(song)
                     }
                 }
             }
@@ -2865,6 +2966,118 @@ class MusicService :
             }
         } finally {
             isSilenceSkipping = false
+        }
+    }
+
+    /**
+     * Updates the status on all connected Matrix RPC clients.
+     * This handles debouncing and respects the global Matrix RPC enabled toggle.
+     *
+     * @param song The [Song] metadata to broadcast, or null to clear.
+     */
+    private fun updateMatrixRPC(song: Song?) {
+        val current = song ?: currentSong.value ?: return
+
+        // IMMEDIATE GATE: If presence is disabled, clear once and stop everything.
+        if (dataStore.get(EnableMatrixRPCKey, false) != true) {
+            clearMatrixRPC()
+            return
+        }
+
+        matrixUpdateJob?.cancel()
+        matrixUpdateJob = scope.launch {
+            var repeatUpdate = false
+            var updateIntervalSeconds = 15
+            matrixRpcUpdateMutex.withLock {
+                delay(1000) // Debounce rapid metadata/playback changes
+
+                // RE-CHECK AFTER DELAY: Just in case it was disabled during the 1s wait.
+                if (dataStore.get(EnableMatrixRPCKey, false) != true) {
+                    clearMatrixRPC()
+                    return@withLock
+                }
+
+                val presence = if (player.isPlaying) "online" else "unavailable"
+                val statusFormat = dataStore.get(MatrixStatusFormatKey, "").ifEmpty { getString(R.string.matrix_status_format_default) }
+                val intervalSeconds = dataStore.get(MatrixUpdateIntervalKey, 15)
+
+                val clients = matrixRpcClientsMutex.withLock { matrixRpcClients.toList() }
+                clients.forEach { client ->
+                    client.updateSong(
+                        song = current,
+                        currentPositionMs = player.currentPosition,
+                        statusFormat = statusFormat,
+                        presence = presence
+                    ).onFailure {
+                        Timber.tag(TAG).w(it, "Matrix RPC update failed")
+                    }
+                }
+
+                if (player.playWhenReady && player.playbackState == Player.STATE_READY && player.isPlaying) {
+                    repeatUpdate = true
+                    updateIntervalSeconds = intervalSeconds
+                }
+            }
+
+            if (repeatUpdate) {
+                delay(updateIntervalSeconds * 1000L)
+                updateMatrixRPC(current)
+            }
+        }
+    }
+
+    /**
+     * Clears the current Matrix status on all connected clients.
+     *
+     * @param showToast Whether to show a localized toast message when status is cleared.
+     */
+    private fun clearMatrixRPC(showToast: Boolean = false) {
+        matrixUpdateJob?.cancel()
+        matrixUpdateJob = scope.launch {
+            var count = 0
+            matrixRpcUpdateMutex.withLock {
+                matrixRpcClientsMutex.withLock {
+                    if (matrixRpcClients.isEmpty()) {
+                        // Always attempt to load accounts when clearing, even if disabled
+                        val accountsJson = dataStore.get(MatrixAccountsKey, "[]")
+                        val accounts = try {
+                            matrixJsonConfig.decodeFromString<List<MatrixAccount>>(accountsJson)
+                        } catch (e: Exception) {
+                            Timber.tag(TAG).e(e, "Failed to decode Matrix accounts for clearing (JSON: $accountsJson)")
+                            emptyList()
+                        }
+
+                        accounts.forEach { account ->
+                            val token = MatrixTokenStore.getToken(this@MusicService, account.homeserver, account.userId)
+                            if (!token.isNullOrEmpty()) {
+                                matrixRpcClients.add(
+                                    MatrixRPC(
+                                        homeserver = account.homeserver,
+                                        userId = account.userId,
+                                        accessToken = token,
+                                        listeningPrefix = getString(R.string.matrix_listening_prefix),
+                                        pausedPrefix = getString(R.string.matrix_paused_prefix)
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    matrixRpcClients.forEach { it.clearStatus() }
+                    count = matrixRpcClients.size
+                }
+            }
+
+            if (showToast && count > 0) {
+                matrixToastJob?.cancel()
+                matrixToastJob = scope.launch(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        this@MusicService,
+                        resources.getQuantityString(R.plurals.matrix_status_cleared, count, count),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 

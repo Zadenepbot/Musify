@@ -159,6 +159,13 @@ val DiscordActivityTypeKey = stringPreferencesKey("discordActivityType")
 val DiscordActivityNameKey = stringPreferencesKey("discordActivityName")
 val DiscordAdvancedModeKey = booleanPreferencesKey("discordAdvancedMode")
 
+// Matrix RPC
+val MatrixAccountsKey = stringPreferencesKey("matrixAccounts")
+val EnableMatrixRPCKey = booleanPreferencesKey("matrixRPCEnable")
+val MatrixStatusFormatKey = stringPreferencesKey("matrixStatusFormat")
+val MatrixUpdateIntervalKey = intPreferencesKey("matrixUpdateInterval")
+val MatrixClearStatusKey = booleanPreferencesKey("matrixClearStatus")
+
 // Google Cast
 val EnableGoogleCastKey = booleanPreferencesKey("enableGoogleCast")
 
