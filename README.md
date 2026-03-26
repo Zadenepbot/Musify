@@ -247,7 +247,7 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 
 <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/XMR.png" alt="Monero QR code" width="150" />
 
-```text
+```
 44XjSELSWcgJTZiCKzjpCQWyXhokrH9RqH3rpp35FkSKi57T25hniHWHQNhLeXyFn3DDYqufmfRB1iEtENerZpJc7xJCcqt
 ```
 
