@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/icon.png" width="200" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/icon.png" alt="Metrolist app icon" width="200" />
 
 # Metrolist
 
@@ -27,12 +27,12 @@
 
 <h1><a id="screenshots"></a>Screenshots</h1>
 
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_1.png" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_2.png" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_3.png" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_4.png" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_5.png" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_1.png" alt="Screenshot 1" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_2.png" alt="Screenshot 2" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_3.png" alt="Screenshot 3" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_4.png" alt="Screenshot 4" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_5.png" alt="Screenshot 5" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" alt="Screenshot 6" width="30%" />
 
 </div>
 
@@ -52,12 +52,12 @@
   <tr>
     <td align="center">
       <a href="https://github.com/MetrolistGroup/Metrolist/releases/latest/download/Metrolist.apk">
-        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" height="75">
+        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
       </a>
     </td>
     <td align="center">
       <a href="https://apt.izzysoft.de/fdroid/index/apk/com.metrolist.music">
-        <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="75">
+        <img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Download from IzzyOnDroid" height="75">
       </a>
     </td>
   </tr>
@@ -67,7 +67,7 @@
   <tr>
     <td align="center" colspan="2">
       <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/MetrolistGroup/Metrolist/">
-        <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" height="50">
+        <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png" alt="Download from Obtainium" height="45">
       </a>
     </td>
   </tr>
@@ -78,12 +78,12 @@
   <tr>
     <td align="center">
       <a href="https://www.openapk.net/metrolist/com.metrolist.music/">
-        <img src="https://www.openapk.net/images/openapk-badge.png" height="75">
+        <img src="https://www.openapk.net/images/openapk-badge.png" alt="Download from OpenAPK" height="75">
       </a>
     </td>
     <td align="center">
       <a href="https://belberi.com/metrolist/">
-        <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/belberi_github.png" height="75">
+        <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/belberi_github.png" alt="Download from Belberi" height="75">
       </a>
     </td>
   </tr>
@@ -100,8 +100,8 @@
   <tbody>
     <tr>
       <td align="center">
-        <a href="https://nightly.link/MetrolistGroup/Metrolist/workflows/build/main/app-universal-with-Google-Cast.zip">
-          <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" height="65">
+        <a href="https://nightly.link/MetrolistGroup/Metrolist/workflows/build/main/app-with-Google-Cast.zip">
+          <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="65">
         </a>
       </td>
     </tr>
@@ -231,7 +231,7 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 
 ### Monero (XMR)
 
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/XMR.png" width="150" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/XMR.png" alt="Monero QR code" width="150" />
 
 ```
 44XjSELSWcgJTZiCKzjpCQWyXhokrH9RqH3rpp35FkSKi57T25hniHWHQNhLeXyFn3DDYqufmfRB1iEtENerZpJc7xJCcqt
@@ -240,7 +240,7 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 ### Buy Me a Coffee
 
 <a href="https://www.buymeacoffee.com/mostafaalagamy">
-  <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/buymeacoffee.png?raw=true" width="150" />
+  <img src="https://github.com/MetrolistGroup/Metrolist/blob/main/assets/buymeacoffee.png?raw=true" alt="Buy Me a Coffee" width="150" />
 </a>
 
 </div>
@@ -332,10 +332,10 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 
 <h1>Contributors</h1>
 
-<h2>This project wouldn't exist without these amazing people!</h3 >
+<h3>This project wouldn't exist without these amazing people!</h3>
 
 <a href="https://github.com/MetrolistGroup/Metrolist/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=MetrolistGroup/Metrolist" />
+  <img src="https://contrib.rocks/image?repo=MetrolistGroup/Metrolist" alt="Contributors"/>
 </a>
 
 </div>
