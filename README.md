@@ -27,12 +27,82 @@
 
 <h1><a id="screenshots"></a>Screenshots</h1>
 
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_1.png" alt="Screenshot 1" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_2.png" alt="Screenshot 2" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_3.png" alt="Screenshot 3" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_4.png" alt="Screenshot 4" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_5.png" alt="Screenshot 5" width="30%" />
-<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" alt="Screenshot 6" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_1.png" alt="Home screen" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_2.png" alt="Artist screen" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_3.png" alt="Recognize music screen" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_4.png" alt="Listen together screen" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_5.png" alt="Player screen" width="30%" />
+<img src="https://github.com/MetrolistGroup/Metrolist/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" alt="Player lyrics screen" width="30%" />
+
+</div>
+
+---
+
+<div align="center">
+
+<h1><a id="features"></a>Features</h1>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+
+### Playback
+- Stream any song or video from YouTube Music
+- Background playback
+- Download & cache for offline use
+- Skip silence
+- Sleep timer
+
+</td>
+    <td width="50%" valign="top">
+
+### Audio
+- Audio normalization
+- Tempo & pitch control
+- Equalizer
+
+</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+
+### Lyrics & Discovery
+- Live synced lyrics
+- AI-powered lyrics translation
+- Personalized quick picks
+- Search songs, albums, artists, videos, and playlists
+
+</td>
+    <td width="50%" valign="top">
+
+### Library & Account
+- Full library management
+- Local playlists
+- Import playlists
+- Reorder songs in playlist or queue
+- YouTube Music account login
+- Sync songs, artists, albums, and playlists
+
+</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+
+### Social
+- Listen together with friends in real-time
+
+</td>
+    <td width="50%" valign="top">
+
+### Interface
+- Home screen widget
+- Light / Dark / Black / Dynamic theme modes
+- 19 color palettes
+- Built with Material 3
+
+</td>
+  </tr>
+</table>
 
 </div>
 
@@ -114,71 +184,22 @@
 
 <div align="center">
 
-<h1><a id="features"></a>Features</h1>
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-
-### Playback
-- Stream any song or video from YouTube Music
-- Background playback
-- Download & cache for offline use
-- Skip silence
-- Sleep timer
-
-</td>
-    <td width="50%" valign="top">
-
-### Audio
-- Audio normalization
-- Tempo & pitch control
-- Equalizer
-
-</td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-
-### Lyrics & Discovery
-- Live synced lyrics
-- AI-powered lyrics translation
-- Personalized quick picks
-- Search songs, albums, artists, videos, and playlists
-
-</td>
-    <td width="50%" valign="top">
-
-### Library & Account
-- Full library management
-- Local playlists
-- Import playlists
-- Reorder songs in playlist or queue
-- YouTube Music account login
-- Sync songs, artists, albums, and playlists
-
-</td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-
-### Social
-- Listen together with friends in real-time
-
-</td>
-    <td width="50%" valign="top">
-
-### Interface
-- Home screen widget
-- Light / Dark / Black / Dynamic theme modes
-- 19 color palettes
-- Built with Material 3
-
-</td>
-  </tr>
-</table>
+<h1><a id="faq"></a>FAQ</h1>
 
 </div>
+
+<details>
+<summary><b>Q: Why isn't Metrolist showing in Android Auto?</b></summary>
+<br/>
+
+Android Auto requires enabling **Unknown sources** via its developer settings:
+
+1. Open **Android Auto** → Settings
+2. Tap the **version number** repeatedly at the bottom to unlock developer settings
+3. Tap the **⋮ menu** (top-right) → **"Developer settings"**
+4. Toggle on **"Unknown sources"**
+
+</details>
 
 ---
 
@@ -202,22 +223,14 @@
 
 <div align="center">
 
-<h1><a id="faq"></a>FAQ</h1>
+<h1><a id="community"></a>Community</h1>
+
+<h3>Have questions, ideas, or just want to chat? We'd love to hear that from you!</h3>
+
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white&labelColor=1c1917)](https://dsc.gg/metrolist)
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1c1917)](https://t.me/metrolistapp)
 
 </div>
-
-<details>
-<summary><b>Q: Why isn't Metrolist showing in Android Auto?</b></summary>
-<br/>
-
-Android Auto requires enabling **Unknown sources** via its developer settings:
-
-1. Open **Android Auto** → Settings
-2. Tap the **version number** repeatedly at the bottom to unlock developer settings
-3. Tap the **⋮ menu** (top-right) → **"Developer settings"**
-4. Toggle on **"Unknown sources"**
-
-</details>
 
 ---
 
@@ -244,19 +257,6 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 </a>
 
 </div>
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="community"></a>Community</h1>
-
-<h3>Have questions, ideas, or just want to chat? We'd love to hear that from you!</h3>
-
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white&labelColor=1c1917)](https://dsc.gg/metrolist)
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1c1917)](https://t.me/metrolistapp)
 
 </div>
 
