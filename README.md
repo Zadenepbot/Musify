@@ -209,7 +209,8 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 
 [![Translation status](https://img.shields.io/weblate/progress/metrolist?style=for-the-badge&labelColor=0d1117)](https://hosted.weblate.org/engage/metrolist/)
 
-<h3>We use Weblate to translate Metrolist. Help us bring Metrolist to more people! <a href="https://hosted.weblate.org/projects/Metrolist/">Start translating here</a>.</h3>
+<h3>We use Weblate to translate Metrolist. Help us bring Metrolist to more people!</h3>
+<h3><a href="https://hosted.weblate.org/projects/Metrolist/">Start translating here</a></h3>
 
 <a href="https://hosted.weblate.org/projects/Metrolist/">
   <img src="https://hosted.weblate.org/widget/Metrolist/horizontal-auto.svg" alt="Translation status" />
@@ -322,7 +323,7 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
   </tbody>
 </table>
 
-<h3>We also thank the entire open-source community! Every library, tool, and API that powers this project.</h3>
+<h3>We also thank the entire open-source community! Every library, tool, and API that powers this project!</h3>
 
 </div>
 
