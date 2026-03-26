@@ -24,39 +24,47 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 private fun convertNeteaseJsonLyric(lyricJson: String): String {
-    // The lyricJson may contain multiple JSON objects separated by newlines.
-    // Each object is like {"t":0,"c":[{"tx":"text"},...]}
+    // The lyricJson may contain both JSON object lines (from Netease) and standard LRC lines.
+    // We only convert JSON lines (starting with '{'), and keep LRC lines unchanged.
     val lines = lyricJson.split("\n").filter { it.trim().isNotEmpty() }
     val result = StringBuilder()
     lines.forEach { line ->
-        try {
-            val json = JSONObject(line)
-            val t = json.optLong("t", 0)
-            val cArray = json.optJSONArray("c") ?: return@forEach
+        val trimmed = line.trim()
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            // Try to parse as JSON object with "t" and "c"
+            try {
+                val json = JSONObject(trimmed)
+                val t = json.optLong("t", 0)
+                val cArray = json.optJSONArray("c") ?: return@forEach
 
-            // Build lyric text from c array's tx fields
-            val sb = StringBuilder()
-            for (i in 0 until cArray.length()) {
-                val obj = cArray.optJSONObject(i) ?: continue
-                val tx = obj.optString("tx", "")
-                if (tx.isNotEmpty()) {
-                    if (sb.isNotEmpty()) sb.append(" ")
-                    sb.append(tx)
+                // Build lyric text from c array's tx fields
+                val sb = StringBuilder()
+                for (i in 0 until cArray.length()) {
+                    val obj = cArray.optJSONObject(i) ?: continue
+                    val tx = obj.optString("tx", "")
+                    if (tx.isNotEmpty()) {
+                        if (sb.isNotEmpty()) sb.append(" ")
+                        sb.append(tx)
+                    }
                 }
-            }
 
-            if (sb.isNotEmpty()) {
-                // Convert time t (ms) to LRC tag [MM:SS.xx]
-                val totalMs = t
-                val minutes = totalMs / 60000
-                val seconds = (totalMs % 60000) / 1000
-                val centis = (totalMs % 1000) / 10
-                val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
-                result.append(timeTag).append(sb).append("\n")
+                if (sb.isNotEmpty()) {
+                    // Convert time t (ms) to LRC tag [MM:SS.xx]
+                    val totalMs = t
+                    val minutes = totalMs / 60000
+                    val seconds = (totalMs % 60000) / 1000
+                    val centis = (totalMs % 1000) / 10
+                    val timeTag = String.format("[%02d:%02d.%02d]", minutes, seconds, centis)
+                    result.append(timeTag).append(sb).append("\n")
+                }
+            } catch (e: Exception) {
+                // If parsing fails, keep original line
+                Timber.tag("NeteaseProvider").w(e, "Failed to parse JSON lyric line, keeping raw: $trimmed")
+                result.append(line).append("\n")
             }
-        } catch (e: Exception) {
-            // If parsing fails for a line, skip it
-            Timber.tag("NeteaseProvider").w(e, "Failed to parse lyric line: $line")
+        } else {
+            // Assume it's already in LRC or plain text format; keep as-is.
+            result.append(line).append("\n")
         }
     }
     return result.toString().trim()
@@ -242,36 +250,26 @@ object NeteaseCloudMusicLyricsProvider {
             val lrc = jsonObj.get("lrc")?.jsonObject
                 ?: throw IllegalStateException("No lrc in response")
             
-            // lyric can be either a JsonPrimitive (string) or JsonObject (structured)
-            val lyricElement = lrc.get("lyric")
-            val lyric = when (lyricElement) {
-                is JsonPrimitive -> lyricElement.content
-                is JsonObject -> {
-                    val jsonStr = lyricElement.toString()
-                    // Try to convert Netease JSON lyric ({"t":..., "c":[...]}) to LRC format
-                    convertNeteaseJsonLyric(jsonStr)
-                }
+            // lyric can be JsonPrimitive (string), JsonObject, or null
+            val lyricRaw = when (val e = lrc.get("lyric")) {
+                is JsonPrimitive -> e.content
+                is JsonObject -> e.toString()
                 null -> throw IllegalStateException("lyric field missing in lrc")
-                else -> throw IllegalStateException("Unexpected lyric type: ${lyricElement::class.simpleName}")
+                else -> throw IllegalStateException("Unexpected lyric type: ${e::class.simpleName}")
             }
+            // Convert Netease JSON lyric ({"t":..., "c":[...]}) to standard LRC format.
+            // This handles both pure JSON strings and mixed LRC+JSON content.
+            val lyric = convertNeteaseJsonLyric(lyricRaw)
 
-            // tlyric may be at top level, also handle primitive/object and convert if needed
+            // tlyric may be at top level; handle similar to lrc
             val tlyricElement = jsonObj.get("tlyric")
-            val tlyric = when (tlyricElement) {
+            val tlyricRaw = when (tlyricElement) {
                 is JsonPrimitive -> tlyricElement.content
-                is JsonObject -> {
-                    val jsonStr = tlyricElement.toString()
-                    // Try to convert Netease JSON lyric (similar structure) to LRC format
-                    try {
-                        convertNeteaseJsonLyric(jsonStr)
-                    } catch (e: Exception) {
-                        Timber.tag("NeteaseProvider").w(e, "Failed to convert tlyric, using raw string")
-                        jsonStr
-                    }
-                }
+                is JsonObject -> tlyricElement.toString()
                 null -> null
                 else -> null
             }
+            val tlyric = tlyricRaw?.let { convertNeteaseJsonLyric(it) }
 
             val lyricPreview = lyric.take(200).replace("\n", "\\n")
             Timber.tag("NeteaseProvider").d("Lyrics fetched successfully, length=${lyric.length}, tlyric=${tlyric?.length ?: 0}, preview: $lyricPreview")
