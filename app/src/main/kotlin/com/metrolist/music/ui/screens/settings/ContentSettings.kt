@@ -498,9 +498,9 @@ fun ContentSettings(
                         Column(
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("网易云音乐")
+                            Text(stringResource(R.string.netease_cloud_music))
                             Text(
-                                text = "从网易云音乐获取歌词 (需要自建 API 服务)",
+                                text = stringResource(R.string.netease_lyrics_provider_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
