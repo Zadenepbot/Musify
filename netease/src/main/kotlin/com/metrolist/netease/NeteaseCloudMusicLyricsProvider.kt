@@ -202,11 +202,30 @@ object NeteaseCloudMusicLyricsProvider {
             // Parse lrc object
             val lrc = jsonObj.get("lrc")?.jsonObject
                 ?: throw IllegalStateException("No lrc in response")
-            val lyric = lrc.get("lyric")?.jsonPrimitive?.content
-                ?: throw IllegalStateException("No lyric content in lrc")
+            
+            // lyric can be either a JsonPrimitive (string) or JsonObject (structured)
+            val lyricElement = lrc.get("lyric")
+            val lyric = when (lyricElement) {
+                is JsonPrimitive -> lyricElement.content
+                is JsonObject -> {
+                    Timber.tag("NeteaseProvider").w("lyric is JsonObject, converting to string")
+                    lyricElement.toString()
+                }
+                null -> throw IllegalStateException("lyric field missing in lrc")
+                else -> throw IllegalStateException("Unexpected lyric type: ${lyricElement::class.simpleName}")
+            }
 
-            // tlyric may be at top level
-            val tlyric = jsonObj.get("tlyric")?.jsonPrimitive?.content
+            // tlyric may be at top level, also handle primitive/object
+            val tlyricElement = jsonObj.get("tlyric")
+            val tlyric = when (tlyricElement) {
+                is JsonPrimitive -> tlyricElement.content
+                is JsonObject -> {
+                    Timber.tag("NeteaseProvider").w("tlyric is JsonObject, converting to string")
+                    tlyricElement.toString()
+                }
+                null -> null
+                else -> null
+            }
 
             val lyricPreview = lyric.take(200).replace("\n", "\\n")
             Timber.tag("NeteaseProvider").d("Lyrics fetched successfully, length=${lyric.length}, tlyric=${tlyric?.length ?: 0}, preview: $lyricPreview")
