@@ -126,7 +126,7 @@ fun PlayerSettings(
 
     val (loudnessLevel, onLoudnessLevelChange) = rememberEnumPreference(
         LoudnessLevelKey,
-        defaultValue = LoudnessLevel.AGGRESSIVE,
+        defaultValue = LoudnessLevel.BALANCED,
     )
 
     val (audioOffload, onAudioOffloadChange) = rememberPreference(
