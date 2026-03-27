@@ -187,6 +187,7 @@ import com.metrolist.music.utils.YTPlayerUtils
 import com.metrolist.music.widget.MetrolistWidgetManager
 import com.metrolist.music.widget.MusicWidgetReceiver
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.time.LocalDateTime
@@ -375,6 +376,9 @@ class MusicService :
     private var isAudioEffectSessionOpened = false
     private var openedAudioEffectSessionId: Int = C.AUDIO_SESSION_ID_UNSET
     private var loudnessEnhancer: LoudnessEnhancer? = null
+
+    private var loudnessSetupJob: Job? = null
+    private var loudnessSetupGeneration: Long = 0L
 
     @Volatile
     private var normalizationEnabledCached: Boolean = false
@@ -1933,13 +1937,14 @@ class MusicService :
         }
 
         // Create or recreate enhancer if needed
-        if (loudnessEnhancer == null) {
-            if (! createLoudnessEnhancerForSessionId(audioSessionId)) {
-                return
-            }
+        if (loudnessEnhancer == null && !createLoudnessEnhancerForSessionId(audioSessionId)) {
+            return
         }
 
-        scope.launch {
+        val requestGeneration = ++loudnessSetupGeneration
+        loudnessSetupJob?.cancel()
+
+        loudnessSetupJob = scope.launch {
             try {
                 val currentMediaId = withContext(Dispatchers.Main) {
                     player.currentMediaItem?.mediaId
@@ -1952,17 +1957,20 @@ class MusicService :
                         database.format(currentMediaId).first()
                     }
 
-                    val loudnessLevel = loudnessLevelCached
-                    val targetLufs = loudnessLevel.targetLufs
+                    val targetLufs = loudnessLevelCached.targetLufs
 
                     Timber.tag(TAG).d("Audio normalization enabled: $normalizeAudio")
                     Timber.tag(TAG)
                         .d("Format loudnessDb: ${format?.loudnessDb}, perceptualLoudnessDb: ${format?.perceptualLoudnessDb}")
 
                     // Use perceptualLoudnessDb if available, otherwise fall back to loudnessDb + offset
-                    val measuredLufs: Double? = format?.perceptualLoudnessDb ?: format?.loudnessDb?.let { it + LoudnessLevel.AGGRESSIVE.targetLufs }
+                    val measuredLufs: Double? = format?.perceptualLoudnessDb
+                        ?: format?.loudnessDb?.let { it + LoudnessLevel.AGGRESSIVE.targetLufs }
 
                     withContext(Dispatchers.Main) {
+                        if (!isActive || requestGeneration != loudnessSetupGeneration) return@withContext
+                        if (player.audioSessionId != audioSessionId || player.currentMediaItem?.mediaId != currentMediaId) return@withContext
+
                         if (measuredLufs != null) {
                             val loudnessDb = measuredLufs.let { it - targetLufs }
                             val targetGain = (-loudnessDb * 100.0).toInt()
@@ -1996,12 +2004,16 @@ class MusicService :
                     }
                 } else {
                     withContext(Dispatchers.Main) {
+                        if (!isActive || requestGeneration != loudnessSetupGeneration) return@withContext
                         cachedNormalizationGainMb = null
                         cachedNormalizationEnabled = false
                         loudnessEnhancer?.enabled = false
                         Timber.tag(TAG).d("setupLoudnessEnhancer: normalization disabled or mediaId unavailable")
                     }
                 }
+            } catch (e: CancellationException) {
+                Timber.tag(TAG).d("setupLoudnessEnhancer: job cancelled, likely due to new setup request or session change")
+                throw e
             } catch (e: Exception) {
                 reportException(e)
                 releaseLoudnessEnhancer()
@@ -2032,7 +2044,10 @@ class MusicService :
             return
         }
 
-        if (isAudioEffectSessionOpened && openedAudioEffectSessionId == audioSessionId) {
+        if (isAudioEffectSessionOpened &&
+            openedAudioEffectSessionId == audioSessionId &&
+            loudnessEnhancer != null
+        ) {
             applyCachedLoudnessEnhancerNow()
 
             if (!cachedNormalizationEnabled || cachedNormalizationGainMb == null) {
@@ -2048,12 +2063,17 @@ class MusicService :
             releaseLoudnessEnhancer(clearNormalizationCache = false)
         }
 
+        val enhancerReady = loudnessEnhancer != null || createLoudnessEnhancerForSessionId(audioSessionId)
+
+        if (!enhancerReady) {
+            isAudioEffectSessionOpened = false
+            openedAudioEffectSessionId = C.AUDIO_SESSION_ID_UNSET
+            Timber.tag(TAG).w("openAudioEffectSession: failed to create LoudnessEnhancer for sessionId=$audioSessionId, audio effects will be unavailable")
+            return
+        }
+
         isAudioEffectSessionOpened = true
         openedAudioEffectSessionId = audioSessionId
-
-        if (loudnessEnhancer == null) {
-            createLoudnessEnhancerForSessionId(audioSessionId)
-        }
 
         applyCachedLoudnessEnhancerNow()
 
@@ -2072,6 +2092,10 @@ class MusicService :
 
     private fun closeAudioEffectSession(sessionIdOverride: Int? = null, clearNormalizationCache: Boolean = true) {
         val sessionIdToClose = sessionIdOverride ?: openedAudioEffectSessionId
+
+        loudnessSetupGeneration++
+        loudnessSetupJob?.cancel()
+        loudnessSetupJob = null
 
         if (! isAudioEffectSessionOpened && (sessionIdToClose == C.AUDIO_SESSION_ID_UNSET || sessionIdToClose <= 0)) {
             return
