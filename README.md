@@ -18,12 +18,17 @@
 
 <br/>
 
-[**Download**](#download-now) · [**Features**](#features) · [**Translate**](#translations) · [**FAQ**](#faq) · [**Community**](#community) · [**Support**](#support-the-project)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white&labelColor=0d1117)](https://dsc.gg/metrolist)
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white&labelColor=0d1117)](https://t.me/metrolistapp)
+
+<br/>
+
+[**Download**](#download-now) · [**Features**](#features) · [**Translate**](#translations) · [**FAQ**](#faq) · [**Support**](#support-the-project)
 
 </div>
 
 > [!WARNING]
-> Regional Restriction — If YouTube Music is unavailable in your region, this app will not work without a **VPN or proxy** connecting to a supported region.
+> Regional Restriction - If YouTube Music is unavailable in your region, this app will not work without a **VPN or proxy** connecting to a supported region.
 
 ---
 
@@ -190,20 +195,9 @@
 
 <h1><a id="faq"></a>FAQ</h1>
 
+<h3>Got questions? Check out our <a href="https://metrolist.meowery.eu/faq">FAQ page</a> for answers to the most common ones!</h3>
+
 </div>
-
-<details>
-<summary><b>Q: Why isn't Metrolist showing in Android Auto?</b></summary>
-<br/>
-
-Android Auto requires enabling **Unknown sources** via its developer settings:
-
-1. Open **Android Auto** → Settings
-2. Tap the **version number** repeatedly at the bottom to unlock developer settings
-3. Tap the **⋮ menu** (top-right) → **"Developer settings"**
-4. Toggle on **"Unknown sources"**
-
-</details>
 
 ---
 
@@ -221,19 +215,6 @@ Android Auto requires enabling **Unknown sources** via its developer settings:
 </a>
 
 <h3>Thank you very much. Every translation makes Metrolist a little more accessible to someone, somewhere in the world!</h3>
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="community"></a>Community</h1>
-
-<h3>Have questions, ideas, or just want to chat? We'd love to hear that from you!</h3>
-
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white&labelColor=0d1117)](https://dsc.gg/metrolist)
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white&labelColor=0d1117)](https://t.me/metrolistapp)
 
 </div>
 
