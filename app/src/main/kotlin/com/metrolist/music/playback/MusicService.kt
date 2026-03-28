@@ -1035,6 +1035,7 @@ class MusicService :
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setAllowedCapturePolicy(C.ALLOW_CAPTURE_BY_ALL)
                     .build(),
                 false,
             )
@@ -1066,6 +1067,7 @@ class MusicService :
                 android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setAllowedCapturePolicy(android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL)
                     .build()
             )
             .setOnAudioFocusChangeListener { focusChange ->
