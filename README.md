@@ -8,6 +8,10 @@
 
 <br/>
 
+<a href="https://trendshift.io/repositories/20652" target="_blank"><img src="https://trendshift.io/api/badge/repositories/20652" alt="MetrolistGroup%2FMetrolist | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
+<br/>
+
 [![Latest release](https://img.shields.io/github/v/release/MetrolistGroup/Metrolist?style=for-the-badge&labelColor=0d1117)](https://github.com/MetrolistGroup/Metrolist/releases)
 [![License](https://img.shields.io/github/license/MetrolistGroup/metrolist?style=for-the-badge&labelColor=0d1117)](https://github.com/MetrolistGroup/Metrolist/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/MetrolistGroup/Metrolist/total?style=for-the-badge&labelColor=0d1117)](https://github.com/MetrolistGroup/Metrolist/releases)
