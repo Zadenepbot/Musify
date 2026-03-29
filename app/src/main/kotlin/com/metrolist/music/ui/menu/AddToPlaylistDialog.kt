@@ -74,7 +74,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.runtime.saveable.Saver
+import com.metrolist.music.LocalSyncUtils
 
 @Composable
 fun AddToPlaylistDialog(
@@ -87,6 +87,7 @@ fun AddToPlaylistDialog(
     viewModel: PlaylistsViewModel = hiltViewModel()
 ) {
     val database = LocalDatabase.current
+    val syncUtils = LocalSyncUtils.current
     val coroutineScope = rememberCoroutineScope()
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         AddToPlaylistSortTypeKey,
@@ -111,11 +112,7 @@ fun AddToPlaylistDialog(
     var selectedPlaylist by remember {
         mutableStateOf<Playlist?>(null)
     }
-    val songIdsSaver = Saver<List<String>?, ArrayList<String>>(
-        save  = { it?.let { ArrayList(it) } ?: ArrayList() },
-        restore = { if (it.isEmpty()) null else it.toList() }
-    )
-    var songIds by rememberSaveable(stateSaver = songIdsSaver) {
+    var songIds by remember {
         mutableStateOf<List<String>?>(null)
     }
     var duplicates by remember {
@@ -134,7 +131,6 @@ fun AddToPlaylistDialog(
     }
     LaunchedEffect(isVisible, songIds, playlists) {
         if (!isVisible) {
-            songIds = null
             playlistsContainingSong = emptySet()
             return@LaunchedEffect
         }
@@ -301,8 +297,14 @@ fun AddToPlaylistDialog(
                                 database.addSongToPlaylist(playlist, songIds!!)
 
                                 playlist.playlist.browseId?.let { plist ->
-                                    songIds?.forEach {
-                                        YouTube.addToPlaylist(plist, it)
+                                    songIds?.forEach { songId ->
+                                        syncUtils.registerPendingAdd(plist, songId)
+                                        try {
+                                            YouTube.addToPlaylist(plist, songId)
+                                        } finally {
+                                            // Always unregister, even if addToPlaylist throws
+                                            syncUtils.unregisterPendingAdd(plist, songId)
+                                        }
                                     }
                                 }
                             }

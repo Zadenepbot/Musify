@@ -55,6 +55,8 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.runBlocking
 
 sealed class SyncOperation {
     data object FullSync : SyncOperation()
@@ -118,6 +120,10 @@ class SyncUtils @Inject constructor(
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
     private var lastfmSendLikes = false
+    private val playlistsBeingModified = ConcurrentHashMap.newKeySet<String>()
+    // Tracks songs currently being added to YouTube — browseId → set of songIds
+    private val pendingYouTubeAdds = ConcurrentHashMap<String, MutableSet<String>>()
+    private val pendingRemovals = ConcurrentHashMap<String, MutableSet<Triple<String, String, String>>>()
 
     companion object {
         private const val MAX_RETRIES = 3
@@ -1374,7 +1380,12 @@ class SyncUtils @Inject constructor(
                                 Timber.d("syncSavedPlaylists: Updated existing playlist ${playlist.title} (${playlist.id})")
                             }
 
-                            executeSyncPlaylist(playlist.id, playlistEntity.id)
+                            if (playlistEntity.id !in playlistsBeingModified) {
+                                executeSyncPlaylist(playlist.id, playlistEntity.id)
+                                delay(DB_OPERATION_DELAY_MS)
+                            } else {
+                                Timber.d("Skipping playlist ${playlist.title} — remove in progress")
+                            }
                             delay(DB_OPERATION_DELAY_MS)
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to sync playlist ${playlist.title}")
@@ -1410,6 +1421,11 @@ class SyncUtils @Inject constructor(
             Timber.d("syncAutoSyncPlaylists: Found ${autoSyncPlaylists.size} playlists to sync")
 
             autoSyncPlaylists.forEach { playlist ->
+                // Skip playlists with a pending remove operation
+                if (playlist.playlist.id in playlistsBeingModified) {
+                    Timber.d("Skipping playlist ${playlist.playlist.name} — remove in progress")
+                    return@forEach
+                }
                 try {
                     executeSyncPlaylist(playlist.playlist.browseId!!, playlist.playlist.id)
                     delay(DB_OPERATION_DELAY_MS)
@@ -1604,6 +1620,127 @@ class SyncUtils @Inject constructor(
             Timber.e(e, "[PODCAST_CLEAR] Error during cleanup")
             updateState { copy(overallStatus = SyncStatus.Error(e.message ?: "Unknown error"), currentOperation = "") }
         }
+    }
+
+    suspend fun removeFromPlaylistAndAwaitSync(
+        browseId: String,
+        songId: String,
+        setVideoId: String,
+        playlistId: String
+    ) {
+        Timber.d("removeFromPlaylistAndAwaitSync: START browseId=$browseId songId=$songId setVideoId=$setVideoId")
+        playlistsBeingModified.add(playlistId)
+        var deferredRemove = false
+        try {
+            withContext(Dispatchers.IO) {
+                val hasPendingAdd = pendingYouTubeAdds[browseId]?.contains(songId) == true
+                Timber.d("removeFromPlaylistAndAwaitSync: hasPendingAdd=$hasPendingAdd")
+                if (hasPendingAdd) {
+                    Timber.d("removeFromPlaylistAndAwaitSync: Deferring remove")
+                    pendingRemovals.getOrPut(browseId) {
+                        java.util.concurrent.ConcurrentHashMap.newKeySet()
+                    }.add(Triple(songId, setVideoId, playlistId))
+                    deferredRemove = true
+                    return@withContext
+                }
+
+                Timber.d("removeFromPlaylistAndAwaitSync: Calling YouTube.removeFromPlaylist")
+                YouTube.removeFromPlaylist(browseId, songId, setVideoId)
+                Timber.d("removeFromPlaylistAndAwaitSync: YouTube.removeFromPlaylist returned")
+
+                for (attempt in 0 until 10) {
+                    delay(3_000L)
+                    val stillPresent = runCatching {
+                        YouTube.playlist(browseId).completed().getOrThrow()
+                    }.getOrNull()?.songs?.any { it.id == songId } ?: true
+                    Timber.d("removeFromPlaylistAndAwaitSync: Poll ${attempt + 1}/10 stillPresent=$stillPresent")
+
+                    if (!stillPresent) return@withContext
+                }
+                Timber.w("removeFromPlaylistAndAwaitSync: Timeout reached")
+            }
+        } finally {
+            if (!deferredRemove) playlistsBeingModified.remove(playlistId)
+            Timber.d("removeFromPlaylistAndAwaitSync: END deferredRemove=$deferredRemove")
+        }
+    }
+
+    fun registerPendingAdd(browseId: String, songId: String) {
+        pendingYouTubeAdds.getOrPut(browseId) {
+            ConcurrentHashMap.newKeySet()
+        }.add(songId)
+        Timber.d("registerPendingAdd: browseId=$browseId songId=$songId")
+    }
+
+    fun unregisterPendingAdd(browseId: String, songId: String) {
+        // Don't unregister immediately — poll until YouTube confirms the add server-side.
+        // This keeps hasPendingAdd=true until the song is actually visible on YouTube.
+        syncScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    for (attempt in 0 until 10) {
+                        delay(3_000L)
+                        val songPresent = runCatching {
+                            YouTube.playlist(browseId).completed().getOrThrow()
+                        }.getOrNull()?.songs?.any { it.id == songId } ?: false
+
+                        Timber.d("unregisterPendingAdd: Waiting for YouTube to confirm add, attempt ${attempt + 1}/10, found=$songPresent")
+
+                        if (songPresent) {
+                            Timber.d("unregisterPendingAdd: Add confirmed on YouTube for songId=$songId")
+                            break
+                        }
+                    }
+
+                    // Now safe to unregister — YouTube has processed the add (or we timed out)
+                    pendingYouTubeAdds[browseId]?.remove(songId)
+                    Timber.d("unregisterPendingAdd: Unregistered songId=$songId")
+
+                    // Execute any deferred remove that arrived while add was pending
+                    val pendingRemoval = pendingRemovals[browseId]?.find { it.first == songId }
+                    if (pendingRemoval != null) {
+                        pendingRemovals[browseId]?.remove(pendingRemoval)
+                        Timber.d("unregisterPendingAdd: Executing deferred remove for songId=$songId")
+                        YouTube.removeFromPlaylist(browseId, songId, pendingRemoval.second)
+                    }
+                }
+            } finally {
+                val pendingRemoval = pendingRemovals[browseId]?.find { it.first == songId }
+                pendingRemoval?.let { playlistsBeingModified.remove(it.third) }
+            }
+        }
+    }
+
+    fun scheduleRemoveFromPlaylist(
+        browseId: String,
+        songId: String,
+        playlistId: String,
+        getSetVideoId: suspend () -> String?
+    ) {
+        playlistsBeingModified.add(playlistId)
+        Thread {
+            runBlocking {
+                var setVideoId = getSetVideoId()
+
+                // setVideoId is only written to DB after first sync.
+                // If not available locally, fetch it directly from YouTube.
+                if (setVideoId == null) {
+                    Timber.w("scheduleRemoveFromPlaylist: setVideoId not in DB, fetching from YouTube")
+                    setVideoId = runCatching {
+                        YouTube.playlist(browseId).completed().getOrThrow()
+                            .songs.find { it.id == songId }?.setVideoId
+                    }.getOrNull()
+                }
+
+                if (setVideoId == null) {
+                    Timber.w("scheduleRemoveFromPlaylist: setVideoId not found on YouTube either, skipping remove for songId=$songId")
+                    playlistsBeingModified.remove(playlistId)
+                    return@runBlocking
+                }
+
+                removeFromPlaylistAndAwaitSync(browseId, songId, setVideoId, playlistId)
+            }
+        }.start()
     }
 
     fun cancelAllSyncs() {

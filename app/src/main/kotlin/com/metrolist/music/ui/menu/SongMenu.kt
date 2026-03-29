@@ -99,6 +99,7 @@ import com.metrolist.music.ui.component.TextFieldDialog
 import com.metrolist.music.ui.utils.ShowMediaInfo
 import com.metrolist.music.viewmodels.CachePlaylistViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -763,23 +764,28 @@ fun SongMenu(
                                 },
                                 onClick = {
                                     database.transaction {
-                                        coroutineScope.launch {
-                                            playlistBrowseId?.let { playlistId ->
-                                                if (playlistSong.map.setVideoId != null) {
-                                                    YouTube.removeFromPlaylist(
-                                                        playlistId,
-                                                        playlistSong.map.songId,
-                                                        playlistSong.map.setVideoId
-                                                    )
-                                                }
-                                            }
-                                        }
                                         move(
                                             playlistSong.map.playlistId,
                                             playlistSong.map.position,
                                             Int.MAX_VALUE
                                         )
                                         delete(playlistSong.map.copy(position = Int.MAX_VALUE))
+                                    }
+                                    playlistBrowseId?.let { browseId ->
+                                        syncUtils.scheduleRemoveFromPlaylist(
+                                            browseId,
+                                            playlistSong.map.songId,
+                                            playlistSong.map.playlistId
+                                        ) {
+                                            // Poll DB until setVideoId is available — it's written during first sync
+                                            var setVideoId: String? = null
+                                            for (attempt in 0 until 10) {
+                                                setVideoId = database.getSetVideoId(playlistSong.map.songId)?.setVideoId
+                                                if (setVideoId != null) break
+                                                delay(3_000L)
+                                            }
+                                            setVideoId
+                                        }
                                     }
                                     onDismiss()
                                 }
