@@ -138,14 +138,13 @@ fun MatrixAccountDialog(
             TextButton(
                 onClick = {
                     val trimmedServer = homeserver.trim()
-                    val normalizedHomeserver =
-                        if (trimmedServer.isNotBlank() && !trimmedServer.startsWith(
-                                "http://",
-                                ignoreCase = true
-                            ) && !trimmedServer.startsWith("https://", ignoreCase = true)
-                        ) {
-                            "https://$trimmedServer"
-                        } else trimmedServer
+                    val normalizedHomeserver = when {
+                        trimmedServer.isBlank() -> trimmedServer
+                        trimmedServer.startsWith("https://", ignoreCase = true) -> trimmedServer
+                        trimmedServer.startsWith("http://", ignoreCase = true) ->
+                            "https://" + trimmedServer.substring(7)
+                        else -> "https://$trimmedServer"
+                    }
 
                     onSave(MatrixAccount(normalizedHomeserver, userId.trim()), accessToken.trim())
                 }
