@@ -122,6 +122,20 @@ fun AddToPlaylistDialog(
         mutableStateOf<Set<String>>(emptySet())
     }
 
+    suspend fun addSongsAndSync(targetPlaylist: Playlist, ids: List<String>) {
+        database.addSongToPlaylist(targetPlaylist, ids)
+        targetPlaylist.playlist.browseId?.let { plist ->
+            ids.forEach { songId ->
+                syncUtils.registerPendingAdd(plist, songId)
+                try {
+                    YouTube.addToPlaylist(plist, songId)
+                } finally {
+                    syncUtils.unregisterPendingAdd(plist, songId)
+                }
+            }
+        }
+    }
+
     LaunchedEffect(isVisible, playlists.isEmpty()) {
         if (!isVisible || playlists.isEmpty()) return@LaunchedEffect
         if (songIds != null) return@LaunchedEffect
@@ -294,19 +308,7 @@ fun AddToPlaylistDialog(
                                 showDuplicateDialog = true
                             } else {
                                 onDismiss()
-                                database.addSongToPlaylist(playlist, songIds!!)
-
-                                playlist.playlist.browseId?.let { plist ->
-                                    songIds?.forEach { songId ->
-                                        syncUtils.registerPendingAdd(plist, songId)
-                                        try {
-                                            YouTube.addToPlaylist(plist, songId)
-                                        } finally {
-                                            // Always unregister, even if addToPlaylist throws
-                                            syncUtils.unregisterPendingAdd(plist, songId)
-                                        }
-                                    }
-                                }
+                                addSongsAndSync(playlist, songIds!!)
                             }
                         }
                     }
@@ -332,12 +334,10 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(
+                            coroutineScope.launch(Dispatchers.IO) {
+                                addSongsAndSync(
                                     selectedPlaylist!!,
-                                    songIds!!.filter {
-                                        !duplicates.contains(it)
-                                    }
+                                    songIds!!.filter { !duplicates.contains(it) }
                                 )
                             }
                         }
@@ -349,8 +349,8 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(selectedPlaylist!!, songIds!!)
+                            coroutineScope.launch(Dispatchers.IO) {
+                                addSongsAndSync(selectedPlaylist!!, songIds!!)
                             }
                         }
                     ) {
