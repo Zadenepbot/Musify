@@ -2997,26 +2997,31 @@ class MusicService :
 
             var repeatUpdate = false
             var updateIntervalSeconds = 15
-            matrixRpcUpdateMutex.withLock {
+
+            val statusState = matrixRpcUpdateMutex.withLock {
                 val presence = if (player.isPlaying) "online" else "unavailable"
                 val statusFormat = dataStore.get(MatrixStatusFormatKey, "").ifEmpty { getString(R.string.matrix_status_format_default) }
                 val intervalSeconds = dataStore.get(MatrixUpdateIntervalKey, 15)
 
                 val clients = matrixRpcClientsMutex.withLock { matrixRpcClients.toList() }
-                clients.forEach { client ->
-                    client.updateSong(
-                        song = current,
-                        currentPositionMs = player.currentPosition,
-                        statusFormat = statusFormat,
-                        presence = presence
-                    ).onFailure {
-                        Timber.tag(TAG).w(it, "Matrix RPC update failed")
-                    }
-                }
 
                 if (player.playWhenReady && player.playbackState == Player.STATE_READY && player.isPlaying) {
                     repeatUpdate = true
                     updateIntervalSeconds = intervalSeconds
+                }
+
+                Triple(clients, presence, statusFormat)
+            }
+
+            val (clients, presence, statusFormat) = statusState
+            clients.forEach { client ->
+                client.updateSong(
+                    song = current,
+                    currentPositionMs = player.currentPosition,
+                    statusFormat = statusFormat,
+                    presence = presence,
+                ).onFailure {
+                    Timber.tag(TAG).w(it, "Matrix RPC update failed")
                 }
             }
 

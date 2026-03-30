@@ -75,6 +75,7 @@ val matrixJsonSerializer = Json { ignoreUnknownKeys = true }
 @Composable
 fun MatrixAccountDialog(
     initialAccount: MatrixAccount?,
+    error: String? = null,
     onDismiss: () -> Unit,
     onSave: (MatrixAccount, String) -> Unit,
     onDelete: (() -> Unit)? = null
@@ -101,6 +102,14 @@ fun MatrixAccountDialog(
         },
         text = {
             Column {
+                if (error != null) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
                 OutlinedTextField(
                     value = homeserver,
                     onValueChange = { homeserver = it },
@@ -147,7 +156,8 @@ fun MatrixAccountDialog(
                     }
 
                     onSave(MatrixAccount(normalizedHomeserver, userId.trim()), accessToken.trim())
-                }
+                },
+                enabled = homeserver.isNotBlank() && userId.isNotBlank() && accessToken.isNotBlank()
             ) {
                 Text(stringResource(R.string.matrix_account_save))
             }
@@ -195,15 +205,28 @@ fun MatrixSettings(
     var showStatusFormatDialog by rememberSaveable { mutableStateOf(false) }
     var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var isAdding by rememberSaveable { mutableStateOf(false) }
+    var dialogError by rememberSaveable { mutableStateOf<String?>(null) }
 
     if (isAdding || editingIndex != null) {
+        val duplicateErrorMessage = stringResource(R.string.matrix_account_duplicate_error)
         MatrixAccountDialog(
             initialAccount = editingIndex?.let { accounts.getOrNull(it) },
+            error = dialogError,
             onDismiss = {
                 isAdding = false
                 editingIndex = null
+                dialogError = null
             },
-            onSave = { account, token ->
+            onSave = onSave@{ account, token ->
+                val duplicateIndex = accounts.indexOfFirst {
+                    it.homeserver == account.homeserver && it.userId == account.userId
+                }
+                if (duplicateIndex != -1 && duplicateIndex != editingIndex) {
+                    dialogError = duplicateErrorMessage
+                    return@onSave
+                }
+                dialogError = null
+
                 val oldAccount = editingIndex?.let { accounts.getOrNull(it) }
                 if (oldAccount != null && (oldAccount.homeserver != account.homeserver || oldAccount.userId != account.userId)) {
                     MatrixTokenStore.removeToken(context, oldAccount.homeserver, oldAccount.userId)
