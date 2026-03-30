@@ -114,18 +114,31 @@ class MatrixRPC(
             .put(jsonBody.toRequestBody("application/json".toMediaType()))
             .build()
 
-        withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    val errorBody = response.body?.string()
-                    Timber.tag("MatrixRPC")
-                        .e("Failed to update status: ${response.code} ${response.message} - Body: $errorBody")
-                } else {
-                    Timber.tag("MatrixRPC").d("Successfully updated status")
-                    lastStatusMsg = resolvedText
-                    lastPresence = presence
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+
+            call.enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+                    continuation.resumeWith(Result.failure(e))
                 }
-            }
+
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    response.use {
+                        if (!response.isSuccessful) {
+                            val errorBody = response.body?.string()
+                            val errorMsg = "Failed to update status: ${response.code} ${response.message} - Body: $errorBody"
+                            Timber.tag("MatrixRPC").e(errorMsg)
+                            continuation.resumeWith(Result.failure(Exception(errorMsg)))
+                        } else {
+                            Timber.tag("MatrixRPC").d("Successfully updated status")
+                            lastStatusMsg = resolvedText
+                            lastPresence = presence
+                            continuation.resumeWith(Result.success(Unit))
+                        }
+                    }
+                }
+            })
         }
     }.onFailure { throwable ->
         if (throwable is kotlinx.coroutines.CancellationException) throw throwable
@@ -155,7 +168,7 @@ class MatrixRPC(
                 .replace("{artist_name}", song.artists.joinToString { it.name })
                 .replace("{album_name}", song.album?.title ?: "")
                 .replace("{current_time}", makeTimeString(currentPositionMs))
-                .replace("{total_time}", makeTimeString(song.song.duration * 1000L))
+                .replace("{total_time}", makeTimeString(if (song.song.duration > 0) song.song.duration * 1000L else 0L))
 
             Timber.tag("MatrixRPC").d("resolveVariables: input='$text', output='$resolved'")
             return resolved

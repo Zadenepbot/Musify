@@ -82,7 +82,7 @@ fun MatrixAccountDialog(
     val context = LocalContext.current
     var homeserver by rememberSaveable { mutableStateOf(initialAccount?.homeserver ?: "") }
     var userId by rememberSaveable { mutableStateOf(initialAccount?.userId ?: "") }
-    var accessToken by rememberSaveable {
+    var accessToken by remember {
         mutableStateOf(
             initialAccount?.let {
                 MatrixTokenStore.getToken(context, it.homeserver, it.userId)
