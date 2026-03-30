@@ -761,7 +761,6 @@
     <string name="matrix_account_delete">Delete</string>
     <string name="matrix_account_duplicate_error">An account with this homeserver and user ID already exists.</string>
     <string name="matrix_homeserver">Homeserver</string>
-    <string name="matrix_homeserver_placeholder">e.g. https://matrix.org</string>
     <string name="matrix_homeserver_placeholder">https://matrix.server.domain</string>
     <string name="matrix_user_id">User ID</string>
     <string name="matrix_user_id_hint">e.g. @user:matrix.org</string>
