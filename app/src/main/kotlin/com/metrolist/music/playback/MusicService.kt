@@ -2986,17 +2986,18 @@ class MusicService :
 
         matrixUpdateJob?.cancel()
         matrixUpdateJob = scope.launch {
+            // Debounce rapid metadata/playback changes without holding the mutex.
+            delay(1000)
+
+            // RE-CHECK AFTER DELAY: Just in case it was disabled during the 1s wait.
+            if (dataStore.get(EnableMatrixRPCKey, false) != true) {
+                clearMatrixRPC()
+                return@launch
+            }
+
             var repeatUpdate = false
             var updateIntervalSeconds = 15
             matrixRpcUpdateMutex.withLock {
-                delay(1000) // Debounce rapid metadata/playback changes
-
-                // RE-CHECK AFTER DELAY: Just in case it was disabled during the 1s wait.
-                if (dataStore.get(EnableMatrixRPCKey, false) != true) {
-                    clearMatrixRPC()
-                    return@withLock
-                }
-
                 val presence = if (player.isPlaying) "online" else "unavailable"
                 val statusFormat = dataStore.get(MatrixStatusFormatKey, "").ifEmpty { getString(R.string.matrix_status_format_default) }
                 val intervalSeconds = dataStore.get(MatrixUpdateIntervalKey, 15)
