@@ -253,7 +253,9 @@ fun ExperimentalLyrics(
         translateLanguage, 
         translateMode,
         deeplFormality,
-        aiSystemPrompt
+        aiSystemPrompt,
+        currentSong,
+        database
     ) {
         LyricsTranslationHelper.manualTrigger.collectLatest {
             val effectiveApiKey = if (aiProvider == "DeepL") deeplApiKey else openRouterApiKey
