@@ -37,11 +37,22 @@ object LyricsUtils {
 
     fun filterLyricsCreditLines(lyrics: String): String {
         return lyrics.lines().filter { line ->
-            // Strip LRC timestamp prefix if present (e.g. [00:00.00])
-            val textContent = if (line.trim().startsWith("[")) {
-                line.replaceFirst(Regex("^\\[\\d\\d:\\d\\d\\.\\d{2,3}\\]"), "").trim()
-            } else {
-                line.trim()
+            // Strip leading bracketed/braced content, version tags, and timestamps
+            // Handles [00:00.00], {agent:v1}, {bg}, [bg: ...], v1: etc.
+            var textContent = line.trim()
+            
+            // Repeatedly strip prefixes while they match common patterns
+            var stripping = true
+            while (stripping) {
+                val prevLength = textContent.length
+                textContent = textContent
+                    .replaceFirst(Regex("^\\[\\d\\d:\\d\\d\\.\\d{2,3}\\]"), "")
+                    .replaceFirst(Regex("^\\{agent:[^}]+\\}"), "")
+                    .replaceFirst(Regex("^\\{bg\\}"), "")
+                    .replaceFirst(Regex("^\\[bg:.*\\]"), "")
+                    .replaceFirst(Regex("^v\\d+:"), "")
+                    .trim()
+                stripping = textContent.length < prevLength
             }
 
             val lowerText = textContent.lowercase(Locale.getDefault())
@@ -373,12 +384,12 @@ object LyricsUtils {
                         entity == "&amp;" -> "&"
                         entity.startsWith("&#x") -> {
                             entity.substring(3, entity.length - 1).toIntOrNull(16)?.let { codePoint ->
-                                String(Character.toChars(codePoint))
+                                if (Character.isValidCodePoint(codePoint)) String(Character.toChars(codePoint)) else "\uFFFD"
                             }
                         }
                         entity.startsWith("&#") -> {
                             entity.substring(2, entity.length - 1).toIntOrNull()?.let { codePoint ->
-                                String(Character.toChars(codePoint))
+                                if (Character.isValidCodePoint(codePoint)) String(Character.toChars(codePoint)) else "\uFFFD"
                             }
                         }
                         else -> null
@@ -617,6 +628,7 @@ object LyricsUtils {
                 val isLastWordInGroup = wordIndex == words.lastIndex
                 val isLastWordOverall = index == wordMatches.lastIndex && isLastWordInGroup
 
+                val wordStartTime = startTimeSeconds + (nextTimestamp - startTimeSeconds) * wordIndex / words.size
                 val wordEndTime = if (!isLastWordInGroup) {
                     startTimeSeconds + (nextTimestamp - startTimeSeconds) * (wordIndex + 1) / words.size
                 } else if (!isLastWordOverall) {
@@ -640,7 +652,7 @@ object LyricsUtils {
                 }
 
                 if (word.isNotBlank()) {
-                    wordTimings.add(WordTimestamp(word, startTimeSeconds, wordEndTime, wordHasTrailingSpace))
+                    wordTimings.add(WordTimestamp(word, wordStartTime, wordEndTime, wordHasTrailingSpace))
                 }
             }
         }
@@ -994,7 +1006,7 @@ object LyricsUtils {
             .trim()
     }
 
-    suspend fun romanizeCyrillic(text: String): String? = withContext(Dispatchers.Default) {
+    suspend fun romanizeCyrillic(text: String, language: String? = null): String? = withContext(Dispatchers.Default) {
         if (text.isEmpty()) return@withContext null
 
         val cyrillicChars = text.filter { it in '\u0400'..'\u04FF' }
@@ -1004,15 +1016,24 @@ object LyricsUtils {
             return@withContext null
         }
 
-        when {
-            isRussian(text) -> romanizeRussianInternal(text)
-            isUkrainian(text) -> romanizeUkrainianInternal(text)
-            isSerbian(text) -> romanizeSerbianInternal(text)
-            isBulgarian(text) -> romanizeBulgarianInternal(text)
-            isBelarusian(text) -> romanizeBelarusianInternal(text)
-            isKyrgyz(text) -> romanizeKyrgyzInternal(text)
-            isMacedonian(text) -> romanizeMacedonianInternal(text)
-            else -> null
+        when (language) {
+            "Russian" -> romanizeRussianInternal(text)
+            "Ukrainian" -> romanizeUkrainianInternal(text)
+            "Serbian" -> romanizeSerbianInternal(text)
+            "Bulgarian" -> romanizeBulgarianInternal(text)
+            "Belarusian" -> romanizeBelarusianInternal(text)
+            "Kyrgyz" -> romanizeKyrgyzInternal(text)
+            "Macedonian" -> romanizeMacedonianInternal(text)
+            else -> when {
+                isRussian(text) -> romanizeRussianInternal(text)
+                isUkrainian(text) -> romanizeUkrainianInternal(text)
+                isSerbian(text) -> romanizeSerbianInternal(text)
+                isBulgarian(text) -> romanizeBulgarianInternal(text)
+                isBelarusian(text) -> romanizeBelarusianInternal(text)
+                isKyrgyz(text) -> romanizeKyrgyzInternal(text)
+                isMacedonian(text) -> romanizeMacedonianInternal(text)
+                else -> null
+            }
         }
     }
 
@@ -1462,13 +1483,13 @@ object LyricsUtils {
             "Korean" in enabledLanguages && isKorean(detectionText) -> romanizeKorean(line)
             "Chinese" in enabledLanguages && isChinese(detectionText) -> romanizeChinese(line)
             "Hindi" in enabledLanguages && isHindi(detectionText) -> romanizeHindi(line)
-            "Ukrainian" in enabledLanguages && isUkrainian(detectionText) -> romanizeCyrillic(line)
-            "Russian" in enabledLanguages && isRussian(detectionText) -> romanizeCyrillic(line)
-            "Serbian" in enabledLanguages && isSerbian(detectionText) -> romanizeCyrillic(line)
-            "Bulgarian" in enabledLanguages && isBulgarian(detectionText) -> romanizeCyrillic(line)
-            "Belarusian" in enabledLanguages && isBelarusian(detectionText) -> romanizeCyrillic(line)
-            "Kyrgyz" in enabledLanguages && isKyrgyz(detectionText) -> romanizeCyrillic(line)
-            "Macedonian" in enabledLanguages && isMacedonian(detectionText) -> romanizeCyrillic(line)
+            "Ukrainian" in enabledLanguages && isUkrainian(detectionText) -> romanizeCyrillic(line, "Ukrainian")
+            "Russian" in enabledLanguages && isRussian(detectionText) -> romanizeCyrillic(line, "Russian")
+            "Serbian" in enabledLanguages && isSerbian(detectionText) -> romanizeCyrillic(line, "Serbian")
+            "Bulgarian" in enabledLanguages && isBulgarian(detectionText) -> romanizeCyrillic(line, "Bulgarian")
+            "Belarusian" in enabledLanguages && isBelarusian(detectionText) -> romanizeCyrillic(line, "Belarusian")
+            "Kyrgyz" in enabledLanguages && isKyrgyz(detectionText) -> romanizeCyrillic(line, "Kyrgyz")
+            "Macedonian" in enabledLanguages && isMacedonian(detectionText) -> romanizeCyrillic(line, "Macedonian")
             else -> null
         }
     }

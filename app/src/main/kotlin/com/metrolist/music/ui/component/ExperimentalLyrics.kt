@@ -117,6 +117,7 @@ import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.LyricsViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -243,7 +244,7 @@ fun ExperimentalLyrics(
     
     LaunchedEffect(
         showLyrics, 
-        lines.size, 
+        lines, 
         aiProvider, 
         openRouterApiKey, 
         deeplApiKey, 
@@ -251,9 +252,10 @@ fun ExperimentalLyrics(
         openRouterModel, 
         translateLanguage, 
         translateMode,
+        deeplFormality,
         aiSystemPrompt
     ) {
-        LyricsTranslationHelper.manualTrigger.collect {
+        LyricsTranslationHelper.manualTrigger.collectLatest {
             val effectiveApiKey = if (aiProvider == "DeepL") deeplApiKey else openRouterApiKey
             if (showLyrics && lines.isNotEmpty() && effectiveApiKey.isNotBlank()) {
                 LyricsTranslationHelper.translateLyrics(
@@ -279,8 +281,8 @@ fun ExperimentalLyrics(
         }
     }
     
-    LaunchedEffect(Unit) {
-        LyricsTranslationHelper.clearTranslationsTrigger.collect {
+    LaunchedEffect(lines) {
+        LyricsTranslationHelper.clearTranslationsTrigger.collectLatest {
             lines.forEach { it.translatedTextFlow.value = null }
         }
     }
@@ -449,8 +451,8 @@ fun ExperimentalLyrics(
     var flingJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val velocityTracker = remember { VelocityTracker() }
     val decayAnimSpec = remember { exponentialDecay<Float>(frictionMultiplier = 1.8f) }
-    val itemHeights = remember(lyrics, mergedLyricsList.size) { mutableStateMapOf<Int, Int>() }
-    var isInitialLayout by remember(lyrics, mergedLyricsList.size) { mutableStateOf(true) }
+    val itemHeights = remember(lyrics, mergedLyricsList) { mutableStateMapOf<Int, Int>() }
+    var isInitialLayout by remember(lyrics, mergedLyricsList) { mutableStateOf(true) }
 
     val activeListIndex by remember(mergedLyricsList, deferredCurrentLineIndex) {
         derivedStateOf {

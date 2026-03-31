@@ -2,6 +2,7 @@ package com.metrolist.music.betterlyrics
 
 import org.w3c.dom.Element
 import org.w3c.dom.Node
+import timber.log.Timber
 import javax.xml.parsers.DocumentBuilderFactory
 
 object TTMLParser {
@@ -68,6 +69,7 @@ object TTMLParser {
                 walk(body, lines, globalOffset, null)
             }
         } catch (e: Exception) {
+            Timber.e(e, "TTMLParser.parseTTML: Failed to parse TTML")
             return emptyList()
         }
         return lines
@@ -166,7 +168,8 @@ object TTMLParser {
         val text = span.textContent ?: ""
         if (begin.isNotEmpty() && end.isNotEmpty()) {
             val next = node.nextSibling
-            val space = next?.nodeType == Node.TEXT_NODE && next.textContent?.contains(Regex("\\s")) == true
+            val space = (text.isNotEmpty() && text.last().isWhitespace()) || 
+                        (next?.nodeType == Node.TEXT_NODE && next.textContent?.firstOrNull()?.isWhitespace() == true)
             spanInfos.add(SpanInfo(text, parseTime(begin) + offset, parseTime(end) + offset, space))
         }
     }

@@ -556,6 +556,7 @@ class MusicService :
         setupAudioFocusRequest()
 
         mediaLibrarySessionCallback.apply {
+            service = this@MusicService
             toggleLike = ::toggleLike
             toggleStartRadio = ::toggleStartRadio
             toggleLibrary = ::toggleLibrary
@@ -3199,6 +3200,7 @@ class MusicService :
         connectivityObserver.unregister()
         abandonAudioFocus()
         releaseLoudnessEnhancer()
+        mediaLibrarySessionCallback.release()
         mediaSession.release()
         player.removeListener(this)
         player.removeListener(sleepTimer)

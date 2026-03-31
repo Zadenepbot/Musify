@@ -228,7 +228,7 @@ fun AppearanceSettings(
     val (lyricsGlowEffect, onLyricsGlowEffectChange) = rememberPreference(LyricsGlowEffectKey, defaultValue = false)
     val (lyricsAnimationStyle, onLyricsAnimationStyleChange) = rememberEnumPreference(LyricsAnimationStyleKey, defaultValue = LyricsAnimationStyle.FADE)
     val (lyricsTextSize, onLyricsTextSizeChange) = rememberPreference(LyricsTextSizeKey, defaultValue = 24f)
-    val (lyricsLineSpacing, onLyricsLineSpacingChange) = rememberPreference(LyricsLineSpacingKey, defaultValue = 12f)
+    val (lyricsLineSpacing, onLyricsLineSpacingChange) = rememberPreference(LyricsLineSpacingKey, defaultValue = 1.2f)
 
     var showExperimentalLyricsBetaDialog by remember { mutableStateOf(false) }
     var showLyricsAnimationStyleDialog by remember { mutableStateOf(false) }
@@ -372,7 +372,7 @@ fun AppearanceSettings(
                 onLyricsAnimationStyleChange(it)
                 showLyricsAnimationStyleDialog = false
             },
-            title = stringResource(R.string.lyrics_animation_style),
+            title = stringResource(R.string.lyrics_animation_style_title),
             current = lyricsAnimationStyle,
             values = LyricsAnimationStyle.values().toList(),
             valueText = {
@@ -1318,7 +1318,7 @@ fun AppearanceSettings(
                     add(
                         Material3SettingsItem(
                             icon = painterResource(R.drawable.lyrics),
-                            title = { Text(stringResource(R.string.lyrics_animation_style)) },
+                            title = { Text(stringResource(R.string.lyrics_animation_style_title)) },
                             description = {
                                 Text(
                                     when (lyricsAnimationStyle) {

@@ -51,6 +51,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -77,6 +78,10 @@ constructor(
     var toggleStartRadio: () -> Unit = {}
     var toggleLibrary: () -> Unit = {}
     var addToTargetPlaylist: () -> Unit = {}
+
+    fun release() {
+        scope.cancel()
+    }
 
     override fun onConnect(
         session: MediaSession,

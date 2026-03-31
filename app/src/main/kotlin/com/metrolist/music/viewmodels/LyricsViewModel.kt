@@ -42,7 +42,8 @@ class LyricsViewModel @Inject constructor() : ViewModel() {
                 if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
                     emptyList()
                 } else {
-                    val isLrc = lyrics.trim().startsWith("[")
+                    val timestampRegex = Regex("\\[\\d{1,2}:\\d{2}")
+                    val isLrc = timestampRegex.containsMatchIn(lyrics)
                     val parsedLines = if (isLrc) LyricsUtils.parseLyrics(lyrics) else emptyList()
                     
                     if (parsedLines.isNotEmpty()) {
@@ -51,7 +52,7 @@ class LyricsViewModel @Inject constructor() : ViewModel() {
                         // Fallback for unsynced or invalid LRC
                         val baseTime = 1000000L // Start at 1000s to avoid overlap with real start
                         lyrics.lines()
-                            .filter { it.isNotBlank() && !it.startsWith("[") }
+                            .filter { it.isNotBlank() && !timestampRegex.containsMatchIn(it) }
                             .mapIndexed { index, line ->
                                 LyricsEntry(baseTime + index, line)
                             }
