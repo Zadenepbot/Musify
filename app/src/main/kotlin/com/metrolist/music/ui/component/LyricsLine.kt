@@ -618,8 +618,8 @@ private fun WordLevelLyrics(
                         val exitDuration = 600f
                         val pOut = (timeSinceEnd / exitDuration).coerceIn(0f, 1f)
                         val peakScale = 0.06f
-                        val decay = 2.5f
-                        val freq = 10.0f
+                        val decay = 3.5f
+                        val freq = 5.0f
                         val baseScalePerSegment = 0.012f
                         if (pOut > 0f) {
                             val baseAtEnd = groupWord.pos * baseScalePerSegment
@@ -627,17 +627,11 @@ private fun WordLevelLyrics(
                             val springOut = totalAtEnd * exp(-decay * pOut) * cos(freq * pOut * PI.toFloat()) * (1f - pOut)
                             crescendoDeltaX = springOut
                             crescendoDeltaY = springOut
-                            val oscOut = springOut - (totalAtEnd * (1f - pOut))
-                            crescendoDeltaX += oscOut * 0.15f
-                            crescendoDeltaY -= oscOut * 0.15f
                         } else if (groupWord.isLast) {
                             val base = groupWord.pos * baseScalePerSegment
                             val springPart = peakScale * (1f - exp(-decay * p) * cos(freq * p * PI.toFloat()) * (1f - p))
                             crescendoDeltaX = base + springPart
                             crescendoDeltaY = base + springPart
-                            val oscillation = -exp(-decay * p) * cos(freq * p * PI.toFloat()) * (1f - p)
-                            crescendoDeltaX += oscillation * peakScale * 0.15f
-                            crescendoDeltaY -= oscillation * peakScale * 0.15f
                         } else {
                             val boost = if (p > 0f) 0.02f * (1f - p) else 0f
                             val base = (groupWord.pos * baseScalePerSegment) + boost

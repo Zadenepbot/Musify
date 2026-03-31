@@ -360,7 +360,20 @@ fun ExperimentalLyrics(
             val effectivePosition = position + lyricsOffset
             
             val initialActiveIndices = findActiveLineIndices(lines, effectivePosition)
-            val scrollActiveIndices = findActiveLineIndices(lines, effectivePosition + (if (hasWordTimings) 150L else 450L))
+            val scrollActiveIndicesRaw = findActiveLineIndices(lines, effectivePosition + (if (hasWordTimings) 150L else 450L))
+            
+            val scrollActiveIndices = scrollActiveIndicesRaw.toMutableSet()
+            for (i in scrollActiveIndicesRaw) {
+                if (lines.getOrNull(i)?.isBackground == true) {
+                    for (j in i - 1 downTo 0) {
+                        if (lines.getOrNull(j)?.isBackground == false) {
+                            scrollActiveIndices.add(j)
+                            break
+                        }
+                    }
+                }
+            }
+            
             val newActiveIndices = initialActiveIndices.toMutableSet()
             for (i in initialActiveIndices) {
                 if (lines.getOrNull(i)?.isBackground == true) {
@@ -648,11 +661,23 @@ fun ExperimentalLyrics(
                     }
             ) {
                 if (isLyricsProviderShown) {
-                    val providerBase = anchorY + (positions[0] ?: 0f) - with(density) { 32.dp.toPx() }
+                    val targetProviderBase = anchorY + (positions[0] ?: 0f) - with(density) { 32.dp.toPx() }
+                    val animatedProviderBase by animateFloatAsState(
+                        targetValue = targetProviderBase,
+                        animationSpec = if (isInitialLayout || !isAutoScrollEnabled) snap()
+                        else {
+                            if (hasWordTimings) {
+                                tween(750, 0, FastOutSlowInEasing)
+                            } else {
+                                tween(500, 0, FastOutSlowInEasing)
+                            }
+                        },
+                        label = "lyricsProviderOffset"
+                    )
                     Text(
                         text = stringResource(R.string.lyrics_from_provider, lyricsEntity.provider),
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth().offset { IntOffset(0, (providerBase + userManualOffset).roundToInt()) }.padding(horizontal = 24.dp, vertical = 4.dp)
+                        modifier = Modifier.fillMaxWidth().offset { IntOffset(0, (animatedProviderBase + userManualOffset).roundToInt()) }.padding(horizontal = 24.dp, vertical = 4.dp)
                     )
                 }
 
