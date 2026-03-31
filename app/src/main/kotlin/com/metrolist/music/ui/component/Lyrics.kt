@@ -8,10 +8,9 @@ package com.metrolist.music.ui.component
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.metrolist.music.constants.ExperimentalLyricsKey
 import com.metrolist.music.utils.rememberPreference
-
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.metrolist.music.viewmodels.LyricsViewModel
 
 @Composable
@@ -19,7 +18,7 @@ fun Lyrics(
     sliderPositionProvider: () -> Long?,
     modifier: Modifier = Modifier,
     showLyrics: Boolean,
-    lyricsViewModel: LyricsViewModel = viewModel()
+    lyricsViewModel: LyricsViewModel = hiltViewModel()
 ) {
     val (experimentalLyrics, _) = rememberPreference(key = ExperimentalLyricsKey, defaultValue = false)
 
