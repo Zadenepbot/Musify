@@ -64,7 +64,6 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.res.stringResource
 
 @Composable
 fun rememberAdjustedFontSize(
@@ -146,12 +145,6 @@ fun rememberAdjustedFontSize(
     }
 
     return calculatedFontSize
-}
-
-enum class LyricsBackgroundStyle {
-    SOLID,
-    BLUR,
-    GRADIENT
 }
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -420,7 +413,7 @@ fun LyricsImageCard(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = stringResource(R.string.app_name),
+                        text = context.getString(R.string.app_name),
                         color = secondaryColor,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
