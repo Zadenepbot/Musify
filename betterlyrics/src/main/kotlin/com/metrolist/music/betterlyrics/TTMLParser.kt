@@ -163,7 +163,7 @@ object TTMLParser {
     private fun parseWordSpan(span: Element, offset: Double, spanInfos: MutableList<SpanInfo>, node: Node) {
         val begin = span.getAttribute("begin")
         val end = span.getAttribute("end")
-        val text = span.textContent?.trim() ?: ""
+        val text = span.textContent ?: ""
         if (begin.isNotEmpty() && end.isNotEmpty()) {
             val next = node.nextSibling
             val space = next?.nodeType == Node.TEXT_NODE && next.textContent?.contains(Regex("\\s")) == true
@@ -222,7 +222,7 @@ object TTMLParser {
             append(w.text)
             if (w.hasTrailingSpace && !w.text.endsWith('-') && i < words.lastIndex) append(" ")
         }
-    }
+    }.trim()
 
     private fun mergeSpansIntoWords(spanInfos: List<SpanInfo>): List<ParsedWord> {
         if (spanInfos.isEmpty()) return emptyList()
@@ -235,7 +235,7 @@ object TTMLParser {
             val prev = spanInfos[i - 1]
             val curr = spanInfos[i]
             if (prev.hasTrailingSpace && !prev.text.endsWith('-')) {
-                words.add(ParsedWord(text.toString().trim(), start, end, true))
+                words.add(ParsedWord(text.toString(), start, end, true))
                 text = StringBuilder(curr.text)
                 start = curr.startTime
                 end = curr.endTime
@@ -244,27 +244,36 @@ object TTMLParser {
                 end = curr.endTime
             }
         }
-        words.add(ParsedWord(text.toString().trim(), start, end, spanInfos.last().hasTrailingSpace))
-        return words
+        words.add(ParsedWord(text.toString(), start, end, spanInfos.last().hasTrailingSpace))
+        return words.map { it.copy(text = it.text.trim()) }.filter { it.text.isNotEmpty() }
     }
 
     fun toLRC(lines: List<ParsedLine>): String {
         val agentMap = mutableMapOf<String, String>()
+        
+        // Phase 1: Preserve explicit v1, v2, v1000
         lines.forEach { line ->
-            line.agent?.lowercase()?.let { if (it == "v1" || it == "v2") agentMap[it] = it }
+            line.agent?.lowercase()?.let { raw ->
+                if (raw == "v1" || raw == "v2" || raw == "v1000") {
+                    agentMap[raw] = raw
+                }
+            }
         }
+        
+        // Phase 2: Map other agents to v1/v2 if available
         var nextNum = 1
         lines.forEach { line ->
             line.agent?.lowercase()?.let { raw ->
                 if (!agentMap.containsKey(raw)) {
-                    while (nextNum <= 2 && agentMap.values.contains("v$nextNum")) nextNum++
+                    while (nextNum <= 2 && (agentMap.containsKey("v$nextNum") || agentMap.values.contains("v$nextNum"))) {
+                        nextNum++
+                    }
                     agentMap[raw] = if (nextNum <= 2) "v$nextNum" else "v1"
                 }
             }
         }
 
-        val hasBg = lines.any { it.isBackground || it.backgroundLines.isNotEmpty() }
-        val multi = agentMap.size > 1 || (agentMap.size == 1 && !agentMap.containsKey("v1")) || hasBg
+        val multi = agentMap.size > 1 || (agentMap.size == 1 && !agentMap.containsKey("v1"))
         
         val sb = StringBuilder(lines.size * 128)
         var lastBg = false
@@ -272,7 +281,13 @@ object TTMLParser {
             val time = formatLrcTime(line.startTime)
             val isBg = line.isBackground
             if (!isBg) lastBg = false
-            val tag = if (isBg) (if (lastBg) "" else "{bg}") else (if (multi) "{agent:${agentMap[line.agent?.lowercase()] ?: "v1"}}" else "")
+            
+            val agentId = agentMap[line.agent?.lowercase()]
+            val tag = when {
+                isBg -> if (lastBg) "" else "{bg}"
+                multi && agentId != null -> "{agent:$agentId}"
+                else -> ""
+            }
             if (isBg) lastBg = true
 
             sb.append(time).append(tag).append(line.text).append('\n')

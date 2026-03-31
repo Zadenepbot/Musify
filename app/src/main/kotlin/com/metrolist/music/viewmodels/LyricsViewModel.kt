@@ -22,6 +22,8 @@ import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class LyricsViewModel @Inject constructor() : ViewModel() {
+    private var processJob: kotlinx.coroutines.Job? = null
+
     private val _lines = MutableStateFlow<List<LyricsEntry>>(emptyList())
     val lines: StateFlow<List<LyricsEntry>> = _lines.asStateFlow()
 
@@ -34,33 +36,25 @@ class LyricsViewModel @Inject constructor() : ViewModel() {
         romanizeCyrillicByLine: Boolean,
         showIntervalIndicator: Boolean
     ) {
-        viewModelScope.launch {
+        processJob?.cancel()
+        processJob = viewModelScope.launch {
             val processedLines = withContext(Dispatchers.Default) {
                 if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
                     emptyList()
-                } else if (lyrics.trim().startsWith("[")) {
-                    val parsedLines = LyricsUtils.parseLyrics(lyrics)
-                    if (parsedLines.isNotEmpty()) {
-                        parsedLines.map { entry ->
-                            LyricsEntry(
-                                entry.time,
-                                entry.text,
-                                entry.words,
-                                agent = entry.agent,
-                                isBackground = entry.isBackground
-                            )
-                        }.let {
-                            listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + it
-                        }
-                    } else {
-                        // Fallback for metadata-only LRC
-                        lyrics.lines().filter { it.isNotBlank() }.mapIndexed { index, line ->
-                            LyricsEntry(Long.MAX_VALUE / 2 + index, line)
-                        }
-                    }
                 } else {
-                    lyrics.lines().filter { it.isNotBlank() }.mapIndexed { index, line ->
-                        LyricsEntry(Long.MAX_VALUE / 2 + index, line)
+                    val isLrc = lyrics.trim().startsWith("[")
+                    val parsedLines = if (isLrc) LyricsUtils.parseLyrics(lyrics) else emptyList()
+                    
+                    if (parsedLines.isNotEmpty()) {
+                        listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + parsedLines
+                    } else {
+                        // Fallback for unsynced or invalid LRC
+                        val baseTime = 1000000L // Start at 1000s to avoid overlap with real start
+                        lyrics.lines()
+                            .filter { it.isNotBlank() && !it.startsWith("[") }
+                            .mapIndexed { index, line ->
+                                LyricsEntry(baseTime + index, line)
+                            }
                     }
                 }
             }

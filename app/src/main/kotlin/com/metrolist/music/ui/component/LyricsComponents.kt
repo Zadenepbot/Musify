@@ -11,6 +11,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.text.Layout
 import android.widget.Toast
+import timber.log.Timber
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut

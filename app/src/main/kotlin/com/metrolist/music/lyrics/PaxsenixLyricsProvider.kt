@@ -56,7 +56,12 @@ object PaxsenixLyricsProvider : LyricsProvider {
         callback: (String) -> Unit,
     ) {
         Timber.tag(TAG).d("getAllLyrics called")
-        Paxsenix.init(context)
-        Paxsenix.getAllLyrics(title, artist, duration, album, callback)
+        try {
+            Paxsenix.init(context)
+            Paxsenix.getAllLyrics(title, artist, duration, album, callback)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error fetching lyrics from Paxsenix")
+            callback("")
+        }
     }
 }

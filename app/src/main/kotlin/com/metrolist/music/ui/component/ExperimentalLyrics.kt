@@ -241,7 +241,18 @@ fun ExperimentalLyrics(
         }
     }
     
-    LaunchedEffect(showLyrics, lines.size) {
+    LaunchedEffect(
+        showLyrics, 
+        lines.size, 
+        aiProvider, 
+        openRouterApiKey, 
+        deeplApiKey, 
+        openRouterBaseUrl, 
+        openRouterModel, 
+        translateLanguage, 
+        translateMode,
+        aiSystemPrompt
+    ) {
         LyricsTranslationHelper.manualTrigger.collect {
             val effectiveApiKey = if (aiProvider == "DeepL") deeplApiKey else openRouterApiKey
             if (showLyrics && lines.isNotEmpty() && effectiveApiKey.isNotBlank()) {
@@ -438,8 +449,8 @@ fun ExperimentalLyrics(
     var flingJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val velocityTracker = remember { VelocityTracker() }
     val decayAnimSpec = remember { exponentialDecay<Float>(frictionMultiplier = 1.8f) }
-    val itemHeights = remember(lyrics) { mutableStateMapOf<Int, Int>() }
-    var isInitialLayout by remember(lyrics) { mutableStateOf(true) }
+    val itemHeights = remember(lyrics, mergedLyricsList.size) { mutableStateMapOf<Int, Int>() }
+    var isInitialLayout by remember(lyrics, mergedLyricsList.size) { mutableStateOf(true) }
 
     val activeListIndex by remember(mergedLyricsList, deferredCurrentLineIndex) {
         derivedStateOf {

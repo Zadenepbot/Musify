@@ -362,22 +362,26 @@ object LyricsUtils {
             val c = text[i]
             if (c == '&') {
                 val end = text.indexOf(';', i + 1)
-                if (end != -1 && end - i < 10) {
+                if (end != -1 && end - i < 12) {
                     val entity = text.substring(i, end + 1)
-                    val decoded = when (entity) {
-                        "&apos;" -> "'"
-                        "&quot;" -> "\""
-                        "&lt;" -> "<"
-                        "&gt;" -> ">"
-                        "&nbsp;" -> " "
-                        "&amp;" -> "&"
-                        else -> {
-                            if (entity.startsWith("&#x")) {
-                                entity.substring(3, entity.length - 1).toIntOrNull(16)?.toChar()?.toString()
-                            } else if (entity.startsWith("&#")) {
-                                entity.substring(2, entity.length - 1).toIntOrNull()?.toChar()?.toString()
-                            } else null
+                    val decoded = when {
+                        entity == "&apos;" -> "'"
+                        entity == "&quot;" -> "\""
+                        entity == "&lt;" -> "<"
+                        entity == "&gt;" -> ">"
+                        entity == "&nbsp;" -> " "
+                        entity == "&amp;" -> "&"
+                        entity.startsWith("&#x") -> {
+                            entity.substring(3, entity.length - 1).toIntOrNull(16)?.let { codePoint ->
+                                String(Character.toChars(codePoint))
+                            }
                         }
+                        entity.startsWith("&#") -> {
+                            entity.substring(2, entity.length - 1).toIntOrNull()?.let { codePoint ->
+                                String(Character.toChars(codePoint))
+                            }
+                        }
+                        else -> null
                     }
                     if (decoded != null) {
                         sb.append(decoded)
