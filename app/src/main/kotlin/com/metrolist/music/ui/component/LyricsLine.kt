@@ -120,7 +120,6 @@ internal fun LyricsLine(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val textMeasurer = rememberTextMeasurer()
     
     val itemModifier = modifier
         .fillMaxWidth()
@@ -132,8 +131,8 @@ internal fun LyricsLine(
         )
         .background(if (isSelected && isSelectionModeActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.Transparent)
         .padding(
-            start = when (lyricsTextPosition) { LyricsPosition.LEFT, LyricsPosition.RIGHT -> 11.dp; else -> 24.dp },
-            end = when (lyricsTextPosition) { LyricsPosition.LEFT, LyricsPosition.RIGHT -> 11.dp; else -> 24.dp },
+            start = when (lyricsTextPosition) { LyricsPosition.LEFT, LyricsPosition.RIGHT -> 11.dp; LyricsPosition.CENTER -> 24.dp },
+            end = when (lyricsTextPosition) { LyricsPosition.LEFT, LyricsPosition.RIGHT -> 11.dp; LyricsPosition.CENTER -> 24.dp },
             top = if (item.isBackground) 0.dp else 12.dp,
             bottom = if (item.isBackground) 2.dp else 12.dp // simplified gap logic
         )
@@ -170,7 +169,7 @@ internal fun LyricsLine(
         else -> when (lyricsTextPosition) {
             LyricsPosition.LEFT -> Alignment.CenterStart
             LyricsPosition.RIGHT -> Alignment.CenterEnd
-            else -> Alignment.Center
+            LyricsPosition.CENTER -> Alignment.Center
         }
     }) {
         @Composable
@@ -312,6 +311,11 @@ private fun WordLevelLyrics(
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
+    val glowPaint = remember {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+        }
+    }
     
     var smoothPosition by remember { mutableLongStateOf(currentPositionState + lyricsOffset) }
     
@@ -685,12 +689,11 @@ private fun WordLevelLyrics(
                                 val glowAlpha = (0.35f * impactFactor).coerceIn(0f, 0.4f)
                                 val baseGlowRadius = 12.dp.toPx() * impactFactor                                                                                    
                                 drawIntoCanvas { canvas ->
-                                    val paint = android.graphics.Paint()
-                                    paint.maskFilter = BlurMaskFilter(baseGlowRadius, BlurMaskFilter.Blur.NORMAL)
-                                    paint.color = expressiveAccent.copy(alpha = glowAlpha).toArgb()
-                                    paint.textSize = lyricStyle.fontSize.toPx()
-                                    paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-                                    canvas.nativeCanvas.drawText(letterLayouts[i].layoutInput.text.text, 0f, letterLayouts[i].firstBaseline, paint)
+                                    glowPaint.maskFilter = BlurMaskFilter(baseGlowRadius, BlurMaskFilter.Blur.NORMAL)
+                                    glowPaint.color = expressiveAccent.copy(alpha = glowAlpha).toArgb()
+                                    glowPaint.textSize = lyricStyle.fontSize.toPx()
+                                    glowPaint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                                    canvas.nativeCanvas.drawText(letterLayouts[i].layoutInput.text.text, 0f, letterLayouts[i].firstBaseline, glowPaint)
                                 }
                             }
                         }
