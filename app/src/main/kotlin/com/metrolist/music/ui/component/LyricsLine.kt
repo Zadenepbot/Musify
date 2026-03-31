@@ -142,6 +142,7 @@ internal fun LyricsLine(
         respectAgentPositioning && item.agent == "v1" -> Alignment.Start
         respectAgentPositioning && item.agent == "v2" -> Alignment.End
         respectAgentPositioning && item.agent == "v1000" -> Alignment.CenterHorizontally
+        item.isBackground -> Alignment.CenterHorizontally
         else -> when (lyricsTextPosition) {
             LyricsPosition.LEFT -> Alignment.Start
             LyricsPosition.CENTER -> Alignment.CenterHorizontally
@@ -153,6 +154,7 @@ internal fun LyricsLine(
         respectAgentPositioning && item.agent == "v1" -> TextAlign.Left
         respectAgentPositioning && item.agent == "v2" -> TextAlign.Right
         respectAgentPositioning && item.agent == "v1000" -> TextAlign.Center
+        item.isBackground -> TextAlign.Center
         else -> when (lyricsTextPosition) {
             LyricsPosition.LEFT -> TextAlign.Left
             LyricsPosition.CENTER -> TextAlign.Center
@@ -427,7 +429,7 @@ private fun WordLevelLyrics(
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val maxWidthPx = constraints.maxWidth
-        val layoutResult = remember(mainText, maxWidthPx) {
+        val layoutResult = remember(mainText, maxWidthPx, lyricStyle) {
             textMeasurer.measure(
                 text = mainText,
                 style = lyricStyle,
@@ -436,7 +438,7 @@ private fun WordLevelLyrics(
             )
         }
         
-        val letterLayouts = remember(mainText) {
+        val letterLayouts = remember(mainText, lyricStyle) {
             mainText.map { textMeasurer.measure(it.toString(), lyricStyle) }
         }
         

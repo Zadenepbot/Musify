@@ -12,11 +12,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
+val LINE_REGEX = "((\\[\\d\\d:\\d\\d\\.\\d{2,3}\\] ?)+)(.*)".toRegex()
+val TIME_REGEX = "\\[(\\d\\d):(\\d\\d)\\.(\\d{2,3})\\]".toRegex()
+
+// Regex for rich sync format: [MM:SS.mm]<MM:SS.mm> word <MM:SS.mm> word ...
+private val RICH_SYNC_LINE_REGEX = "\\[(\\d{1,2}):(\\d{2})\\.(\\d{2,3})\\](.*)".toRegex()
+private val RICH_SYNC_WORD_REGEX = "<(\\d{1,2}):(\\d{2})\\.(\\d{2,3})>([^<]+)".toRegex()
+
+// Regex for Paxsenix v1/v2/bg format
+// [00:00.000]v1: <00:00.000>I <00:00.154>promise...
+// [bg: <02:18.078>Yeah<02:19.341>]
+private val PAXSENIX_AGENT_LINE_REGEX = "\\[(\\d{1,2}):(\\d{2})\\.(\\d{2,3})\\](v\\d+):\\s*(.*)".toRegex()
+private val PAXSENIX_BG_LINE_REGEX = "^\\[bg:\\s*(.*)\\]$".toRegex()
+
+// Regex for agent and background markers (existing format)
+private val AGENT_REGEX = "\\{agent:([^}]+)\\}".toRegex()
+private val BACKGROUND_REGEX = "^\\{bg\\}".toRegex()
+
 @Suppress("RegExpRedundantEscape")
 object LyricsUtils {
-    val LINE_REGEX = "((\\[\\d\\d:\\d\\d\\.\\d{2,3}\\] ?)+)(.*)".toRegex()
-    val TIME_REGEX = "\\[(\\d\\d):(\\d\\d)\\.(\\d{2,3})\\]".toRegex()
-
     fun cleanTitleForSearch(title: String): String {
         return title.replace(Regex("\\s*[(\\[].*?[)\\]]"), "").trim()
     }
@@ -41,20 +55,6 @@ object LyricsUtils {
             !isCredit
         }.joinToString("\n")
     }
-
-    // Regex for rich sync format: [MM:SS.mm]<MM:SS.mm> word <MM:SS.mm> word ...
-    private val RICH_SYNC_LINE_REGEX = "\\[(\\d{1,2}):(\\d{2})\\.(\\d{2,3})\\](.*)".toRegex()
-    private val RICH_SYNC_WORD_REGEX = "<(\\d{1,2}):(\\d{2})\\.(\\d{2,3})>([^<]+)".toRegex()
-
-    // Regex for Paxsenix v1/v2/bg format
-    // [00:00.000]v1: <00:00.000>I <00:00.154>promise...
-    // [bg: <02:18.078>Yeah<02:19.341>]
-    private val PAXSENIX_AGENT_LINE_REGEX = "\\[(\\d{1,2}):(\\d{2})\\.(\\d{2,3})\\](v\\d+):\\s*(.*)".toRegex()
-    private val PAXSENIX_BG_LINE_REGEX = "^\\[bg:\\s*(.*)\\]$".toRegex()
-
-    // Regex for agent and background markers (existing format)
-    private val AGENT_REGEX = "\\{agent:([^}]+)\\}".toRegex()
-    private val BACKGROUND_REGEX = "^\\{bg\\}".toRegex()
 
     private val KANA_ROMAJI_MAP: Map<String, String> = mapOf(
         // Digraphs (Yōon - combinations like kya, sho)
@@ -446,6 +446,7 @@ object LyricsUtils {
      */
     private fun parseRichSyncLyrics(lines: List<String>): List<LyricsEntry> {
         val result = mutableListOf<LyricsEntry>()
+        var lastNonBgAgent: String? = null
 
         lines.forEachIndexed { index, line ->
             val trimmedLine = line.trim()
@@ -468,7 +469,7 @@ object LyricsUtils {
                 val plainText = content.replace(Regex("<\\d{1,2}:\\d{2}\\.\\d{2,3}>\\s*"), "").trim()
                 
                 val lineTimeMs = wordTimings?.firstOrNull()?.startTime?.let { (it * 1000).toLong() } ?: 0L
-                result.add(LyricsEntry(lineTimeMs, plainText, wordTimings, agent = "bg", isBackground = true))
+                result.add(LyricsEntry(lineTimeMs, plainText, wordTimings, agent = lastNonBgAgent ?: "bg", isBackground = true))
                 return@forEachIndexed
             }
             
@@ -496,6 +497,9 @@ object LyricsUtils {
                 // Extract plain text (remove all <MM:SS.mm> tags)
                 val plainText = content.replace(Regex("<\\d{1,2}:\\d{2}\\.\\d{2,3}>\\s*"), "").trim()
                 
+                if (!agent.isNullOrBlank()) {
+                    lastNonBgAgent = agent
+                }
                 result.add(LyricsEntry(lineTimeMs, plainText, wordTimings, agent = agent, isBackground = false))
                 return@forEachIndexed
             }
@@ -538,7 +542,10 @@ object LyricsUtils {
                 // Extract plain text (remove all <MM:SS.mm> tags)
                 val plainText = content.replace(Regex("<\\d{1,2}:\\d{2}\\.\\d{2,3}>\\s*"), "").trim()
 
-                result.add(LyricsEntry(lineTimeMs, plainText, wordTimings, agent = agent, isBackground = isBackground))
+                if (!isBackground && !agent.isNullOrBlank()) {
+                    lastNonBgAgent = agent
+                }
+                result.add(LyricsEntry(lineTimeMs, plainText, wordTimings, agent = if (isBackground) lastNonBgAgent ?: "bg" else agent, isBackground = isBackground))
             }
         }
 

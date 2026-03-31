@@ -331,7 +331,9 @@ internal fun LyricsColorPickerDialog(
                             hsv[1] > 0.2f
                         }.take(5))
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to extract palette colors")
+                }
             }
         }
     }

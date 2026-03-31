@@ -382,25 +382,23 @@ object LyricsTranslationHelper {
 
                             // Save to database if songId is provided
                             if (songId.isNotBlank() && database != null) {
-                                scope.launch(Dispatchers.IO) {
-                                    try {
-                                        val currentLyrics = database.lyrics(songId).first()
-                                        if (currentLyrics != null) {
-                                            database.query {
-                                                upsert(
-                                                    currentLyrics.copy(
-                                                        translatedLyrics = translatedLines.joinToString("\n"),
-                                                        translationLanguage = targetLanguage,
-                                                        translationMode = mode,
-                                                    ),
-                                                )
-                                            }
-                                            // Signal that translations have been saved
-                                            _translationSaved.tryEmit(Unit)
+                                try {
+                                    val currentLyrics = database.lyrics(songId).first()
+                                    if (currentLyrics != null) {
+                                        database.query {
+                                            upsert(
+                                                currentLyrics.copy(
+                                                    translatedLyrics = translatedLines.joinToString("\n"),
+                                                    translationLanguage = targetLanguage,
+                                                    translationMode = mode,
+                                                ),
+                                            )
                                         }
-                                    } catch (e: Exception) {
-                                        Timber.e(e, "Failed to save translated lyrics to database")
+                                        // Signal that translations have been saved
+                                        _translationSaved.tryEmit(Unit)
                                     }
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Failed to save translated lyrics to database")
                                 }
                             }
 

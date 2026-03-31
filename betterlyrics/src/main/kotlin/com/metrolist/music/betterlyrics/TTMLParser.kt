@@ -164,7 +164,7 @@ object TTMLParser {
         val begin = span.getAttribute("begin")
         val end = span.getAttribute("end")
         val text = span.textContent?.trim() ?: ""
-        if (text.isNotEmpty() && begin.isNotEmpty() && end.isNotEmpty()) {
+        if (begin.isNotEmpty() && end.isNotEmpty()) {
             val next = node.nextSibling
             val space = next?.nodeType == Node.TEXT_NODE && next.textContent?.contains(Regex("\\s")) == true
             spanInfos.add(SpanInfo(text, parseTime(begin) + offset, parseTime(end) + offset, space))
@@ -192,12 +192,12 @@ object TTMLParser {
         
         if (!hasSpans) {
             val text = span.textContent?.trim() ?: ""
-            return if (text.isNotEmpty()) ParsedLine(text, start, emptyList(), isBackground = true) else null
+            return ParsedLine(text, start, emptyList(), isBackground = true)
         }
         
         val words = mergeSpansIntoWords(spanInfos)
         val text = if (words.isEmpty()) getDirectText(span).trim() else buildLineText(words)
-        return if (text.isNotEmpty()) ParsedLine(text, start, words, isBackground = true) else null
+        return ParsedLine(text, start, words, isBackground = true)
     }
 
     private fun getDirectText(el: Element): String {

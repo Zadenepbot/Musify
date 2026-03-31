@@ -17,6 +17,7 @@ import io.ktor.client.request.parameter
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+import java.util.Locale
 import kotlin.math.abs
 
 object Paxsenix {
@@ -333,7 +334,7 @@ object Paxsenix {
                 val lineText = line.text.joinToString(" ") { it.text }
 
                 if (lineText.isNotBlank()) {
-                    appendLine(String.format("[%02d:%02d.%02d]%s%s", minutes, seconds, centiseconds, agent, lineText))
+                    appendLine(String.format(Locale.US, "[%02d:%02d.%02d]%s%s", minutes, seconds, centiseconds, agent, lineText))
 
                     if (line.text.isNotEmpty()) {
                         val wordsData = line.text.joinToString("|") { word ->
@@ -460,6 +461,7 @@ object Paxsenix {
                     hasWordSync = wordSync
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Manual search lyrics fetch failed")
             }
             
             ManualSearchResult(

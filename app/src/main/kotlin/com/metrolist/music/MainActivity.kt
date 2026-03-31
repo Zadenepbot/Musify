@@ -131,6 +131,7 @@ import com.metrolist.music.constants.DefaultOpenTabKey
 import com.metrolist.music.constants.DisableScreenshotKey
 import com.metrolist.music.constants.DynamicThemeKey
 import com.metrolist.music.constants.EnableHighRefreshRateKey
+import com.metrolist.music.constants.ExperimentalLyricsKey
 import com.metrolist.music.constants.LastSeenVersionKey
 import com.metrolist.music.constants.ListenTogetherInTopBarKey
 import com.metrolist.music.constants.ListenTogetherUsernameKey
@@ -598,14 +599,19 @@ class MainActivity : ComponentActivity() {
                     // SimpMusic Removal Migration
                     if (dataStore.data.first()[SimpMusicMigrationDoneKey] != true) {
                         dataStore.edit { settings ->
-                            // Remove SimpMusic from serialized order string
+                            // Remove SimpMusic from serialized order string and append Paxsenix if missing
                             val currentOrder = settings[LyricsProviderOrderKey] ?: ""
-                            if (currentOrder.contains("SimpMusic")) {
-                                val newOrder = currentOrder.split(",")
+                            if (currentOrder.contains("SimpMusic") || !currentOrder.contains("Paxsenix")) {
+                                val orderList = currentOrder.split(",")
                                     .map { it.trim() }
                                     .filter { it.isNotBlank() && it != "SimpMusic" }
-                                    .joinToString(",")
-                                settings[LyricsProviderOrderKey] = newOrder
+                                    .toMutableList()
+                                
+                                if (!orderList.contains("Paxsenix")) {
+                                    orderList.add("Paxsenix")
+                                }
+                                
+                                settings[LyricsProviderOrderKey] = orderList.joinToString(",")
                             }
 
                             // Reset preferred provider if it was SimpMusic
