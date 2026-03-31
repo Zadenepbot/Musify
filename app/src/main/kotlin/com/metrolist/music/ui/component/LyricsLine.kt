@@ -217,14 +217,14 @@ internal fun LyricsLine(
                 } else if (mainText != null) {
                     remember(mainText, item.time) {
                         val words = mainText.split(Regex("\\s+")).filter { it.isNotBlank() }
-                        val totalDurationSec = 0.25
+                        val wordDurationSec = 0.18
+                        val wordStaggerSec = 0.03
                         val startTimeSec = item.time / 1000.0
-                        val wordDurationSec = if (words.isNotEmpty()) totalDurationSec / words.size else 0.0
                         words.mapIndexed { idx, wordText ->
                             WordTimestamp(
                                 text = wordText,
-                                startTime = startTimeSec + (idx * wordDurationSec),
-                                endTime = startTimeSec + ((idx + 1) * wordDurationSec),
+                                startTime = startTimeSec + (idx * wordStaggerSec),
+                                endTime = startTimeSec + (idx * wordStaggerSec) + wordDurationSec,
                                 hasTrailingSpace = idx < words.size - 1
                             )
                         }

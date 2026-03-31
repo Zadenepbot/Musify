@@ -360,7 +360,7 @@ fun ExperimentalLyrics(
             val effectivePosition = position + lyricsOffset
             
             val initialActiveIndices = findActiveLineIndices(lines, effectivePosition)
-            val scrollActiveIndicesRaw = findActiveLineIndices(lines, effectivePosition + (if (hasWordTimings) 150L else 450L))
+            val scrollActiveIndicesRaw = findActiveLineIndices(lines, effectivePosition + (if (hasWordTimings) 0L else 250L))
             
             val scrollActiveIndices = scrollActiveIndicesRaw.toMutableSet()
             for (i in scrollActiveIndicesRaw) {
@@ -660,17 +660,16 @@ fun ExperimentalLyrics(
                         }
                     }
             ) {
+                val lyricsOffsetVal = (currentSong?.song?.lyricsOffset ?: 0).toLong()
+                val currentEffectivePosition = currentPositionState + lyricsOffsetVal
+                
                 if (isLyricsProviderShown) {
                     val targetProviderBase = anchorY + (positions[0] ?: 0f) - with(density) { 32.dp.toPx() }
                     val animatedProviderBase by animateFloatAsState(
                         targetValue = targetProviderBase,
                         animationSpec = if (isInitialLayout || !isAutoScrollEnabled) snap()
                         else {
-                            if (hasWordTimings) {
-                                tween(750, 0, FastOutSlowInEasing)
-                            } else {
-                                tween(500, 0, FastOutSlowInEasing)
-                            }
+                            tween(750, 0, FastOutSlowInEasing)
                         },
                         label = "lyricsProviderOffset"
                     )
@@ -693,11 +692,7 @@ fun ExperimentalLyrics(
                             targetValue = if (isAutoScrollEnabled) targetOffset else frozenOffset.floatValue,
                             animationSpec = if (isInitialLayout || !isAutoScrollEnabled) snap() 
                                             else {
-                                                if (hasWordTimings) {
-                                                    tween(750, (distance * LYRICS_STAGGER_DELAY_PER_DISTANCE).coerceAtMost(LYRICS_STAGGER_DELAY_MAX_MS), FastOutSlowInEasing)
-                                                } else {
-                                                    tween(500, 0, FastOutSlowInEasing)
-                                                }
+                                                tween(750, (distance * LYRICS_STAGGER_DELAY_PER_DISTANCE).coerceAtMost(LYRICS_STAGGER_DELAY_MAX_MS), FastOutSlowInEasing)
                                             },
                             label = "lyricStaggeredOffset_$listIndex"
                         )
@@ -719,7 +714,13 @@ fun ExperimentalLyrics(
                                     val item = listItem.entry
                                     val isActiveLine = activeLineIndices.contains(index)
                                     val pairedMainLineIndex = if (item.isBackground) (index - 1 downTo 0).firstOrNull { lines.getOrNull(it)?.isBackground == false } ?: -1 else -1
-                                    val bgVisible = item.isBackground && (activeLineIndices.contains(pairedMainLineIndex) || activeLineIndices.contains(index))
+                                    
+                                    val isInGapWithMain = if (item.isBackground && pairedMainLineIndex != -1) {
+                                        val pairedMainLine = lines[pairedMainLineIndex]
+                                        currentEffectivePosition >= pairedMainLine.time && currentEffectivePosition <= item.time
+                                    } else false
+                                    
+                                    val bgVisible = item.isBackground && (activeLineIndices.contains(pairedMainLineIndex) || activeLineIndices.contains(index) || isInGapWithMain)
                                     
                                     LyricsLine(
                                         index = index, item = item, isSynced = isSynced,
