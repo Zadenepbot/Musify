@@ -72,6 +72,10 @@
     <string name="hide_player_thumbnail_desc">Replace the album artwork with the app logo in the player</string>
     <string name="crop_album_art">Crop album art</string>
     <string name="crop_album_art_desc">Force a square aspect ratio by cropping video thumbnails</string>
+    <string name="enable_video_playback">Enable Video Playback</string>
+    <string name="enable_video_playback_desc">Play video content when available instead of showing static thumbnail</string>
+    <string name="song_toggle">Song</string>
+    <string name="video_toggle">Video</string>
 
     <string name="already_in_playlist">Already in playlist: </string>
 

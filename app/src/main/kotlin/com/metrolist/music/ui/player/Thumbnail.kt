@@ -5,6 +5,14 @@
 
 package com.metrolist.music.ui.player
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
+import androidx.compose.foundation.clickable
+import com.metrolist.music.constants.SongVideoToggleKey
+import com.metrolist.music.constants.VideoPlaybackKey
+import com.metrolist.music.models.MediaMetadata
+import com.metrolist.music.ui.component.VideoPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -146,11 +154,11 @@ private fun getMediaItems(
     val timeline = player.currentTimeline
     val currentIndex = player.currentMediaItemIndex
     val shuffleModeEnabled = player.shuffleModeEnabled
-    
+
     val currentMediaItem = try {
         player.currentMediaItem
     } catch (e: Exception) { null }
-    
+
     val previousMediaItem = if (swipeThumbnail && !timeline.isEmpty) {
         val previousIndex = timeline.getPreviousWindowIndex(
             currentIndex,
@@ -175,7 +183,7 @@ private fun getMediaItems(
 
     val items = listOfNotNull(previousMediaItem, currentMediaItem, nextMediaItem)
     val currentMediaIndex = items.indexOf(currentMediaItem)
-    
+
     return MediaItemsData(items, currentMediaIndex)
 }
 
@@ -203,11 +211,29 @@ fun Thumbnail(
     isListenTogetherGuest: Boolean = false,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val player = playerConnection.player
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
 
+    val isVideoPlaybackEnabled by rememberPreference(VideoPlaybackKey, true)
+    val isSongVideoToggleEnabled by rememberPreference(SongVideoToggleKey, true)
+
+    var isVideoShown by remember { mutableStateOf(false) }
+    var hasVideoTrack by remember { mutableStateOf(false) }
+
     // Collect states
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isVideoSong = mediaMetadata?.isVideoSong == true
+
+    // Synchronize video toggle state with actual track selection
+    LaunchedEffect(player) {
+        try {
+            val currentParams = player.trackSelectionParameters
+            isVideoShown = !currentParams.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO)
+        } catch (e: Exception) {
+            isVideoShown = false
+        }
+    }
     val error by playerConnection.error.collectAsState()
     val queueTitle by playerConnection.queueTitle.collectAsState()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
@@ -223,13 +249,13 @@ fun Thumbnail(
         key = PlayerBackgroundStyleKey,
         defaultValue = PlayerBackgroundStyle.DEFAULT
     )
-    
+
     // Pre-calculate text color based on background style
     val textBackgroundColor = getTextColor(playerBackground)
-    
+
     // Grid state
     val thumbnailLazyGridState = rememberLazyGridState()
-    
+
     // Calculate media items data - memoized
     val mediaItemsData by remember(
         playerConnection.player.currentMediaItemIndex,
@@ -241,7 +267,7 @@ fun Thumbnail(
             getMediaItems(playerConnection.player, swipeThumbnail)
         }
     }
-    
+
     val mediaItems = mediaItemsData.items
     val currentMediaIndex = mediaItemsData.currentIndex
 
@@ -334,13 +360,38 @@ fun Thumbnail(
             ) {
                 // Now Playing header - hide in landscape mode
                 if (!isLandscape) {
-                    ThumbnailHeader(
-                        queueTitle = queueTitle,
-                        albumTitle = mediaMetadata?.album?.title,
-                        textColor = textBackgroundColor
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = PlayerHorizontalPadding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ThumbnailHeader(
+                            queueTitle = queueTitle,
+                            albumTitle = mediaMetadata?.album?.title,
+                            textColor = textBackgroundColor,
+                            modifier = Modifier.align(Alignment.CenterStart)
+                        )
+
+                        if (isVideoSong && isSongVideoToggleEnabled && !isListenTogetherGuest) {
+                            SongVideoToggle(
+                                isVideoSelected = isVideoShown,
+                                onToggle = {
+                                    playerConnection.toggleVideoPlayback()
+                                    isVideoShown = !isVideoShown
+                                },
+                                textColor = textBackgroundColor,
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            )
+                        } else {
+                            CastButton(
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                                tintColor = textBackgroundColor
+                            )
+                        }
+                    }
                 }
-                
+
                 // Thumbnail content
                 BoxWithConstraints(
                     contentAlignment = Alignment.Center,
@@ -366,12 +417,12 @@ fun Thumbnail(
                             showSeekEffect = showEffect
                         }
                     }
-                    
+
                     // Derive scroll enabled state to prevent unnecessary recomposition
                     val isScrollEnabled by remember(swipeThumbnail) {
                         derivedStateOf { swipeThumbnail && isPlayerExpanded() }
                     }
-                    
+
                     LazyHorizontalGrid(
                         state = thumbnailLazyGridState,
                         rows = GridCells.Fixed(1),
@@ -385,7 +436,7 @@ fun Thumbnail(
                     ) {
                         items(
                             items = mediaItems,
-                            key = { item -> 
+                            key = { item ->
                                 item.mediaId.ifEmpty { "unknown_${item.hashCode()}" }
                             }
                         ) { item ->
@@ -402,7 +453,9 @@ fun Thumbnail(
                                 isLandscape = isLandscape,
                                 isListenTogetherGuest = isListenTogetherGuest,
                                 currentMediaId = mediaMetadata?.id,
-                                currentMediaThumbnail = mediaMetadata?.thumbnailUrl
+                                currentMediaThumbnail = mediaMetadata?.thumbnailUrl,
+                                isVideoShown = isVideoShown && isVideoPlaybackEnabled,
+                                onHasVideoChanged = { hasVideoTrack = it }
                             )
                         }
                     }
@@ -440,44 +493,47 @@ private fun ThumbnailHeader(
     modifier: Modifier = Modifier
 ) {
     val listenTogetherManager = LocalListenTogetherManager.current
-    val listenTogetherRoleState = listenTogetherManager?.role?.collectAsState(initial = RoomRole.NONE)
-    val isListenTogetherGuest = listenTogetherRoleState?.value == RoomRole.GUEST
-    Box(
+    val listenTogetherRoleState =
+        listenTogetherManager?.role?.collectAsState(initial = RoomRole.NONE)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
+            .padding(horizontal = 48.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 48.dp)
-        ) {
-            // Listen Together indicator
-            if (listenTogetherRoleState?.value != RoomRole.NONE) {
-                Text(
-                    text = if (listenTogetherRoleState?.value == RoomRole.HOST) "Hosting Listen Together" else "Listening Together",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = textColor
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.now_playing),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = textColor
-                )
-            }
-            val playingFrom = queueTitle ?: albumTitle
-            if (!playingFrom.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = playingFrom,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = textColor.copy(alpha = 0.8f),
-                    maxLines = 1,
-                    modifier = Modifier.basicMarquee()
-                )
-            }
+        // Listen Together indicator
+        if (listenTogetherRoleState?.value != RoomRole.NONE) {
+            Text(
+                text =
+                if (listenTogetherRoleState?.value == RoomRole.HOST) {
+                    "Hosting Listen Together"
+                } else {
+                    "Listening Together"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.now_playing),
+                style = MaterialTheme.typography.titleMedium,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
+        }
+        val playingFrom = queueTitle ?: albumTitle
+        if (!playingFrom.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = playingFrom,
+                style = MaterialTheme.typography.titleMedium,
+                color = textColor.copy(alpha = 0.8f),
+                maxLines = 1,
+                modifier = Modifier.basicMarquee(),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -501,6 +557,8 @@ private fun ThumbnailItem(
     currentMediaId: String? = null,
     currentMediaThumbnail: String? = null,
     modifier: Modifier = Modifier,
+    isVideoShown: Boolean = false,
+    onHasVideoChanged: (Boolean) -> Unit = {},
 ) {
     val incrementalSeekSkipEnabled by rememberPreference(SeekExtraSeconds, defaultValue = false)
     var skipMultiplier by remember { mutableIntStateOf(1) }
@@ -563,18 +621,32 @@ private fun ThumbnailItem(
             if (hidePlayerThumbnail) {
                 HiddenThumbnailPlaceholder(textBackgroundColor = textBackgroundColor)
             } else {
-                val artworkUriToUse = if (item.mediaId == currentMediaId && !currentMediaThumbnail.isNullOrBlank()) {
-                    currentMediaThumbnail
-                } else {
-                    item.mediaMetadata.artworkUri?.toString()
-                }
+                val artworkUriToUse =
+                    if (item.mediaId == currentMediaId && !currentMediaThumbnail.isNullOrBlank()) {
+                        currentMediaThumbnail
+                    } else {
+                        item.mediaMetadata.artworkUri?.toString()
+                    }
 
                 ThumbnailImage(
                     artworkUri = artworkUriToUse,
                     cropArtwork = cropAlbumArt
                 )
+
+                if (item.mediaId == currentMediaId) {
+                    AnimatedVisibility(
+                        visible = isVideoShown,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        VideoPlayer(
+                            player = playerConnection.player,
+                            onHasVideoChanged = onHasVideoChanged
+                        )
+                    }
+                }
             }
-            
+
             // Cast button at top-right corner of thumbnail
             CastButton(
                 modifier = Modifier
@@ -659,4 +731,50 @@ private fun SeekEffectOverlay(
             .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
             .padding(8.dp)
     )
+}
+
+@Composable
+private fun SongVideoToggle(
+    isVideoSelected: Boolean,
+    onToggle: () -> Unit,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(textColor.copy(alpha = 0.1f))
+            .clickable { onToggle() }
+            .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (!isVideoSelected) textColor.copy(alpha = 0.2f) else Color.Transparent)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.song_toggle),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (!isVideoSelected) textColor else textColor.copy(alpha = 0.6f),
+                fontWeight = if (!isVideoSelected) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (isVideoSelected) textColor.copy(alpha = 0.2f) else Color.Transparent)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.video_toggle),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (isVideoSelected) textColor else textColor.copy(alpha = 0.6f),
+                fontWeight = if (isVideoSelected) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+    }
 }

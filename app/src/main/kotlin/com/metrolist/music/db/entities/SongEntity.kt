@@ -63,7 +63,13 @@ data class SongEntity(
     @ColumnInfo(name = "uploadEntityId", defaultValue = "NULL")
     val uploadEntityId: String? = null,
     @ColumnInfo(name = "isCached", defaultValue = "0")
-    val isCached: Boolean = false
+    val isCached: Boolean = false,
+    @ColumnInfo(name = "videoId", defaultValue = "NULL")
+    val videoId: String? = null,
+    @ColumnInfo(name = "artworkUrl", defaultValue = "NULL")
+    val artworkUrl: String? = null,
+    @ColumnInfo(name = "squareThumbnailUrl", defaultValue = "NULL")
+    val squareThumbnailUrl: String? = null
 ) {
     fun localToggleLike() = copy(
         liked = !liked,

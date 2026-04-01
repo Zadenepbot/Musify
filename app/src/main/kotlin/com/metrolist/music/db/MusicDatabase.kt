@@ -150,7 +150,6 @@ class MusicDatabase(
         AutoMigration(from = 31, to = 32),
         AutoMigration(from = 32, to = 33),
         AutoMigration(from = 33, to = 34),
-        AutoMigration(from = 34, to = 35),
         AutoMigration(from = 35, to = 36, spec = Migration35To36::class),
     ],
 )
@@ -162,40 +161,41 @@ abstract class InternalDatabase : RoomDatabase() {
     companion object {
         const val DB_NAME = "song.db"
 
+        fun createBuilder(context: Context): RoomDatabase.Builder<InternalDatabase> =
+            Room.databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_21_24,
+                    MIGRATION_22_24,
+                    MIGRATION_24_25,
+                    MIGRATION_34_35,
+                )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
+                .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        super.onOpen(db)
+                        try {
+                            db.query("PRAGMA busy_timeout = 60000").close()
+                            db.query("PRAGMA cache_size = -16000").close()
+                            db.query("PRAGMA wal_autocheckpoint = 1000").close()
+                            db.query("PRAGMA synchronous = NORMAL").close()
+                        } catch (e: Exception) {
+                            Timber.tag("MusicDatabase").e(e, "Failed to set PRAGMA settings")
+                        }
+                    }
+                })
+
         fun newInstance(context: Context): MusicDatabase =
             MusicDatabase(
-                delegate =
-                Room
-                    .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
-                    .addMigrations(
-                        MIGRATION_1_2,
-                        MIGRATION_21_24,
-                        MIGRATION_22_24,
-                        MIGRATION_24_25,
-                    )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                    .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
-                    .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
-                    .addCallback(object : RoomDatabase.Callback() {
-                        override fun onOpen(db: SupportSQLiteDatabase) {
-                            super.onOpen(db)
-                            try {
-                                db.query("PRAGMA busy_timeout = 60000").close()
-                                db.query("PRAGMA cache_size = -16000").close()
-                                db.query("PRAGMA wal_autocheckpoint = 1000").close()
-                                db.query("PRAGMA synchronous = NORMAL").close()
-                            } catch (e: Exception) {
-                                Timber.tag("MusicDatabase").e(e, "Failed to set PRAGMA settings")
-                            }
-                        }
-                    })
-                    .build(),
+                delegate = createBuilder(context).build()
             )
     }
 }
 
-// ===== Migrations =====
+//  Migrations
 
 val MIGRATION_1_2 =
     object : Migration(1, 2) {
@@ -471,7 +471,7 @@ val MIGRATION_22_24 =
         }
     }
 
-// ===== AutoMigration Specs =====
+//  AutoMigration Specs
 
 @DeleteColumn.Entries(
     DeleteColumn(tableName = "song", columnName = "isTrash"),
@@ -548,13 +548,13 @@ class Migration11To12 : AutoMigrationSpec {
                     table = "album",
                     conflictAlgorithm = SQLiteDatabase.CONFLICT_IGNORE,
                     values =
-                    contentValuesOf(
-                        "id" to albumId,
-                        "title" to albumName,
-                        "songCount" to 0,
-                        "duration" to 0,
-                        "lastUpdateTime" to 0,
-                    ),
+                        contentValuesOf(
+                            "id" to albumId,
+                            "title" to albumName,
+                            "songCount" to 0,
+                            "duration" to 0,
+                            "lastUpdateTime" to 0,
+                        ),
                 )
             }
         }
@@ -641,7 +641,7 @@ class Migration22To23 : AutoMigrationSpec {
     }
 }
 
-class Migration23To24: AutoMigrationSpec {
+class Migration23To24 : AutoMigrationSpec {
     override fun onPostMigrate(db: SupportSQLiteDatabase) {
         var hasIsUploaded = false
         db.query("PRAGMA table_info('song')").use { cursor ->
@@ -737,3 +737,67 @@ class Migration35To36 : AutoMigrationSpec {
         }
     }
 }
+
+/**
+ * Manual migration from version 34 to 35.
+ * This replaces the AutoMigration to handle cases where columns might already exist
+ * from previous development builds or partial migrations.
+ */
+val MIGRATION_34_35 =
+    object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Check existing columns in song table
+            val existingSongColumns = mutableSetOf<String>()
+            db.query("PRAGMA table_info('song')").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        existingSongColumns.add(cursor.getString(nameIndex))
+                    }
+                }
+            }
+
+            // Check existing columns in artist table
+            val existingArtistColumns = mutableSetOf<String>()
+            db.query("PRAGMA table_info('artist')").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        existingArtistColumns.add(cursor.getString(nameIndex))
+                    }
+                }
+            }
+
+            // Recreate views (always safe to drop and recreate)
+            db.execSQL("DROP VIEW IF EXISTS sorted_song_artist_map")
+            db.execSQL("DROP VIEW IF EXISTS sorted_song_album_map")
+            db.execSQL("DROP VIEW IF EXISTS playlist_song_map_preview")
+
+            // Add columns to song table if they don't exist
+            if ("playbackPosition" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `playbackPosition` INTEGER DEFAULT NULL")
+            }
+            if ("uploadEntityId" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `uploadEntityId` TEXT DEFAULT NULL")
+            }
+            if ("videoId" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `videoId` TEXT DEFAULT NULL")
+            }
+            if ("artworkUrl" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `artworkUrl` TEXT DEFAULT NULL")
+            }
+            if ("squareThumbnailUrl" !in existingSongColumns) {
+                db.execSQL("ALTER TABLE `song` ADD COLUMN `squareThumbnailUrl` TEXT DEFAULT NULL")
+            }
+
+            // Add columns to artist table if they don't exist
+            if ("isPodcastChannel" !in existingArtistColumns) {
+                db.execSQL("ALTER TABLE `artist` ADD COLUMN `isPodcastChannel` INTEGER NOT NULL DEFAULT 0")
+            }
+
+            // Recreate views
+            db.execSQL("CREATE VIEW `sorted_song_artist_map` AS SELECT * FROM song_artist_map ORDER BY position")
+            db.execSQL("CREATE VIEW `sorted_song_album_map` AS SELECT * FROM song_album_map ORDER BY `index`")
+            db.execSQL("CREATE VIEW `playlist_song_map_preview` AS SELECT * FROM playlist_song_map WHERE position <= 3 ORDER BY position")
+        }
+    }

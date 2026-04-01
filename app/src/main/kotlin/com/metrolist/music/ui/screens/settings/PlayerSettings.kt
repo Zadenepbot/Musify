@@ -64,6 +64,7 @@ import com.metrolist.music.constants.SimilarContent
 import com.metrolist.music.constants.SkipSilenceInstantKey
 import com.metrolist.music.constants.SkipSilenceKey
 import com.metrolist.music.constants.StopMusicOnTaskClearKey
+import com.metrolist.music.constants.VideoPlaybackKey
 import com.metrolist.music.ui.component.DefaultDialog
 import com.metrolist.music.ui.component.EnumDialog
 import com.metrolist.music.ui.component.IconButton
@@ -190,6 +191,10 @@ fun PlayerSettings(
         KeepScreenOn,
         defaultValue = false
     )
+    val (videoPlayback, onVideoPlaybackChange) = rememberPreference(
+        VideoPlaybackKey,
+        defaultValue = true
+    )
     val (historyDuration, onHistoryDurationChange) = rememberPreference(
         HistoryDuration,
         defaultValue = 30f
@@ -262,6 +267,27 @@ fun PlayerSettings(
         Material3SettingsGroup(
             title = stringResource(R.string.player),
             items = buildList {
+                add(Material3SettingsItem(
+                    icon = painterResource(R.drawable.slow_motion_video),
+                    title = { Text(stringResource(R.string.enable_video_playback)) },
+                    description = { Text(stringResource(R.string.enable_video_playback_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = videoPlayback,
+                            onCheckedChange = { onVideoPlaybackChange(it) },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (videoPlayback) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onVideoPlaybackChange(!videoPlayback) }
+                ))
                 add(Material3SettingsItem(
                     icon = painterResource(R.drawable.graphic_eq),
                     title = { Text(stringResource(R.string.audio_quality)) },

@@ -33,10 +33,15 @@ data class MediaMetadata(
     val libraryRemoveToken: String? = null,
     val suggestedBy: String? = null,
     val isEpisode: Boolean = false,
-    val uploadEntityId: String? = null,
+    val videoId: String? = null,
+    val artworkUrl: String? = null,
+    val squareThumbnailUrl: String? = null,
 ) : Serializable {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
+
+    val resolvedVideoId: String?
+        get() = videoId ?: setVideoId
 
     data class Artist(
         val id: String?,
@@ -64,7 +69,9 @@ data class MediaMetadata(
             libraryRemoveToken = libraryRemoveToken,
             isVideo = isVideoSong,
             isEpisode = isEpisode,
-            uploadEntityId = uploadEntityId
+            videoId = videoId ?: setVideoId,
+            artworkUrl = artworkUrl,
+            squareThumbnailUrl = squareThumbnailUrl
         )
 }
 
@@ -98,6 +105,9 @@ fun Song.toMediaMetadata() =
         musicVideoType = if (song.isVideo) "MUSIC_VIDEO_TYPE_OMV" else null,
         suggestedBy = null,
         isEpisode = song.isEpisode,
+        videoId = song.videoId,
+        artworkUrl = song.artworkUrl,
+        squareThumbnailUrl = song.squareThumbnailUrl
     )
 
 fun SongItem.toMediaMetadata() =
@@ -127,7 +137,9 @@ fun SongItem.toMediaMetadata() =
         libraryRemoveToken = libraryRemoveToken,
         suggestedBy = null,
         isEpisode = isEpisode,
-        uploadEntityId = uploadEntityId
+        videoId = setVideoId,
+        artworkUrl = null,
+        squareThumbnailUrl = thumbnail.resize(544, 544),
     )
 
 fun EpisodeItem.toMediaMetadata() =
@@ -153,4 +165,6 @@ fun EpisodeItem.toMediaMetadata() =
         isEpisode = true,
         libraryAddToken = libraryAddToken,
         libraryRemoveToken = libraryRemoveToken,
+        artworkUrl = null,
+        squareThumbnailUrl = thumbnail.resize(544, 544),
     )
