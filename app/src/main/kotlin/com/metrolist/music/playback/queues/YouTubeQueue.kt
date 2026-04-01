@@ -45,7 +45,7 @@ class YouTubeQueue(
                     var items = nextResult.items
                     val relEndpoint = nextResult.relatedEndpoint
                     
-                    if (isRadioRequest && nextResult.continuation == null && items.size <= 1) {
+                    if (isRadioRequest && continuation == null && items.size <= 1) {
                         if (endpoint.playlistId?.startsWith("RDAMVM") == true) {
                             throw EmptyRadioQueueException()
                         } else if (relEndpoint != null) {
