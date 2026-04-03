@@ -840,15 +840,7 @@ fun SongMenu(
                                                     ps.map.songId,
                                                     ps.map.playlistId
                                                 ) {
-                                                    capturedSetVideoId ?: run {
-                                                        var setVideoId: String? = null
-                                                        for (attempt in 0 until 10) {
-                                                            setVideoId = database.getSetVideoId(ps.map.songId)?.setVideoId
-                                                            if (setVideoId != null) break
-                                                            delay(3_000L)
-                                                        }
-                                                        setVideoId
-                                                    }
+                                                    capturedSetVideoId
                                                 }
                                             }
                                             onDismiss()
