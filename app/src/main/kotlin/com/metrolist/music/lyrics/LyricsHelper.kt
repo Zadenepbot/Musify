@@ -129,8 +129,7 @@ constructor(
             return LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
         }
 
-        val scope = CoroutineScope(SupervisorJob())
-        val deferred = scope.async {
+        val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
             val enabledProviders = lyricsProviders.filter { it.isEnabled(context) }
             val perProviderTimeout = MAX_LYRICS_FETCH_MS / enabledProviders.size.coerceAtLeast(1)
@@ -153,7 +152,7 @@ constructor(
                         result?.isSuccess == true -> {
                             Timber.tag("LyricsHelper").i("Successfully got lyrics from ${provider.name}")
                             val filteredLyrics = LyricsUtils.filterLyricsCreditLines(result.getOrNull()!!)
-                            return@async LyricsWithProvider(filteredLyrics, provider.name)
+                            return@withTimeoutOrNull LyricsWithProvider(filteredLyrics, provider.name)
                         }
                         result == null -> {
                             Timber.tag("LyricsHelper").w("${provider.name} timed out after ${perProviderTimeout}ms")
@@ -169,13 +168,9 @@ constructor(
                 }
             }
             Timber.tag("LyricsHelper").w("All providers failed for ${mediaMetadata.title}")
-            return@async LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
+            return@withTimeoutOrNull LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
         }
-
-        val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) { deferred.await() }
-            ?: LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
-        scope.cancel()
-        return result
+        return result ?: LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
     }
 
     suspend fun getAllLyrics(
