@@ -3268,8 +3268,7 @@ class MusicService :
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        if (dataStore.get(StopMusicOnTaskClearKey, false) && player.isPlaying) {
-            player.pause()
+        if (dataStore.get(StopMusicOnTaskClearKey, false)) {
             player.stop()
             stopSelf()
         }
