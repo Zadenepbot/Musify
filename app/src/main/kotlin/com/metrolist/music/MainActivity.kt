@@ -337,16 +337,6 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-        // This is more reliable than onDestroy() for detecting task clear
-        if (dataStore.get(StopMusicOnTaskClearKey, false) &&
-            playerConnection?.isPlaying?.value == true
-        ) {
-            stopService(Intent(this, MusicService::class.java))
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         if (dataStore.get(StopMusicOnTaskClearKey, false) &&
