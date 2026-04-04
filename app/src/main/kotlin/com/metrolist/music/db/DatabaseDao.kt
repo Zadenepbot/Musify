@@ -1069,17 +1069,47 @@ interface DatabaseDao {
         playlistId: String,
         now: LocalDateTime = LocalDateTime.now(),
     )
-    @Transaction
+     @Transaction
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
         var position = playlist.songCount
         songIds.forEach { id ->
-            insert(
-                PlaylistSongMap(
-                    songId = id,
-                    playlistId = playlist.id,
-                    position = position++
+            val existingSong = getSongByIdBlocking(id)
+            if (existingSong != null) {
+                insert(
+                    PlaylistSongMap(
+                        songId = id,
+                        playlistId = playlist.id,
+                        position = position++
+                    )
                 )
-            )
+            }
+        }
+        updatePlaylistLastUpdated(playlist.id)
+    }
+
+    // Adds songs to playlist and marks them as inLibrary to ensure they persist across syncs
+    // This prevents songs from being removed during automatic playlist synchronization
+    @Transaction
+    fun addSongToPlaylistWithLibrarySync(playlist: Playlist, songIds: List<String>) {
+        val now = LocalDateTime.now()
+        var position = playlist.songCount
+
+        songIds.forEach { id ->
+            val existingSong = getSongByIdBlocking(id)
+            if (existingSong != null) {
+                // If song already exists, update it to mark as inLibrary if not already marked
+                if (existingSong.song.inLibrary == null) {
+                    inLibrary(id, now)
+                }
+                // Add to playlist mapping
+                insert(
+                    PlaylistSongMap(
+                        songId = id,
+                        playlistId = playlist.id,
+                        position = position++
+                    )
+                )
+            }
         }
         updatePlaylistLastUpdated(playlist.id)
     }
