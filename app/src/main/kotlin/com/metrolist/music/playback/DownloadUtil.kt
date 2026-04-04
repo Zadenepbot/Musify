@@ -66,6 +66,11 @@ constructor(
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
+    /**
+     * ResolvingDataSource factory that handles URL resolution and database synchronization
+     * for played songs. It ensures metadata is updated upon playback without incorrectly
+     * marking songs as downloaded.
+     */
     private val dataSourceFactory =
         ResolvingDataSource.Factory(
             CacheDataSource

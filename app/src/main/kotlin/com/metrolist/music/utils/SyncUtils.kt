@@ -409,6 +409,10 @@ class SyncUtils @Inject constructor(
     suspend fun cleanupDuplicatePlaylistsSuspend() = executeCleanupDuplicatePlaylists()
     suspend fun clearAllSyncedContentSuspend() = executeClearAllSyncedContent()
 
+    /**
+     * Clears all library data for the current user, except for explicitly downloaded content.
+     * This is typically called during logout or account switching.
+     */
     suspend fun clearAllLibraryData() = withContext(Dispatchers.IO) {
         Timber.d("[LOGOUT_CLEAR] Starting complete library data cleanup")
         try {
