@@ -178,7 +178,7 @@ fun LibraryMixScreen(
             songThumbnails = emptyList(),
         )
 
-    val cachePlaylist =
+    val cachedPlaylist =
         Playlist(
             playlist =
                 PlaylistEntity(
@@ -488,6 +488,8 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .clickable {
                                             navController.navigate("auto_playlist/downloaded")
+                                        }
+                                        .animateItem(),
                             )
                         }
                     }
@@ -826,6 +828,8 @@ fun LibraryMixScreen(
                                             onClick = {
                                                 navController.navigate("auto_playlist/downloaded")
                                             },
+                                        )
+                                        .animateItem(),
                             )
                         }
                     }
