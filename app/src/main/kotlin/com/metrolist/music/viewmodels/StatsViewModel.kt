@@ -363,14 +363,9 @@ constructor(
 
         database.clearPlaylist(playlistId)
 
-        songs.forEachIndexed { position, song ->
-            database.insert(
-                PlaylistSongMap(
-                    songId = song.song.id,
-                    playlistId = playlistId,
-                    position = position,
-                ),
-            )
+        val fullPlaylist = database.playlist(playlistId).first()
+        if (fullPlaylist != null) {
+            database.addSongToPlaylistWithLibrarySync(fullPlaylist, songs.map { it.song.id })
         }
     }
 

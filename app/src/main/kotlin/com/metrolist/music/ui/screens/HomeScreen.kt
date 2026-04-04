@@ -427,42 +427,37 @@ fun CommunityPlaylistCard(
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             if (dbPlaylist?.playlist == null) {
+                                val playlistEntity =
+                                    PlaylistEntity(
+                                        name = item.playlist.title,
+                                        browseId = item.playlist.id,
+                                        thumbnailUrl = item.playlist.thumbnail,
+                                        remoteSongCount =
+                                            item.playlist.songCountText
+                                                ?.split(" ")
+                                                ?.firstOrNull()
+                                                ?.toIntOrNull(),
+                                        playEndpointParams = item.playlist.playEndpoint?.params,
+                                        shuffleEndpointParams = item.playlist.shuffleEndpoint?.params,
+                                        radioEndpointParams = item.playlist.radioEndpoint?.params,
+                                    ).toggleLike()
                                 database.transaction {
-                                    val playlistEntity =
-                                        PlaylistEntity(
-                                            name = item.playlist.title,
-                                            browseId = item.playlist.id,
-                                            thumbnailUrl = item.playlist.thumbnail,
-                                            remoteSongCount =
-                                                item.playlist.songCountText
-                                                    ?.split(" ")
-                                                    ?.firstOrNull()
-                                                    ?.toIntOrNull(),
-                                            playEndpointParams = item.playlist.playEndpoint?.params,
-                                            shuffleEndpointParams = item.playlist.shuffleEndpoint?.params,
-                                            radioEndpointParams = item.playlist.radioEndpoint?.params,
-                                        ).toggleLike()
                                     insert(playlistEntity)
-                                    scope.launch(Dispatchers.IO) {
-                                        item.songs
-                                            .ifEmpty {
-                                                YouTube
-                                                    .playlist(item.playlist.id)
-                                                    .completed()
-                                                    .getOrNull()
-                                                    ?.songs
-                                                    .orEmpty()
-                                            }.map { it.toMediaMetadata() }
-                                            .onEach(::insert)
-                                            .mapIndexed { index, song ->
-                                                PlaylistSongMap(
-                                                    songId = song.id,
-                                                    playlistId = playlistEntity.id,
-                                                    position = index,
-                                                    setVideoId = song.setVideoId,
-                                                )
-                                            }.forEach(::insert)
-                                    }
+                                }
+                                val songIds = item.songs
+                                    .ifEmpty {
+                                        YouTube
+                                            .playlist(item.playlist.id)
+                                            .completed()
+                                            .getOrNull()
+                                            ?.songs
+                                            .orEmpty()
+                                    }.map { it.toMediaMetadata() }
+                                    .onEach { database.transaction { insert(it) } }
+                                    .map { it.id }
+                                val createdPlaylist = database.playlist(playlistEntity.id).first()
+                                if (createdPlaylist != null) {
+                                    database.addSongToPlaylistWithLibrarySync(createdPlaylist, songIds)
                                 }
                             } else {
                                 database.transaction {

@@ -105,6 +105,7 @@ import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.OnlinePlaylistViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -575,46 +576,43 @@ private fun OnlinePlaylistHeader(
         ) {
             // Like Button - Smaller secondary button
             Surface(
-                onClick = {
-                    if (dbPlaylist != null) {
-                        database.transaction {
-                            val currentPlaylist = dbPlaylist.playlist
-                            update(currentPlaylist, playlist)
-                            update(currentPlaylist.toggleLike())
-                        }
-                    } else {
-                        database.transaction {
-                            val playlistEntity =
-                                PlaylistEntity(
-                                    name = playlist.title,
-                                    browseId = playlist.id,
-                                    thumbnailUrl = playlist.thumbnail,
-                                    isEditable = playlist.isEditable,
-                                    remoteSongCount =
-                                        playlist.songCountText?.let {
-                                            Regex("""\d+""").find(it)?.value?.toIntOrNull()
-                                        },
-                                    playEndpointParams = playlist.playEndpoint?.params,
-                                    shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                                    radioEndpointParams = playlist.radioEndpoint?.params,
-                                ).toggleLike()
-                            insert(playlistEntity)
-                            coroutineScope.launch(Dispatchers.IO) {
-                                songs
-                                    .map { it.toMediaMetadata() }
-                                    .onEach(::insert)
-                                    .mapIndexed { index, song ->
-                                        PlaylistSongMap(
-                                            songId = song.id,
-                                            playlistId = playlistEntity.id,
-                                            position = index,
-                                            setVideoId = song.setVideoId,
-                                        )
-                                    }.forEach(::insert)
-                            }
-                        }
-                    }
-                },
+                 onClick = {
+                     if (dbPlaylist != null) {
+                         database.transaction {
+                             val currentPlaylist = dbPlaylist.playlist
+                             update(currentPlaylist, playlist)
+                             update(currentPlaylist.toggleLike())
+                         }
+                     } else {
+                         coroutineScope.launch(Dispatchers.IO) {
+                             val playlistEntity =
+                                 PlaylistEntity(
+                                     name = playlist.title,
+                                     browseId = playlist.id,
+                                     thumbnailUrl = playlist.thumbnail,
+                                     isEditable = playlist.isEditable,
+                                     remoteSongCount =
+                                         playlist.songCountText?.let {
+                                             Regex("""\d+""").find(it)?.value?.toIntOrNull()
+                                         },
+                                     playEndpointParams = playlist.playEndpoint?.params,
+                                     shuffleEndpointParams = playlist.shuffleEndpoint?.params,
+                                     radioEndpointParams = playlist.radioEndpoint?.params,
+                                 ).toggleLike()
+                             database.transaction {
+                                 insert(playlistEntity)
+                             }
+                             val songIds = songs
+                                 .map { it.toMediaMetadata() }
+                                 .onEach { database.transaction { insert(it) } }
+                                 .map { it.id }
+                             val createdPlaylist = database.playlist(playlistEntity.id).first()
+                             if (createdPlaylist != null) {
+                                 database.addSongToPlaylistWithLibrarySync(createdPlaylist, songIds)
+                             }
+                         }
+                     }
+                 },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.size(48.dp),

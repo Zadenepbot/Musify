@@ -1491,14 +1491,6 @@ class SyncUtils @Inject constructor(
                             if (database.song(song.id).firstOrNull() == null) {
                                 database.insert(song)
                             }
-                            database.insert(
-                                PlaylistSongMap(
-                                    songId = song.id,
-                                    playlistId = playlistId,
-                                    position = idx,
-                                    setVideoId = song.setVideoId
-                                )
-                            )
                         }
 
                         downloadedSongIds.forEach { songId ->
@@ -1518,6 +1510,10 @@ class SyncUtils @Inject constructor(
                                 }
                             }
                         }
+                    }
+                    val playlistEntity = database.playlist(playlistId).first()
+                    if (playlistEntity != null) {
+                        database.addSongToPlaylistWithLibrarySync(playlistEntity, songs.map { it.id })
                     }
                     Timber.d("syncPlaylist: Successfully synced playlist")
                 } catch (e: Exception) {
