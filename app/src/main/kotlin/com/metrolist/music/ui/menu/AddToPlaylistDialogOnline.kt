@@ -324,7 +324,7 @@ fun AddToPlaylistDialogOnline(
                                                                     } catch (e: Exception) {
                                                                         Timber.tag("Exception").e(e.toString())
                                                                     }
-                                                                    database.addSongToPlaylist(playlist, ids)
+                                                                    database.addSongToPlaylistWithLibrarySync(playlist, ids)
                                                                 }
                                                             }
                                                         }
@@ -453,8 +453,8 @@ fun AddToPlaylistDialogOnline(
                     onClick = {
                         showDuplicateDialog = false
                         onDismiss()
-                        database.transaction {
-                            addSongToPlaylist(
+                         database.transaction {
+                            addSongToPlaylistWithLibrarySync(
                                 selectedPlaylist!!,
                                 songIds!!.filter {
                                     !duplicates.contains(it)
@@ -470,8 +470,8 @@ fun AddToPlaylistDialogOnline(
                     onClick = {
                         showDuplicateDialog = false
                         onDismiss()
-                        database.transaction {
-                            addSongToPlaylist(selectedPlaylist!!, songIds!!)
+                         database.transaction {
+                            addSongToPlaylistWithLibrarySync(selectedPlaylist!!, songIds!!)
                         }
                     }
                 ) {

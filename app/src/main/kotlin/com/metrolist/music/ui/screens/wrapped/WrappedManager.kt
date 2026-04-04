@@ -84,7 +84,7 @@ class WrappedManager(
                     val createdPlaylist = databaseDao.playlist(playlistId).first()
                     if (createdPlaylist != null) {
                         val songIds = allSongs.map { it.id }
-                        databaseDao.addSongToPlaylist(createdPlaylist, songIds)
+                        databaseDao.addSongToPlaylistWithLibrarySync(createdPlaylist, songIds)
                     } else {
                         Timber.tag("WrappedManager")
                             .e("Failed to retrieve created playlist with id: $playlistId")
