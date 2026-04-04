@@ -463,7 +463,7 @@ class SyncUtils @Inject constructor(
             // Finally, delete songs but keep downloaded ones
             if ("song" in allTables) {
                 Timber.d("[LOGOUT_CLEAR] Deleting songs (keeping downloaded)")
-                safeRawQuery("DELETE FROM song WHERE dateDownload IS NULL")
+                safeRawQuery("DELETE FROM song WHERE isDownloaded = 0")
             }
 
             Timber.d("[LOGOUT_CLEAR] All library data cleared successfully")
