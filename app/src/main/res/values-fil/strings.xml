@@ -155,7 +155,7 @@
     <string name="sleep_timer">Oras ng pagtulog</string>
     <string name="end_of_song">Pagtatapos ng kanta</string>
     <plurals name="minute">
-        <item quantity="one">1 minuto</item>
+        <item quantity="one">%d minuto</item>
         <item quantity="other">%d minuto</item>
     </plurals>
     <string name="error_no_stream">Walang magagamit na stream</string>
@@ -196,10 +196,6 @@
     <string name="squiggly">Guhit-guhit</string>
     <string name="misc">Misc</string>
     <string name="default_open_tab">Default na nakabukas na tab</string>
-    <plurals name="n_selected">
-        <item quantity="one"></item>
-        <item quantity="other">%d mga pinili</item>
-    </plurals>
     <string name="volume">Volume</string>
     <string name="grid_cell_size">Sukat ng grid cell</string>
     <string name="small">Maliit</string>
