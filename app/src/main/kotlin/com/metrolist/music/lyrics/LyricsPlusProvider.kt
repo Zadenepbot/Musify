@@ -85,7 +85,7 @@ object LyricsPlusProvider : LyricsProvider {
             if (!album.isNullOrBlank()) {
                 parameter("album", album)
             }
-            parameter("source", "apple,lyricsplus,musixmatch,spotify,musixmatch-word")
+            parameter("source", "apple,lyricsplus,qq,musixmatch,musixmatch-word")
         }
 
         if (response.status == HttpStatusCode.OK) {
