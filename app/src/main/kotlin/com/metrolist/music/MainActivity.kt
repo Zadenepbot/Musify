@@ -131,18 +131,23 @@ import com.metrolist.music.constants.DefaultOpenTabKey
 import com.metrolist.music.constants.DisableScreenshotKey
 import com.metrolist.music.constants.DynamicThemeKey
 import com.metrolist.music.constants.EnableHighRefreshRateKey
+import com.metrolist.music.constants.ExperimentalLyricsKey
 import com.metrolist.music.constants.LastSeenVersionKey
 import com.metrolist.music.constants.ListenTogetherInTopBarKey
 import com.metrolist.music.constants.ListenTogetherUsernameKey
+import com.metrolist.music.constants.LyricsProviderOrderKey
 import com.metrolist.music.constants.MiniPlayerBottomSpacing
 import com.metrolist.music.constants.MiniPlayerHeight
 import com.metrolist.music.constants.NavigationBarAnimationSpec
 import com.metrolist.music.constants.NavigationBarHeight
 import com.metrolist.music.constants.PauseListenHistoryKey
 import com.metrolist.music.constants.PauseSearchHistoryKey
+import com.metrolist.music.constants.PreferredLyricsProvider
+import com.metrolist.music.constants.PreferredLyricsProviderKey
 import com.metrolist.music.constants.PureBlackKey
 import com.metrolist.music.constants.SYSTEM_DEFAULT
 import com.metrolist.music.constants.SelectedThemeColorKey
+import com.metrolist.music.constants.SimpMusicMigrationDoneKey
 import com.metrolist.music.constants.SlimNavBarHeight
 import com.metrolist.music.constants.SlimNavBarKey
 import com.metrolist.music.constants.StopMusicOnTaskClearKey
@@ -151,6 +156,7 @@ import com.metrolist.music.constants.UseNewMiniPlayerDesignKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.SearchHistory
 import com.metrolist.music.extensions.toEnum
+import com.metrolist.music.lyrics.LyricsProviderRegistry
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.playback.DownloadUtil
 import com.metrolist.music.playback.MusicService
@@ -305,12 +311,11 @@ class MainActivity : ComponentActivity() {
         // Explicitly start the service so it becomes an "explicitly started" service.
         // Without this, the service only exists while a client is bound (BIND_AUTO_CREATE).
         // When onStop() releases the binding (e.g. screen off, app backgrounded), Media3's
-        // MediaNotificationManager tries to call startForegroundService() to keep the service
-        // alive — but this is blocked on Android 12+ when the app is in the background,
-        // causing ForegroundServiceStartNotAllowedException. Starting the service explicitly
-        // here ensures it persists independently of binding state, so Media3 never needs to
-        // re-start it from a background context.
-        startService(Intent(this, MusicService::class.java))
+        // MediaNotificationManager tries to keep the service alive, but this is blocked on
+        // Android 12+ when the app is in the background. Using startForegroundService() ensures
+        // the service persists independently of binding state on all Android versions, including
+        // Android 16+ where startService() from background contexts is not allowed.
+        ContextCompat.startForegroundService(this, Intent(this, MusicService::class.java))
         
         // Bind to service - if already bound, this is a no-op but ensures we stay connected
         if (!isServiceBound) {
@@ -589,6 +594,34 @@ class MainActivity : ComponentActivity() {
                     if (lastSeenVersion != currentVersion) {
                         showChangelog.value = true
                     }
+
+                    // SimpMusic Removal Migration
+                    if (dataStore.data.first()[SimpMusicMigrationDoneKey] != true) {
+                        dataStore.edit { settings ->
+                            // Remove SimpMusic from serialized order string and append Paxsenix if missing
+                            val currentOrder = settings[LyricsProviderOrderKey] ?: ""
+                            if (currentOrder.contains("SimpMusic") || !currentOrder.contains("Paxsenix")) {
+                                val orderList = currentOrder.split(",")
+                                    .map { it.trim() }
+                                    .filter { it.isNotBlank() && it != "SimpMusic" }
+                                    .toMutableList()
+                                
+                                if (!orderList.contains("Paxsenix")) {
+                                    orderList.add("Paxsenix")
+                                }
+                                
+                                settings[LyricsProviderOrderKey] = orderList.joinToString(",")
+                            }
+
+                            // Reset preferred provider if it was SimpMusic
+                            if (settings[PreferredLyricsProviderKey] == "SIMPMUSIC") {
+                                settings[PreferredLyricsProviderKey] = PreferredLyricsProvider.LRCLIB.name
+                            }
+
+                            settings[SimpMusicMigrationDoneKey] = true
+                        }
+                    }
+
                     dataStore.edit { settings ->
                         settings[LastSeenVersionKey] = currentVersion
                     }

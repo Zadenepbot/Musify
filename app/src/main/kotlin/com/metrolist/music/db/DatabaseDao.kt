@@ -65,6 +65,17 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
 
+/**
+ * Helloo! Note from a dev:
+ * SQL Injection Prevention:
+ * - All queries use Room's parameterized query syntax with :paramName placeholders
+ * - Query parameters are automatically sanitized by Room's SQLite implementation
+ * - NEVER concatenate user input directly into queries (e.g., "WHERE id = " + userInput)
+ * - Room automatically handles escaping and prevents SQL injection attacks
+ *
+ * Safe pattern: @Query("SELECT * FROM song WHERE id = :songId")
+ * Unsafe pattern: @Query("SELECT * FROM song WHERE id = " + userInput) // DO NOT USE
+ */
 @Dao
 interface DatabaseDao {
     @Transaction
@@ -179,6 +190,18 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
     fun playlistSongs(playlistId: String): Flow<List<PlaylistSong>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT DISTINCT song.*
+        FROM song
+        JOIN playlist_song_map ON playlist_song_map.songId = song.id
+        JOIN playlist ON playlist.id = playlist_song_map.playlistId
+        WHERE playlist.bookmarkedAt IS NOT NULL
+        """,
+    )
+    fun songsInBookmarkedPlaylists(): Flow<List<Song>>
 
     @Transaction
     @Query(
@@ -1073,13 +1096,16 @@ interface DatabaseDao {
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
         var position = playlist.songCount
         songIds.forEach { id ->
-            insert(
-                PlaylistSongMap(
-                    songId = id,
-                    playlistId = playlist.id,
-                    position = position++
+            val existingSong = getSongByIdBlocking(id)
+            if (existingSong != null) {
+                insert(
+                    PlaylistSongMap(
+                        songId = id,
+                        playlistId = playlist.id,
+                        position = position++
+                    )
                 )
-            )
+            }
         }
         updatePlaylistLastUpdated(playlist.id)
     }
@@ -1107,25 +1133,19 @@ interface DatabaseDao {
     }.map { it.reversed(descending) }
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY dateDownload")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY dateDownload")
     fun downloadedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY title")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY title")
     fun downloadedSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY totalPlayTime")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY totalPlayTime")
     fun downloadedSongsByPlayTimeAsc(): Flow<List<Song>>
 
     @Query("UPDATE song SET isDownloaded = :downloaded, dateDownload = :date WHERE id = :songId")
     fun updateDownloadedInfo(songId: String, downloaded: Boolean, date: LocalDateTime?)
-
-    @Query("UPDATE song SET isCached = :cached WHERE id = :songId")
-    fun updateCachedInfo(songId: String, cached: Boolean)
-
-    @Query("UPDATE song SET isCached = 1 WHERE id IN (:songIds)")
-    fun updateCachedInfoMany(songIds: List<String>)
 
     @Query("UPDATE song SET playbackPosition = :position WHERE id = :songId")
     fun updatePlaybackPosition(songId: String, position: Long?)
@@ -1237,15 +1257,15 @@ interface DatabaseDao {
     }.map { it.reversed(descending) }
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY dateDownload")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY dateDownload")
     fun downloadedPodcastEpisodesByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY title")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY title")
     fun downloadedPodcastEpisodesByNameAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY totalPlayTime")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
 
     // Saved episodes (in library but not necessarily downloaded)
