@@ -125,4 +125,35 @@ object NewPipeExtractor {
             emptyList()
         }
     }
+
+    fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
+        YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId)
+    }
+
+    fun getStreamUrl(format: PlayerResponse.StreamingData.Format, videoId: String): String? {
+        return try {
+            val url = format.url ?: format.signatureCipher?.let { signatureCipher ->
+                val params = parseQueryString(signatureCipher)
+                val obfuscatedSignature = params["s"]
+                    ?: throw ParsingException("Could not parse cipher signature")
+                val signatureParam = params["sp"]
+                    ?: throw ParsingException("Could not parse cipher signature parameter")
+                val url = params["url"]?.let { URLBuilder(it) }
+                    ?: throw ParsingException("Could not parse cipher url")
+                url.parameters[signatureParam] =
+                    YoutubeJavaScriptPlayerManager.deobfuscateSignature(
+                        videoId,
+                        obfuscatedSignature
+                    )
+                url.toString()
+            } ?: throw ParsingException("Could not find format url")
+
+            YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                videoId,
+                url
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
