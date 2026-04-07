@@ -200,19 +200,29 @@ object FunctionNameExtractor {
 
     /**
      * Get hardcoded config for a known player.js hash
+     * Falls back to first known config if exact hash not found
      */
     fun getHardcodedConfig(playerHash: String): HardcodedPlayerConfig? {
+        // Try exact match first
         val config = KNOWN_PLAYER_CONFIGS[playerHash]
         if (config != null) {
             Timber.tag(TAG).d("Found hardcoded config for hash $playerHash:")
             Timber.tag(TAG).d("  sigFunc=${config.sigFuncName}(${config.sigConstantArg}, ...)")
             Timber.tag(TAG).d("  nFunc=${config.nFuncName}[${config.nArrayIndex}]")
             Timber.tag(TAG).d("  signatureTimestamp=${config.signatureTimestamp}")
-        } else {
-            Timber.tag(TAG).w("No hardcoded config for hash: $playerHash")
-            Timber.tag(TAG).w("Known hashes: ${KNOWN_PLAYER_CONFIGS.keys.joinToString()}")
+            return config
         }
-        return config
+        
+        // Fallback: try first config for unknown hashes (YouTube may use different hashes)
+        val fallbackConfig = KNOWN_PLAYER_CONFIGS.values.firstOrNull()
+        if (fallbackConfig != null) {
+            Timber.tag(TAG).w("No exact config for hash: $playerHash, using fallback (74edf1a3)")
+            Timber.tag(TAG).w("This may happen if YouTube updated the player.js hash")
+            return fallbackConfig
+        }
+        
+        Timber.tag(TAG).e("No hardcoded config available for any hash!")
+        return null
     }
 
     /**
