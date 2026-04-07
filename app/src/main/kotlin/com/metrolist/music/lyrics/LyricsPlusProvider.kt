@@ -136,7 +136,7 @@ object LyricsPlusProvider : LyricsProvider {
         val response = client.get("$url/v2/lyrics/get") {
             parameter("title", title)
             parameter("artist", artist)
-            parameter("duration", if (duration > 0) duration / 1000 else -1)
+            if (duration > 0) parameter("duration", duration / 1000)  // omit if invalid
             if (!album.isNullOrBlank()) parameter("album", album)
             parameter("source", "apple,lyricsplus,qq,musixmatch,musixmatch-word")
         }
@@ -149,6 +149,11 @@ object LyricsPlusProvider : LyricsProvider {
         duration: Int,
         album: String?,
     ): LyricsPlusResponse? {
+        if (title.isBlank() || artist.isBlank()) {
+            Timber.tag("LyricsPlus").d("Skipping fetch: missing title or artist")
+            return null
+        }
+
         for (baseUrl in baseUrls) {
             try {
                 val result = fetchFromUrl(baseUrl, title, artist, duration, album)
