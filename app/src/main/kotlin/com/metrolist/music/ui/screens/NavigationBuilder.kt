@@ -30,6 +30,7 @@ import com.metrolist.music.ui.screens.artist.ArtistItemsScreen
 import com.metrolist.music.ui.screens.artist.ArtistScreen
 import com.metrolist.music.ui.screens.artist.ArtistSongsScreen
 import com.metrolist.music.ui.screens.equalizer.EqScreen
+import com.metrolist.music.ui.screens.equalizer.wizard.WizardScreen
 import com.metrolist.music.ui.screens.library.LibraryScreen
 import com.metrolist.music.ui.screens.playlist.AutoPlaylistScreen
 import com.metrolist.music.ui.screens.playlist.CachePlaylistScreen
@@ -422,7 +423,11 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     dialog("equalizer") {
-        EqScreen()
+        EqScreen(onOpenWizard = { navController.navigate("eq_wizard") })
+    }
+
+    composable("eq_wizard") {
+        WizardScreen(onNavigateBack = { navController.popBackStack() })
     }
 
     composable(
