@@ -202,7 +202,7 @@ fun YouTubePlaylistMenu(
                                         }.map { it.toMediaMetadata() }
                                         .onEach { database.transaction { insert(it) } }
                                         .map { it.id to it.setVideoId }
-                                    database.addSongToPlaylistWithLibrarySync(playlistFull, songIds)
+                                    database.addSongsToPlaylist(playlistFull, songIds)
                                 }
                             }
                             if (playlist.isPodcast) {

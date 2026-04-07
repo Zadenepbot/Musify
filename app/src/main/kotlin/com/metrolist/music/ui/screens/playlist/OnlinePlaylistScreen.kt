@@ -606,7 +606,7 @@ private fun OnlinePlaylistHeader(
                                  val songIds = songMetadata.map { it.id to it.setVideoId }
                                  val createdPlaylist = database.playlist(playlistEntity.id).first()
                                      ?: throw IllegalStateException("Failed to create playlist")
-                                 database.addSongToPlaylistWithLibrarySync(createdPlaylist, songIds)
+                                 database.addSongsToPlaylist(createdPlaylist, songIds)
                              }
                          }
                      }

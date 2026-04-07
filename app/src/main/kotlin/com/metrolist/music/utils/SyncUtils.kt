@@ -1513,7 +1513,7 @@ class SyncUtils @Inject constructor(
 
                         val playlistEntity = database.playlistBlocking(playlistId)
                         if (playlistEntity != null) {
-                            database.addSongToPlaylistWithLibrarySync(
+                            database.addSongsToPlaylist(
                                 playlistEntity,
                                 songs.map { it.id to it.setVideoId }
                             )

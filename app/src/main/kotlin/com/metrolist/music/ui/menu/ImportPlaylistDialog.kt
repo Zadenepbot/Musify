@@ -57,7 +57,7 @@ fun ImportPlaylistDialog(
 
                     if (playlist != null) {
                         songIds = onGetSong()
-                        database.addSongToPlaylistWithLibrarySync(playlist, songIds!!.map { it to null })
+                        database.addSongsToPlaylist(playlist, songIds!!.map { it to null })
                     }
 
                     onDismiss()

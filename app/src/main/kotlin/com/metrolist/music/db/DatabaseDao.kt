@@ -1112,7 +1112,7 @@ interface DatabaseDao {
     
     // This prevents songs from being removed during automatic playlist synchronization
     @Transaction
-    fun addSongToPlaylistWithLibrarySync(
+    fun addSongsToPlaylist(
         playlist: Playlist,
         songs: List<Pair<String, String?>>  // Pair of (songId, setVideoId)
     ) {

@@ -365,7 +365,7 @@ constructor(
 
         val fullPlaylist = database.playlist(playlistId).first()
         if (fullPlaylist != null) {
-            database.addSongToPlaylistWithLibrarySync(fullPlaylist, songs.map { it.id to null })
+            database.addSongsToPlaylist(fullPlaylist, songs.map { it.id to null })
         }
     }
 

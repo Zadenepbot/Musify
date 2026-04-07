@@ -1364,7 +1364,7 @@ fun LocalPlaylistHeader(
                                             .map(SongItem::toMediaMetadata)
                                             .onEach(::insert)
                                             .map { it.id to it.setVideoId }
-                                        addSongToPlaylistWithLibrarySync(playlist, songIds)
+                                        addSongsToPlaylist(playlist, songIds)
                                     }
                                     withContext(Dispatchers.Main) {
                                         snackbarHostState.showSnackbar(playlistSyncedStr)
