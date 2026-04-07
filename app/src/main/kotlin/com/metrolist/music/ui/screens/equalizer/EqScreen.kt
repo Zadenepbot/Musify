@@ -60,7 +60,8 @@ import timber.log.Timber
 @Composable
 fun EqScreen(
     viewModel: EQViewModel = hiltViewModel(),
-    playbackState: PlaybackState? = null
+    playbackState: PlaybackState? = null,
+    onOpenWizard: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -125,6 +126,7 @@ fun EqScreen(
             // Launch file picker for .txt files
             filePickerLauncher.launch("text/plain")
         },
+        onOpenWizard = onOpenWizard,
         onOpenSystemEqualizer = {
             playerConnection?.let { connection ->
                 val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
@@ -193,6 +195,7 @@ private fun EqScreenContent(
     activeProfileId: String?,
     onProfileSelected: (String?) -> Unit,
     onImportCustomEQ: () -> Unit,
+    onOpenWizard: () -> Unit,
     onOpenSystemEqualizer: () -> Unit,
     onDeleteProfile: (String) -> Unit
 ) {
@@ -230,6 +233,12 @@ private fun EqScreenContent(
                     )
                 }
                 Row {
+                    IconButton(onClick = onOpenWizard) {
+                        Icon(
+                            painter = painterResource(R.drawable.discover_tune),
+                            contentDescription = stringResource(R.string.eq_wizard)
+                        )
+                    }
                     IconButton(onClick = onImportCustomEQ) {
                         Icon(
                             painter = painterResource(R.drawable.add),
@@ -297,7 +306,11 @@ private fun EqScreenContent(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onImportCustomEQ) {
+                                Button(onClick = onOpenWizard) {
+                                    Text(stringResource(R.string.eq_wizard))
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(onClick = onImportCustomEQ) {
                                     Text(stringResource(R.string.import_profile))
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
