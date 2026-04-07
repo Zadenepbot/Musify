@@ -290,17 +290,31 @@ object YTPlayerUtils {
                         Timber.tag(TAG).d("  Transformed URL length: ${streamUrl.length}")
                         Timber.tag(TAG).d("  URL changed: ${originalUrl != streamUrl}")
 
-                        // Append pot= parameter with streaming data poToken
-                        val needsPoToken = (currentClient.useWebPoTokens || isPrivatelyOwnedTrack) && poToken?.streamingDataPoToken != null
+                        // Extract pot= from URL if present (YouTube now includes it in streaming URLs)
+                        // Otherwise use the generated poToken
+                        val urlPot = try {
+                            val uri = Uri.parse(streamUrl)
+                            uri.getQueryParameter("pot")
+                        } catch (e: Exception) {
+                            null
+                        }
+
+                        // Use pot from URL if present, otherwise use generated poToken
+                        val effectivePoToken = urlPot ?: poToken?.streamingDataPoToken
+                        val needsPoToken = (currentClient.useWebPoTokens || isPrivatelyOwnedTrack) && effectivePoToken != null
                         Timber.tag(TAG).d("PoToken decision:")
                         Timber.tag(TAG).d("  needsPoToken: $needsPoToken")
+                        Timber.tag(TAG).d("  hasPotFromUrl: ${urlPot != null}")
                         Timber.tag(TAG).d("  hasStreamingDataPoToken: ${poToken?.streamingDataPoToken != null}")
 
-                        if (needsPoToken) {
+                        if (needsPoToken && urlPot == null && effectivePoToken != null) {
+                            // Only append if not already in URL and we have a token
                             Timber.tag(TAG).d("Appending pot= parameter to stream URL")
                             val separator = if ("?" in streamUrl) "&" else "?"
-                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken.streamingDataPoToken)}"
+                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(effectivePoToken)}"
                             Timber.tag(TAG).d("  Final URL length (with pot): ${streamUrl.length}")
+                        } else if (urlPot != null) {
+                            Timber.tag(TAG).d("Using pot from streaming URL (no append needed)")
                         }
                     } catch (e: Exception) {
                         Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
