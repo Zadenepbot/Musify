@@ -49,7 +49,8 @@ fun WizardScreen(
         onModelSelected = { viewModel.onModelSelected(it) },
         onVariantToggled = { viewModel.onVariantToggled(it) },
         onNextClicked = { viewModel.onNextClicked() },
-        onBackClicked = { viewModel.onBackClicked() }
+        onBackClicked = { viewModel.onBackClicked() },
+        onNavigateBack = onNavigateBack
     )
 }
 
@@ -64,7 +65,8 @@ private fun WizardScreenContent(
     onModelSelected: (DeviceModel) -> Unit,
     onVariantToggled: (String) -> Unit,
     onNextClicked: () -> Unit,
-    onBackClicked: () -> Unit
+    onBackClicked: () -> Unit,
+    onNavigateBack: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -79,10 +81,8 @@ private fun WizardScreenContent(
                     )
                 },
                 navigationIcon = {
-                    if (state.canGoBack) {
-                        IconButton(onClick = onBackClicked) {
-                            Icon(painterResource(R.drawable.arrow_back), "Back")
-                        }
+                    IconButton(onClick = if (state.canGoBack) onBackClicked else onNavigateBack) {
+                        Icon(painterResource(R.drawable.arrow_back), "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
