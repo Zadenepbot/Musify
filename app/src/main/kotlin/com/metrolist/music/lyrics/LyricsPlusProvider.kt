@@ -176,6 +176,15 @@ object LyricsPlusProvider : LyricsProvider {
      */
     private fun convertToLrc(response: LyricsPlusResponse?): String? {
         val lyrics = response?.lyrics?.takeIf { it.isNotEmpty() } ?: return null
+
+        if (response.type.isNullOrEmpty() || response.type.equals("None", ignoreCase = true)) {
+            return lyrics
+                .joinToString("\n") { it.text }
+                .trimEnd()
+                .ifBlank { null }
+        }
+
+        
         val isWordSync = response.type.equals("Word", ignoreCase = true)
 
         // Agent mapping
