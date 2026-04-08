@@ -1276,6 +1276,7 @@ class MainActivity : ComponentActivity() {
                                         latestVersionName = latestVersionName,
                                         activity = this@MainActivity,
                                         snackbarHostState = snackbarHostState,
+                                        playerBottomSheetState = playerBottomSheetState,
                                     )
                                 }
                             }
