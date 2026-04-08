@@ -23,6 +23,7 @@ data class WizardState(
     val selectedVariantIds: Set<String> = emptySet(),
 
     // UI state flags
+    val isDatabaseReady: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     val isComplete: Boolean = false

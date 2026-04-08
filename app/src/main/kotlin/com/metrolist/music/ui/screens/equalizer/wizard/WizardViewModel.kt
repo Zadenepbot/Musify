@@ -34,10 +34,9 @@ class WizardViewModel @Inject constructor(
 
     private var searchJob: Job? = null
 
-    init {
-        // Build the index when ViewModel is created
+    fun downloadDatabase() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+            _state.update { it.copy(isLoading = true, error = null) }
             val success = autoEqSearch.buildIndex()
             if (!success) {
                 _state.update {
@@ -47,8 +46,7 @@ class WizardViewModel @Inject constructor(
                     )
                 }
             } else {
-                _state.update { it.copy(isLoading = false) }
-                // Load all brands immediately after index is built
+                _state.update { it.copy(isLoading = false, isDatabaseReady = true) }
                 searchBrands("")
             }
         }

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 
@@ -41,6 +42,7 @@ fun WizardScreen(
 
     WizardScreenContent(
         state = state,
+        onDownloadDatabase = { viewModel.downloadDatabase() },
         onBrandSearchQueryChanged = { viewModel.onBrandSearchQueryChanged(it) },
         onBrandSelected = { viewModel.onBrandSelected(it) },
         onModelSearchQueryChanged = { viewModel.onModelSearchQueryChanged(it) },
@@ -55,6 +57,7 @@ fun WizardScreen(
 @Composable
 private fun WizardScreenContent(
     state: WizardState,
+    onDownloadDatabase: () -> Unit,
     onBrandSearchQueryChanged: (String) -> Unit,
     onBrandSelected: (DeviceBrand) -> Unit,
     onModelSearchQueryChanged: (String) -> Unit,
@@ -112,6 +115,8 @@ private fun WizardScreenContent(
                             searchQuery = state.brandSearchQuery,
                             brands = state.brands,
                             isLoading = state.isLoading,
+                            isDatabaseReady = state.isDatabaseReady,
+                            onDownloadDatabase = onDownloadDatabase,
                             onSearchQueryChanged = onBrandSearchQueryChanged,
                             onBrandSelected = onBrandSelected
                         )
@@ -266,6 +271,8 @@ private fun BrandSelectionStep(
     searchQuery: String,
     brands: List<DeviceBrand>,
     isLoading: Boolean,
+    isDatabaseReady: Boolean,
+    onDownloadDatabase: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onBrandSelected: (DeviceBrand) -> Unit
 ) {
@@ -277,6 +284,36 @@ private fun BrandSelectionStep(
         if (listState.isScrollInProgress) {
             focusManager.clearFocus()
         }
+    }
+
+    if (!isDatabaseReady) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isLoading) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.eq_downloading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Button(onClick = onDownloadDatabase) {
+                    Icon(
+                        painter = painterResource(R.drawable.download),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.eq_download_db))
+                }
+            }
+        }
+        return
     }
 
     Column(
