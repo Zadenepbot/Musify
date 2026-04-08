@@ -424,7 +424,7 @@ class GitHubAutoEqSearch(private val context: Context) {
 
         return when (source) {
             "Headphone.com Legacy", "Innerfidelity" -> "HMS II.3"
-            else -> "Unknown"
+            else -> "unknown"
         }
     }
 
