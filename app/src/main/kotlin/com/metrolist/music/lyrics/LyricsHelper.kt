@@ -132,12 +132,21 @@ constructor(
         val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
             val enabledProviders = lyricsProviders.filter { it.isEnabled(context) }
-            val perProviderTimeout = MAX_LYRICS_FETCH_MS / enabledProviders.size.coerceAtLeast(1)
+            val startTime = System.currentTimeMillis()
 
-            for (provider in enabledProviders) {
+            for ((index, provider) in enabledProviders.withIndex()) {
+                val elapsed = System.currentTimeMillis() - startTime
+                val remaining = MAX_LYRICS_FETCH_MS - elapsed
+                if (remaining <= 0) break
+
+                // Give each provider an equal share of whatever time is left,
+                // but never more than a reasonable per-provider cap (10s)
+                val remainingProviders = enabledProviders.size - index
+                val perProviderTimeout = (remaining / remainingProviders).coerceAtMost(10000L)
+
                 try {
                     Timber.tag("LyricsHelper")
-                        .d("Trying provider: ${provider.name} for $cleanedTitle (timeout: ${perProviderTimeout}ms)")
+                        .d("Trying ${provider.name} (timeout: ${perProviderTimeout}ms, remaining: ${remaining}ms)")
                     val result = withTimeoutOrNull(perProviderTimeout) {
                         provider.getLyrics(
                             context,
@@ -150,16 +159,12 @@ constructor(
                     }
                     when {
                         result?.isSuccess == true -> {
-                            Timber.tag("LyricsHelper").i("Successfully got lyrics from ${provider.name}")
+                            Timber.tag("LyricsHelper").i("Got lyrics from ${provider.name}")
                             val filteredLyrics = LyricsUtils.filterLyricsCreditLines(result.getOrNull()!!)
                             return@withTimeoutOrNull LyricsWithProvider(filteredLyrics, provider.name)
                         }
-                        result == null -> {
-                            Timber.tag("LyricsHelper").w("${provider.name} timed out after ${perProviderTimeout}ms")
-                        }
-                        else -> {
-                            Timber.tag("LyricsHelper").w("${provider.name} failed: ${result.exceptionOrNull()?.message}")
-                        }
+                        result == null -> Timber.tag("LyricsHelper").w("${provider.name} timed out after ${perProviderTimeout}ms")
+                        else -> Timber.tag("LyricsHelper").w("${provider.name} failed: ${result.exceptionOrNull()?.message}")
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -168,8 +173,8 @@ constructor(
                 }
             }
             Timber.tag("LyricsHelper").w("All providers failed for ${mediaMetadata.title}")
-            return@withTimeoutOrNull LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
-        }
+            LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
+}
         return result ?: LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
     }
 
