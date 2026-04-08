@@ -311,16 +311,23 @@ private fun computeBiquadCoefficients(
             a1 = 2.0 * (aMinusOne - aPlusOne * cosOmega)
             a2 = aPlusOne - aMinusOne * cosOmega - twoSqrtAAlpha
         }
-        else -> {
-            // LPQ/HPQ: treat as peaking as fallback
-            val A = 10.0.pow(gain / 40.0)
+        FilterType.LPQ -> {
             val alpha = sinOmega / (2.0 * q)
-            b0 = 1.0 + alpha * A
-            b1 = -2.0 * cosOmega
-            b2 = 1.0 - alpha * A
-            a0 = 1.0 + alpha / A
+            b0 = (1.0 - cosOmega) / 2.0
+            b1 = 1.0 - cosOmega
+            b2 = (1.0 - cosOmega) / 2.0
+            a0 = 1.0 + alpha
             a1 = -2.0 * cosOmega
-            a2 = 1.0 - alpha / A
+            a2 = 1.0 - alpha
+        }
+        FilterType.HPQ -> {
+            val alpha = sinOmega / (2.0 * q)
+            b0 = (1.0 + cosOmega) / 2.0
+            b1 = -(1.0 + cosOmega)
+            b2 = (1.0 + cosOmega) / 2.0
+            a0 = 1.0 + alpha
+            a1 = -2.0 * cosOmega
+            a2 = 1.0 - alpha
         }
     }
 
