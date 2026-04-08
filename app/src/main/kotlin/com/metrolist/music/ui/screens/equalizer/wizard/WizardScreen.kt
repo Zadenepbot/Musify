@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 
 /**
@@ -582,12 +583,13 @@ private fun VariantSelectionStep(
             tonalElevation = 3.dp,
             shadowElevation = 8.dp
         ) {
+            val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
             Button(
                 onClick = onCompleteClicked,
                 enabled = canComplete && !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + bottomPadding)
                     .height(56.dp)
             ) {
                 if (isLoading) {
