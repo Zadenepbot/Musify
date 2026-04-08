@@ -139,7 +139,6 @@ object LyricsPlusProvider : LyricsProvider {
             parameter("artist", artist)
             if (duration > 0) parameter("duration", duration)  // omit if invalid
             if (!album.isNullOrBlank()) parameter("album", album)
-            parameter("source", "apple,lyricsplus,qq,musixmatch,musixmatch-word")
         }
         if (response.status == HttpStatusCode.OK) response.body<LyricsPlusResponse>() else null
     }.getOrNull()
