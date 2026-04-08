@@ -90,7 +90,8 @@
 - Import playlists
 - Reorder songs in playlist or queue
 - YouTube Music account login
-- Sync songs, artists, albums, and playlists
+- Sync songs, artists, albums, and playlists  
+  - After logging in, open **Library → Playlists** once with **YouTube Music sync enabled** to trigger the initial playlist import. Subsequent syncs run automatically and now de-duplicate playlists by their YouTube ID so imports don’t create local duplicates.
 
 </td>
   </tr>

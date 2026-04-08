@@ -34,6 +34,8 @@ import com.metrolist.innertube.YouTube
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 import com.metrolist.music.constants.AccountChannelHandleKey
+import androidx.datastore.preferences.core.edit
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.constants.AccountEmailKey
 import com.metrolist.music.constants.AccountNameKey
 import com.metrolist.music.constants.DataSyncIdKey
@@ -43,9 +45,13 @@ import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.utils.reportException
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -63,6 +69,8 @@ fun LoginScreen(
     var accountEmail by rememberPreference(AccountEmailKey, "")
     var accountChannelHandle by rememberPreference(AccountChannelHandleKey, "")
     var hasCompletedLogin by remember { mutableStateOf(false) }
+    val pendingVisitorData = remember { AtomicReference<CompletableDeferred<String>?>(null) }
+    val pendingDataSyncId = remember { AtomicReference<CompletableDeferred<String>?>(null) }
 
     var webView: WebView? = null
 
@@ -74,21 +82,64 @@ fun LoginScreen(
             WebView(webViewContext).apply {
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
-                        loadUrl("javascript:Android.onRetrieveVisitorData(window.yt.config_.VISITOR_DATA)")
-                        loadUrl("javascript:Android.onRetrieveDataSyncId(window.yt.config_.DATASYNC_ID)")
-
                         if (url?.startsWith("https://music.youtube.com") == true && !hasCompletedLogin) {
+                            val visitorDataDeferred = CompletableDeferred<String>()
+                            val dataSyncIdDeferred = CompletableDeferred<String>()
+                            pendingVisitorData.set(visitorDataDeferred)
+                            pendingDataSyncId.set(dataSyncIdDeferred)
+
+                            loadUrl("javascript:Android.onRetrieveVisitorData(window.yt.config_.VISITOR_DATA)")
+                            loadUrl("javascript:Android.onRetrieveDataSyncId(window.yt.config_.DATASYNC_ID)")
+
                             innerTubeCookie = CookieManager.getInstance().getCookie(url)
                             hasCompletedLogin = true
 
                             coroutineScope.launch {
-                                // Small delay to ensure preferences are saved
-                                delay(500)
+                                val resolvedVisitorData = withTimeoutOrNull(5000) { visitorDataDeferred.await() }
+                                val resolvedDataSyncId = withTimeoutOrNull(5000) { dataSyncIdDeferred.await() }
+
+                                if (resolvedVisitorData.isNullOrBlank() || resolvedDataSyncId.isNullOrBlank()) {
+                                    hasCompletedLogin = false
+                                    reportException(
+                                        IllegalStateException(
+                                            "Login: timed out waiting for visitorData/dataSyncId from WebView",
+                                        ),
+                                    )
+                                    pendingVisitorData.set(null)
+                                    pendingDataSyncId.set(null)
+                                    return@launch
+                                }
+
+                                visitorData = resolvedVisitorData
+                                dataSyncId = resolvedDataSyncId
+
+                                // Persist critical auth preferences before restart so the next process sees a logged-in state
+                                try {
+                                    context.dataStore.edit { settings ->
+                                        settings[VisitorDataKey] = resolvedVisitorData
+                                        settings[DataSyncIdKey] = resolvedDataSyncId
+                                        settings[InnerTubeCookieKey] = innerTubeCookie
+                                    }
+                                } catch (e: IOException) {
+                                    hasCompletedLogin = false
+                                    Timber.e(e, "Login: Failed to persist auth data to DataStore")
+                                    reportException(e)
+                                    pendingVisitorData.set(null)
+                                    pendingDataSyncId.set(null)
+                                    return@launch
+                                } catch (e: Exception) {
+                                    hasCompletedLogin = false
+                                    Timber.e(e, "Login: Unexpected failure while persisting auth data")
+                                    reportException(e)
+                                    pendingVisitorData.set(null)
+                                    pendingDataSyncId.set(null)
+                                    return@launch
+                                }
 
                                 // Initialize YouTube object with new authentication data
                                 YouTube.cookie = innerTubeCookie
-                                YouTube.dataSyncId = dataSyncId
-                                YouTube.visitorData = visitorData
+                                YouTube.dataSyncId = resolvedDataSyncId
+                                YouTube.visitorData = resolvedVisitorData
 
                                 Timber.d("Login: YouTube object initialized, validating...")
 
@@ -117,6 +168,9 @@ fun LoginScreen(
                                     hasCompletedLogin = false // Allow retry
                                     reportException(it)
                                 }
+
+                                pendingVisitorData.set(null)
+                                pendingDataSyncId.set(null)
                             }
                         }
                     }
@@ -131,13 +185,18 @@ fun LoginScreen(
                     @JavascriptInterface
                     fun onRetrieveVisitorData(newVisitorData: String?) {
                         if (newVisitorData != null) {
-                            visitorData = newVisitorData
+                            pendingVisitorData.get()?.complete(newVisitorData)
                         }
                     }
                     @JavascriptInterface
                     fun onRetrieveDataSyncId(newDataSyncId: String?) {
                         if (newDataSyncId != null) {
-                            dataSyncId = newDataSyncId.substringBefore("||")
+                            val normalizedDataSyncId =
+                                newDataSyncId
+                                    .takeIf { !it.contains("||") }
+                                    ?: newDataSyncId.takeIf { it.endsWith("||") }?.substringBefore("||")
+                                    ?: newDataSyncId.substringAfter("||")
+                            pendingDataSyncId.get()?.complete(normalizedDataSyncId)
                         }
                     }
                 }, "Android")

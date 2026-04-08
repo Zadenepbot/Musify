@@ -8,7 +8,6 @@
     <string name="album_cover_desc">Album cover</string>
     <string name="top_music_videos">Top music videos</string>
     <string name="trending">Trending</string>
-    <string name="parsed_from_link">Parsed from link</string>
 
     <string name="weeks">Weeks</string>
     <string name="months">Months</string>
@@ -384,11 +383,6 @@
     <string name="audio_offload">Enable audio offload</string>
     <string name="audio_offload_description">Uses the hardware audio offload path for playback. Disabling this may increase battery usage, but can help if you experience issues with playback or audio post-processing</string>
     <string name="audio_offload_disabled_by_crossfade">Disabled because crossfade is active</string>
-
-    <!-- Varispeed -->
-    <string name="speed">Playback Speed</string>
-    <string name="varispeed">Enable varispeed</string>
-    <string name="varispeed_description">Link pitch to playback speed, resulting in tape-style speedup and slowdown effects</string>
 
     <!-- Google Cast -->
     <string name="google_cast">Google Cast</string>
@@ -917,11 +911,29 @@
     <string name="time_transfer_convert">Convert</string>
     <string name="song_dropdown_more_results">Keep typing to narrow results (%d more)</string>
 
-    <!-- Accessibility -->
-    <string name="back">Back</string>
+    <!-- Playlist cleanup -->
+    <string name="search_playlists">Search playlists…</string>
+    <string name="playlist_cleanup">Playlist cleanup</string>
+    <string name="delete_empty_playlists">Delete empty playlists</string>
+    <string name="no_empty_playlists">No empty playlists found</string>
+    <string name="find_duplicates">Find duplicate playlists</string>
+    <string name="duplicate_playlists">Duplicate playlists</string>
+    <string name="no_duplicate_playlists">No duplicate playlists found</string>
+    <string name="keep_largest">Keep largest</string>
+    <string name="delete_selected">Delete selected (%d)</string>
+    <string name="also_delete_from_youtube">Also delete from YouTube account</string>
+    <string name="select_all">Select all</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="select_all_except_largest">Select all except largest</string>
     <string name="clear_search">Clear search</string>
-    <string name="close_chip">Close</string>
-    <string name="switch_to_list_view">Switch to list view</string>
-    <string name="switch_to_grid_view">Switch to grid view</string>
-    <string name="more_options">More options</string>
+    <string name="open_playlist_search">Open playlist search</string>
+    <string name="close_playlist_search">Close playlist search</string>
+    <string name="duplicate_group_header">\"%1$s\" — %2$d copies</string>
+    <string name="local_remote_songs">%1$d local / %2$d remote songs</string>
+    <string name="n_songs">%d songs</string>
+    <string name="yt_browse_id">YT: %s</string>
+    <plurals name="delete_empty_playlists_confirm">
+        <item quantity="one">Delete %d empty playlist? This cannot be undone.</item>
+        <item quantity="other">Delete %d empty playlists? This cannot be undone.</item>
+    </plurals>
 </resources>

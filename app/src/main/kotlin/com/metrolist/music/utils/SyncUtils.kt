@@ -1356,8 +1356,10 @@ class SyncUtils @Inject constructor(
                         .reversed()
                     val remoteIds = remotePlaylists.map { it.id }.toSet()
 
-                    val localPlaylists = database.playlistsByNameAsc().first()
-                    localPlaylists.filterNot { it.playlist.browseId in remoteIds }
+                    // 1) Un-bookmark local playlists that no longer exist remotely
+                    val localPlaylistsSnapshot = database.playlistsByNameAsc().first()
+                    localPlaylistsSnapshot
+                        .filterNot { it.playlist.browseId in remoteIds }
                         .filterNot { it.playlist.browseId == null }
                         .forEach { playlist ->
                             try {
@@ -1368,30 +1370,36 @@ class SyncUtils @Inject constructor(
                             }
                         }
 
+                    // 2) For each remote playlist, upsert exactly one PlaylistEntity by browseId
                     for (playlist in remotePlaylists) {
                         try {
-                            var playlistEntity = localPlaylists.find { it.playlist.browseId == playlist.id }?.playlist
+                            val existing =
+                                database.playlistByBrowseId(playlist.id).firstOrNull()?.playlist
 
-                            if (playlistEntity == null) {
-                                playlistEntity = PlaylistEntity(
-                                    name = playlist.title,
-                                    browseId = playlist.id,
-                                    thumbnailUrl = playlist.thumbnail,
-                                    isEditable = playlist.isEditable,
-                                    bookmarkedAt = LocalDateTime.now(),
-                                    remoteSongCount = playlist.songCountText?.let {
-                                        Regex("""\d+""").find(it)?.value?.toIntOrNull()
-                                    },
-                                    playEndpointParams = playlist.playEndpoint?.params,
-                                    shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                                    radioEndpointParams = playlist.radioEndpoint?.params
-                                )
-                                database.insert(playlistEntity)
-                                Timber.d("syncSavedPlaylists: Created new playlist ${playlist.title} (${playlist.id})")
-                            } else {
-                                database.update(playlistEntity, playlist)
-                                Timber.d("syncSavedPlaylists: Updated existing playlist ${playlist.title} (${playlist.id})")
-                            }
+                            val playlistEntity =
+                                if (existing == null) {
+                                    val created =
+                                        PlaylistEntity(
+                                            name = playlist.title,
+                                            browseId = playlist.id,
+                                            thumbnailUrl = playlist.thumbnail,
+                                            isEditable = playlist.isEditable,
+                                            bookmarkedAt = LocalDateTime.now(),
+                                            remoteSongCount = playlist.songCountText?.let {
+                                                Regex("""\d+""").find(it)?.value?.toIntOrNull()
+                                            },
+                                            playEndpointParams = playlist.playEndpoint?.params,
+                                            shuffleEndpointParams = playlist.shuffleEndpoint?.params,
+                                            radioEndpointParams = playlist.radioEndpoint?.params,
+                                        )
+                                    database.insert(created)
+                                    Timber.d("syncSavedPlaylists: Created new playlist ${playlist.title} (${playlist.id})")
+                                    created
+                                } else {
+                                    database.update(existing, playlist)
+                                    Timber.d("syncSavedPlaylists: Updated existing playlist ${playlist.title} (${playlist.id})")
+                                    existing
+                                }
 
                             if (!isPlaylistBeingModified(playlistEntity.id)) {
                                 executeSyncPlaylist(playlist.id, playlistEntity.id)
@@ -1403,6 +1411,13 @@ class SyncUtils @Inject constructor(
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to sync playlist ${playlist.title}")
                         }
+                    }
+
+                    // 3) Best-effort cleanup for any historical duplicates with the same browseId
+                    try {
+                        executeCleanupDuplicatePlaylists()
+                    } catch (e: Exception) {
+                        Timber.e(e, "syncSavedPlaylists: Failed to cleanup duplicate playlists")
                     }
 
                     updateState { copy(playlists = SyncStatus.Completed) }
@@ -1479,43 +1494,19 @@ class SyncUtils @Inject constructor(
 
                     Timber.d("syncPlaylist: Updating local playlist (remote: ${remoteIds.size}, local: ${localIds.size})")
 
-                    val localSongsBeforeSync = database.playlistSongs(playlistId).first()
-                    val downloadedSongIds = localSongsBeforeSync
-                        .filter { it.song.song.isDownloaded || it.song.song.dateDownload != null }
-                        .map { it.song.id }
-                        .toSet()
-
                     database.withTransaction {
                         database.clearPlaylist(playlistId)
-                        songs.forEach { song ->
-                            if (database.getSongByIdBlocking(song.id) == null) {
+                        songs.forEachIndexed { idx, song ->
+                            if (database.song(song.id).firstOrNull() == null) {
                                 database.insert(song)
                             }
-                        }
-
-                        downloadedSongIds.forEach { songId ->
-                            if (songId !in remoteIds) {
-                                val existingSong = database.getSongByIdBlocking(songId)
-                                if (existingSong != null) {
-                                    val maxPosition = database.playlistSongsBlocking(playlistId)
-                                        .maxOfOrNull { it.map.position } ?: -1
-                                    database.insert(
-                                        PlaylistSongMap(
-                                            songId = songId,
-                                            playlistId = playlistId,
-                                            position = maxPosition + 1
-                                        )
-                                    )
-                                    Timber.d("syncPlaylist: Preserved downloaded song $songId in playlist")
-                                }
-                            }
-                        }
-
-                        val playlistEntity = database.playlistBlocking(playlistId)
-                        if (playlistEntity != null) {
-                            database.addSongsToPlaylist(
-                                playlistEntity,
-                                songs.map { it.id to it.setVideoId }
+                            database.insert(
+                                PlaylistSongMap(
+                                    songId = song.id,
+                                    playlistId = playlistId,
+                                    position = idx,
+                                    setVideoId = song.setVideoId
+                                )
                             )
                         }
                     }
