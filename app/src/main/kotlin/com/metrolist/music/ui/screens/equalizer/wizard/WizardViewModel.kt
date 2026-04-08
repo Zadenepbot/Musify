@@ -209,8 +209,8 @@ class WizardViewModel @Inject constructor(
                             label.contains("ANC ON", ignoreCase = true) ||
                             label.contains("ANC Off", ignoreCase = true)
                     val isPadModified = label.contains("velour", ignoreCase = true) ||
-                            label.contains("pad", ignoreCase = true) &&
-                            !label.contains("(sample", ignoreCase = true)
+                            (label.contains("pad", ignoreCase = true) &&
+                            !label.contains("(sample", ignoreCase = true))
 
                     EQProfileVariant(
                         id = "${modelId}_${index}",
