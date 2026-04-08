@@ -109,9 +109,12 @@ fun EqScreen(
         }
     }
 
+    val activeProfile = state.profiles.find { it.id == state.activeProfileId }
+
     EqScreenContent(
         profiles = state.profiles,
         activeProfileId = state.activeProfileId,
+        activeProfile = activeProfile,
         onProfileSelected = { viewModel.selectProfile(it) },
         onNavigateBack = { navController.navigateUp() },
         onAddClicked = { showAddDialog = true },
@@ -203,6 +206,7 @@ fun EqScreen(
 private fun EqScreenContent(
     profiles: List<SavedEQProfile>,
     activeProfileId: String?,
+    activeProfile: SavedEQProfile?,
     onProfileSelected: (String?) -> Unit,
     onNavigateBack: () -> Unit,
     onAddClicked: () -> Unit,
@@ -239,6 +243,14 @@ private fun EqScreenContent(
             contentPadding = PaddingValues(bottom = LocalPlayerAwareWindowInsets.current
                 .asPaddingValues().calculateBottomPadding())
         ) {
+            // Frequency response graph
+            item {
+                EqFrequencyResponseGraph(
+                    bands = activeProfile?.bands ?: emptyList(),
+                    preamp = activeProfile?.preamp ?: 0.0
+                )
+            }
+
             // "No Equalization" option (always first)
             item {
                 NoEqualizationItem(
