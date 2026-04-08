@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadRequest
@@ -708,13 +709,16 @@ fun PlayerMenu(
                                         )
                                     },
                                     onClick = {
-                                        val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-                                            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, playerConnection.player.audioSessionId)
-                                            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
-                                            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-                                        }
-                                        if (intent.resolveActivity(context.packageManager) != null) {
-                                            systemEqLauncher.launch(intent)
+                                        val audioSessionId = playerConnection.player.audioSessionId
+                                        if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId > 0) {
+                                            val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                                                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId)
+                                                putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                                                putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                                            }
+                                            if (intent.resolveActivity(context.packageManager) != null) {
+                                                systemEqLauncher.launch(intent)
+                                            }
                                         }
                                         onDismiss()
                                     },
