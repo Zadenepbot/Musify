@@ -132,6 +132,7 @@ import com.metrolist.music.constants.ShowLyricsKey
 import com.metrolist.music.constants.ShuffleModeKey
 import com.metrolist.music.constants.ShufflePlaylistFirstKey
 import com.metrolist.music.constants.SimilarContent
+import com.metrolist.music.constants.StopMusicOnTaskClearKey
 import com.metrolist.music.constants.SkipSilenceInstantKey
 import com.metrolist.music.constants.SkipSilenceKey
 import com.metrolist.music.db.entities.Event
@@ -3217,6 +3218,11 @@ class MusicService :
     override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        if (dataStore.get(StopMusicOnTaskClearKey, false) && player.isPlaying) {
+            player.stop()
+            player.clearMediaItems()
+            stopSelf()
+        }
         super.onTaskRemoved(rootIntent)
     }
 

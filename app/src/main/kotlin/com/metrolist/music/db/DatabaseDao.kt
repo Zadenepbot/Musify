@@ -65,6 +65,17 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
 
+/**
+ * Helloo! Note from a dev:
+ * SQL Injection Prevention:
+ * - All queries use Room's parameterized query syntax with :paramName placeholders
+ * - Query parameters are automatically sanitized by Room's SQLite implementation
+ * - NEVER concatenate user input directly into queries (e.g., "WHERE id = " + userInput)
+ * - Room automatically handles escaping and prevents SQL injection attacks
+ *
+ * Safe pattern: @Query("SELECT * FROM song WHERE id = :songId")
+ * Unsafe pattern: @Query("SELECT * FROM song WHERE id = " + userInput) // DO NOT USE
+ */
 @Dao
 interface DatabaseDao {
     @Transaction
@@ -179,6 +190,18 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
     fun playlistSongs(playlistId: String): Flow<List<PlaylistSong>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT DISTINCT song.*
+        FROM song
+        JOIN playlist_song_map ON playlist_song_map.songId = song.id
+        JOIN playlist ON playlist.id = playlist_song_map.playlistId
+        WHERE playlist.bookmarkedAt IS NOT NULL
+        """,
+    )
+    fun songsInBookmarkedPlaylists(): Flow<List<Song>>
 
     @Transaction
     @Query(
@@ -1075,7 +1098,7 @@ interface DatabaseDao {
         "SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount " +
         "FROM playlist WHERE bookmarkedAt IS NOT NULL AND " +
         "(SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) = 0 " +
-        "AND (remoteSongCount IS NULL OR remoteSongCount = 0)"
+        "AND (remoteSongCount IS NULL OR remoteSongCount = 0)",
     )
     fun emptyPlaylists(): Flow<List<Playlist>>
 
@@ -1084,19 +1107,73 @@ interface DatabaseDao {
         "SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount " +
         "FROM playlist WHERE bookmarkedAt IS NOT NULL AND name IN " +
         "(SELECT name FROM playlist WHERE bookmarkedAt IS NOT NULL GROUP BY name HAVING COUNT(*) > 1) " +
-        "ORDER BY name, MAX((SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id), COALESCE(remoteSongCount, 0)) DESC"
+        "ORDER BY name, MAX((SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id), COALESCE(remoteSongCount, 0)) DESC",
     )
     fun duplicatePlaylistsByName(): Flow<List<Playlist>>
 
     @Transaction
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
         var position = playlist.songCount
-        songIds.forEach { id ->
+        val existingSongIds = songIds
+            .distinct()
+            .filter { id -> getSongByIdBlocking(id) != null }
+        val duplicateSongIds =
+            if (existingSongIds.isEmpty()) {
+                emptySet()
+            } else {
+                playlistDuplicates(playlist.id, existingSongIds).toHashSet()
+            }
+        val newSongIds = existingSongIds.filterNot { id -> id in duplicateSongIds }
+
+        newSongIds.forEach { id ->
             insert(
                 PlaylistSongMap(
                     songId = id,
                     playlistId = playlist.id,
                     position = position++
+                )
+            )
+        }
+        updatePlaylistLastUpdated(playlist.id)
+    }
+    
+    // This prevents songs from being removed during automatic playlist synchronization
+    @Transaction
+    fun addSongsToPlaylist(
+        playlist: Playlist,
+        songs: List<Pair<String, String?>>  // Pair of (songId, setVideoId)
+    ) {
+        val now = LocalDateTime.now()
+        var position = playlist.songCount
+
+        val existingSongs = songs
+            .map { it.first }
+            .distinct()
+            .mapNotNull { id -> getSongByIdBlocking(id)?.let { song -> id to song } }
+            .toMap()
+        val duplicateSongIds =
+            if (existingSongs.isEmpty()) {
+                emptySet()
+            } else {
+                playlistDuplicates(playlist.id, existingSongs.keys.toList()).toHashSet()
+            }
+        val newSongs = songs
+            .distinctBy { it.first }
+            .filter { (id, _) -> id in existingSongs && id !in duplicateSongIds }
+
+        newSongs.forEach { (id, setVideoId) ->
+            val existingSong = existingSongs[id] ?: return@forEach
+            // If song already exists, update it to mark as inLibrary if not already marked
+            if (existingSong.song.inLibrary == null) {
+                inLibrary(id, now)
+            }
+            // Add to playlist mapping, preserving setVideoId for reordering operations
+            insert(
+                PlaylistSongMap(
+                    songId = id,
+                    playlistId = playlist.id,
+                    position = position++,
+                    setVideoId = setVideoId
                 )
             )
         }
@@ -1126,15 +1203,25 @@ interface DatabaseDao {
     }.map { it.reversed(descending) }
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY dateDownload")
+    @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
+    fun playlistSongsBlocking(playlistId: String): List<PlaylistSong>
+
+    @Transaction
+    @Query(
+        "SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) " +
+                "AS songCount FROM playlist WHERE id = :playlistId"
+    )
+    fun playlistBlocking(playlistId: String): Playlist?
+    @Transaction
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY dateDownload")
     fun downloadedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY title")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY title")
     fun downloadedSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE (isDownloaded = 1 OR isCached = 1) AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY totalPlayTime")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 AND (isEpisode = 0 OR isEpisode IS NULL) ORDER BY totalPlayTime")
     fun downloadedSongsByPlayTimeAsc(): Flow<List<Song>>
 
     @Query("UPDATE song SET isDownloaded = :downloaded, dateDownload = :date WHERE id = :songId")
@@ -1256,15 +1343,15 @@ interface DatabaseDao {
     }.map { it.reversed(descending) }
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY dateDownload")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY dateDownload")
     fun downloadedPodcastEpisodesByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY title")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY title")
     fun downloadedPodcastEpisodesByNameAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isEpisode = 1 AND (isDownloaded = 1 OR isCached = 1) ORDER BY totalPlayTime")
+    @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
 
     // Saved episodes (in library but not necessarily downloaded)

@@ -8,6 +8,7 @@
     <string name="album_cover_desc">Album cover</string>
     <string name="top_music_videos">Top music videos</string>
     <string name="trending">Trending</string>
+    <string name="parsed_from_link">Parsed from link</string>
 
     <string name="weeks">Weeks</string>
     <string name="months">Months</string>
@@ -383,6 +384,11 @@
     <string name="audio_offload">Enable audio offload</string>
     <string name="audio_offload_description">Uses the hardware audio offload path for playback. Disabling this may increase battery usage, but can help if you experience issues with playback or audio post-processing</string>
     <string name="audio_offload_disabled_by_crossfade">Disabled because crossfade is active</string>
+
+    <!-- Varispeed -->
+    <string name="speed">Playback Speed</string>
+    <string name="varispeed">Enable varispeed</string>
+    <string name="varispeed_description">Link pitch to playback speed, resulting in tape-style speedup and slowdown effects</string>
 
     <!-- Google Cast -->
     <string name="google_cast">Google Cast</string>
@@ -925,7 +931,6 @@
     <string name="select_all">Select all</string>
     <string name="deselect_all">Deselect all</string>
     <string name="select_all_except_largest">Select all except largest</string>
-    <string name="clear_search">Clear search</string>
     <string name="open_playlist_search">Open playlist search</string>
     <string name="close_playlist_search">Close playlist search</string>
     <string name="duplicate_group_header">\"%1$s\" — %2$d copies</string>
@@ -936,4 +941,12 @@
         <item quantity="one">Delete %d empty playlist? This cannot be undone.</item>
         <item quantity="other">Delete %d empty playlists? This cannot be undone.</item>
     </plurals>
+
+    <!-- Accessibility -->
+    <string name="back">Back</string>
+    <string name="clear_search">Clear search</string>
+    <string name="close_chip">Close</string>
+    <string name="switch_to_list_view">Switch to list view</string>
+    <string name="switch_to_grid_view">Switch to grid view</string>
+    <string name="more_options">More options</string>
 </resources>
