@@ -274,17 +274,7 @@ constructor(
 
     private suspend fun deletePlaylistInternal(
         playlist: com.metrolist.music.db.entities.Playlist,
-        alsoDeleteFromYouTube: Boolean,
     ): Boolean {
-        if (alsoDeleteFromYouTube) {
-            playlist.playlist.browseId?.let { browseId ->
-                val result = YouTube.deletePlaylist(browseId)
-                if (result.isFailure) {
-                    reportException(result.exceptionOrNull() ?: Exception("YouTube deletion failed"))
-                    return false
-                }
-            }
-        }
         database.withTransaction {
             if (playlist.playlist.bookmarkedAt != null) {
                 update(playlist.playlist.localToggleLike())
@@ -294,11 +284,38 @@ constructor(
         return true
     }
 
+    private suspend fun deletePlaylistsInternal(
+        playlists: List<com.metrolist.music.db.entities.Playlist>,
+        alsoDeleteFromYouTube: Boolean,
+    ) {
+        val remoteDeleteResults = mutableMapOf<String, Boolean>()
+
+        for (playlist in playlists) {
+            val browseId = playlist.playlist.browseId
+            val canDeleteLocally =
+                if (alsoDeleteFromYouTube && browseId != null) {
+                    remoteDeleteResults.getOrPut(browseId) {
+                        val result = YouTube.deletePlaylist(browseId)
+                        if (result.isFailure) {
+                            reportException(result.exceptionOrNull() ?: Exception("YouTube deletion failed"))
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                } else {
+                    true
+                }
+
+            if (canDeleteLocally) {
+                deletePlaylistInternal(playlist)
+            }
+        }
+    }
+
     fun deleteEmptyPlaylists(alsoDeleteFromYouTube: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            for (playlist in emptyPlaylists.value) {
-                deletePlaylistInternal(playlist, alsoDeleteFromYouTube)
-            }
+            deletePlaylistsInternal(emptyPlaylists.value, alsoDeleteFromYouTube)
         }
     }
 
@@ -307,9 +324,7 @@ constructor(
         alsoDeleteFromYouTube: Boolean = false,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            for (playlist in playlists) {
-                deletePlaylistInternal(playlist, alsoDeleteFromYouTube)
-            }
+            deletePlaylistsInternal(playlists, alsoDeleteFromYouTube)
         }
     }
 

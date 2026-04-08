@@ -1532,6 +1532,14 @@ class SyncUtils @Inject constructor(
             for ((browseId, playlists) in browseIdGroups) {
                 if (playlists.size > 1) {
                     Timber.w("Found ${playlists.size} duplicate playlists for browseId: $browseId")
+                    val playlistsBeingModified = playlists.filter { isPlaylistBeingModified(it.id) }
+                    if (playlistsBeingModified.isNotEmpty()) {
+                        Timber.d(
+                            "Skipping duplicate cleanup for browseId=$browseId because playlist edits are in progress: " +
+                                playlistsBeingModified.joinToString { it.id },
+                        )
+                        continue
+                    }
                     val toKeep = playlists.maxByOrNull { it.songCount } ?: playlists.first()
 
                     playlists.filter { it.id != toKeep.id }.forEach { duplicate ->
