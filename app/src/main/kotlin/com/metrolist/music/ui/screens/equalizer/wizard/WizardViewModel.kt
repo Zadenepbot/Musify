@@ -358,14 +358,22 @@ class WizardViewModel @Inject constructor(
                     }
                 }
 
-                // Save all profiles
-                eqProfileRepository.saveProfiles(profiles)
+                if (profiles.isNotEmpty()) {
+                    eqProfileRepository.saveProfiles(profiles)
 
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isComplete = true
-                    )
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            isComplete = true
+                        )
+                    }
+                } else {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "Failed to load any EQ profiles for the selected variants"
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _state.update {
