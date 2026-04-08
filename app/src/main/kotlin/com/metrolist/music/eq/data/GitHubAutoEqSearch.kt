@@ -188,9 +188,9 @@ class GitHubAutoEqSearch(private val context: Context) {
      * Fetch a raw file from GitHub, with local caching.
      */
     private fun fetchRawFile(repoPath: String): String? {
-        // Check local cache
+        // Check local cache (same TTL as tree.json)
         val cacheFile = File(cacheDir, repoPath.replace("/", File.separator))
-        if (cacheFile.exists()) {
+        if (cacheFile.exists() && System.currentTimeMillis() - cacheFile.lastModified() < CACHE_TTL_MS) {
             return cacheFile.readText()
         }
 
