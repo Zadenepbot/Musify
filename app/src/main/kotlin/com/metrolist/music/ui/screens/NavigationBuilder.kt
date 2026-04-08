@@ -432,7 +432,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable("eq_wizard") {
-        WizardScreen(onNavigateBack = { navController.popBackStack("equalizer", inclusive = false) })
+        WizardScreen(onNavigateBack = { navController.popBackStack() })
     }
 
     composable(
