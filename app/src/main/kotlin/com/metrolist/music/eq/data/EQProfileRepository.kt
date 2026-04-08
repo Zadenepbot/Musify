@@ -102,6 +102,10 @@ class EQProfileRepository @Inject constructor(
             currentProfiles.add(profile)
         }
 
+        if (profile.id == _activeProfile.value?.id) {
+            _activeProfile.value = profile
+        }
+
         // Save to SharedPreferences
         val profilesJson = json.encodeToString<List<SavedEQProfile>>(currentProfiles)
         prefs.edit { putString(KEY_PROFILES, profilesJson) }
@@ -115,12 +119,17 @@ class EQProfileRepository @Inject constructor(
     suspend fun saveProfiles(profiles: List<SavedEQProfile>) = withContext(Dispatchers.IO) {
         val currentProfiles = _profiles.value.toMutableList()
 
+        val activeId = _activeProfile.value?.id
+
         profiles.forEach { newProfile ->
             val existingIndex = currentProfiles.indexOfFirst { it.id == newProfile.id }
             if (existingIndex >= 0) {
                 currentProfiles[existingIndex] = newProfile
             } else {
                 currentProfiles.add(newProfile)
+            }
+            if (newProfile.id == activeId) {
+                _activeProfile.value = newProfile
             }
         }
 
