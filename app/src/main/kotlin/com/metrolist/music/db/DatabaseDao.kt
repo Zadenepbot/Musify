@@ -1114,25 +1114,25 @@ interface DatabaseDao {
     @Transaction
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
         var position = playlist.songCount
-        val existingSongIds = songIds
-            .distinct()
-            .filter { id -> getSongByIdBlocking(id) != null }
+        val requestedSongIds = songIds.distinct()
         val duplicateSongIds =
-            if (existingSongIds.isEmpty()) {
+            if (requestedSongIds.isEmpty()) {
                 emptySet()
             } else {
-                playlistDuplicates(playlist.id, existingSongIds).toHashSet()
+                playlistDuplicates(playlist.id, requestedSongIds).toHashSet()
             }
-        val newSongIds = existingSongIds.filterNot { id -> id in duplicateSongIds }
+        val newSongIds = requestedSongIds.filterNot { id -> id in duplicateSongIds }
 
         newSongIds.forEach { id ->
-            insert(
-                PlaylistSongMap(
-                    songId = id,
-                    playlistId = playlist.id,
-                    position = position++
+            if (getSongByIdBlocking(id) != null) {
+                insert(
+                    PlaylistSongMap(
+                        songId = id,
+                        playlistId = playlist.id,
+                        position = position++
+                    )
                 )
-            )
+            }
         }
         updatePlaylistLastUpdated(playlist.id)
     }
@@ -1146,36 +1146,23 @@ interface DatabaseDao {
         val now = LocalDateTime.now()
         var position = playlist.songCount
 
-        val existingSongs = songs
-            .map { it.first }
-            .distinct()
-            .mapNotNull { id -> getSongByIdBlocking(id)?.let { song -> id to song } }
-            .toMap()
-        val duplicateSongIds =
-            if (existingSongs.isEmpty()) {
-                emptySet()
-            } else {
-                playlistDuplicates(playlist.id, existingSongs.keys.toList()).toHashSet()
-            }
-        val newSongs = songs
-            .distinctBy { it.first }
-            .filter { (id, _) -> id in existingSongs && id !in duplicateSongIds }
-
-        newSongs.forEach { (id, setVideoId) ->
-            val existingSong = existingSongs[id] ?: return@forEach
+        songs.forEach { (id, setVideoId) ->
+            val existingSong = getSongByIdBlocking(id)
             // If song already exists, update it to mark as inLibrary if not already marked
-            if (existingSong.song.inLibrary == null) {
-                inLibrary(id, now)
-            }
-            // Add to playlist mapping, preserving setVideoId for reordering operations
-            insert(
-                PlaylistSongMap(
-                    songId = id,
-                    playlistId = playlist.id,
-                    position = position++,
-                    setVideoId = setVideoId
+            if (existingSong != null) {
+                if (existingSong.song.inLibrary == null) {
+                    inLibrary(id, now)
+                }
+                // Add to playlist mapping, preserving setVideoId for reordering operations
+                insert(
+                    PlaylistSongMap(
+                        songId = id,
+                        playlistId = playlist.id,
+                        position = position++,
+                        setVideoId = setVideoId
+                    )
                 )
-            )
+            }
         }
         updatePlaylistLastUpdated(playlist.id)
     }
@@ -1229,6 +1216,9 @@ interface DatabaseDao {
 
     @Query("UPDATE song SET isCached = :cached WHERE id = :songId")
     fun updateCachedInfo(songId: String, cached: Boolean)
+
+    @Query("UPDATE song SET isCached = 0 WHERE isCached = 1")
+    fun clearCachedInfo()
 
     @Query("UPDATE song SET isCached = 1 WHERE id IN (:songIds)")
     fun updateCachedInfoMany(songIds: List<String>)

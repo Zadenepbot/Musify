@@ -529,8 +529,8 @@ class MusicService :
         scope.launch(Dispatchers.IO) {
             try {
                 val cachedIds = playerCache.keys.toList()
-                if (cachedIds.isNotEmpty()) {
-                    val fullyCachedIds = cachedIds.filter { mediaId ->
+                val fullyCachedIds =
+                    cachedIds.filter { mediaId ->
                         val contentLength = playerCache.getContentMetadata(mediaId)
                             .get(androidx.media3.datasource.cache.ContentMetadata.KEY_CONTENT_LENGTH, -1L)
                         if (contentLength > 0) {
@@ -540,11 +540,14 @@ class MusicService :
                             false
                         }
                     }
+
+                database.withTransaction {
+                    clearCachedInfo()
                     if (fullyCachedIds.isNotEmpty()) {
                         val chunkSize = 500
                         for (i in fullyCachedIds.indices step chunkSize) {
                             val chunk = fullyCachedIds.subList(i, minOf(i + chunkSize, fullyCachedIds.size))
-                            database.updateCachedInfoMany(chunk)
+                            updateCachedInfoMany(chunk)
                         }
                     }
                 }
@@ -3218,7 +3221,9 @@ class MusicService :
     override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (dataStore.get(StopMusicOnTaskClearKey, false) && player.isPlaying) {
+        if (dataStore.get(StopMusicOnTaskClearKey, false) &&
+            (player.playbackState != Player.STATE_IDLE || player.mediaItemCount > 0)
+        ) {
             player.stop()
             player.clearMediaItems()
             stopSelf()
@@ -3527,8 +3532,8 @@ class MusicService :
     }
 
     private fun performCrossfadeSwap() {
-        isCrossfading = true
         val nextPlayer = secondaryPlayer ?: return
+        isCrossfading = true
         val currentPlayer = player
 
         fadingPlayer = currentPlayer
@@ -3573,47 +3578,72 @@ class MusicService :
             val startVolume = try {
                 fadingPlayer?.volume ?: 1f
             } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to read crossfade start volume")
                 1f
             }
 
-            for (i in 0..steps) {
-                if (!isActive) break
-                // Pause volume ramp if player is paused
-                while (!player.isPlaying && isActive) {
-                    delay(100)
-                }
-
-                val progress = i / steps.toFloat()
-                val fadeIn = 1.0f - (1.0f - progress) * (1.0f - progress)
-                val fadeOut = (1.0f - progress) * (1.0f - progress)
-
-                try {
-                    player.volume = startVolume * fadeIn
-                    fadingPlayer?.volume = startVolume * fadeOut
-                } catch (e: Exception) {
-                    break
-                }
-
-                delay(stepTime)
-            }
-
             try {
-                fadingPlayer?.volume = 0f
-                player.volume = startVolume
+                for (i in 0..steps) {
+                    if (!isActive) break
+                    // Pause volume ramp if player is paused
+                    while (!player.isPlaying && isActive) {
+                        delay(100)
+                    }
+
+                    val progress = i / steps.toFloat()
+                    val fadeIn = 1.0f - (1.0f - progress) * (1.0f - progress)
+                    val fadeOut = (1.0f - progress) * (1.0f - progress)
+
+                    try {
+                        player.volume = startVolume * fadeIn
+                        fadingPlayer?.volume = startVolume * fadeOut
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e(e, "Crossfade volume update failed")
+                        break
+                    }
+
+                    delay(stepTime)
+                }
+            } finally {
+                try {
+                    fadingPlayer?.volume = 0f
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "Failed to mute fading player during crossfade cleanup")
+                }
+                try {
+                    player.volume = startVolume
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "Failed to restore player volume after crossfade")
+                }
                 cleanupCrossfade()
-            } catch (e: Exception) {
             }
         }
     }
 
     private fun cleanupCrossfade() {
-        fadingPlayer?.stop()
-        fadingPlayer?.clearMediaItems()
-        fadingPlayer?.release()
-        fadingPlayer = null
-        isCrossfading = false
-        applyEffectiveVolume()
-        sleepTimer.notifySongTransition()
+        val playerToCleanup = fadingPlayer
+        try {
+            try {
+                playerToCleanup?.stop()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to stop fading player during cleanup")
+            }
+            try {
+                playerToCleanup?.clearMediaItems()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to clear fading player queue during cleanup")
+            }
+            try {
+                playerToCleanup?.release()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to release fading player during cleanup")
+            }
+        } finally {
+            fadingPlayer = null
+            isCrossfading = false
+            applyEffectiveVolume()
+            sleepTimer.notifySongTransition()
+        }
     }
 
     companion object {
