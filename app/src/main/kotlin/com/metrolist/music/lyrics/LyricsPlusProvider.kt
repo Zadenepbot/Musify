@@ -105,6 +105,18 @@ object LyricsPlusProvider : LyricsProvider {
         //"https://lyrics-plus-backend.vercel.app", //ibra's vercel (disabled due it's disabled)
     )
 
+    @Volatile
+    private var lastWorkingServer: String? = null
+
+    private fun getPrioritizedServers(): List<String> {
+        val last = lastWorkingServer
+        return if (last != null && last in baseUrls) {
+            listOf(last) + baseUrls.filter { it != last }
+        } else {
+            baseUrls
+        }
+    }
+
     private val client by lazy {
         HttpClient(CIO) {
             install(ContentNegotiation) {
@@ -154,10 +166,13 @@ object LyricsPlusProvider : LyricsProvider {
             return null
         }
 
-        for (baseUrl in baseUrls) {
+        for (baseUrl in getPrioritizedServers()) {
             try {
                 val result = fetchFromUrl(baseUrl, title, artist, duration, album)
-                if (result != null && !result.lyrics.isNullOrEmpty()) return result
+                if (result != null && !result.lyrics.isNullOrEmpty()) {
+                    lastWorkingServer = baseUrl
+                    return result
+                }
             } catch (e: Exception) {
                 Timber.tag("LyricsPlus").d(e, "Failed to fetch from $baseUrl")
             }
