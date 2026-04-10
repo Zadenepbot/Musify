@@ -2870,19 +2870,12 @@ class MusicService :
                                     }
                                     .addInterceptor { chain ->
                                         var request = chain.request()
-                                        Timber.tag("MusicService").d("OkHttp interceptor: ${request.url.toString().take(80)}")
-                                        // Add auth cookie for privately-owned/uploaded track streams
-                                        if (request.url.queryParameter("_metrolist_private") != null) {
-                                            Timber.tag("MusicService").d("Private stream detected, attaching cookie")
-                                            // Strip the marker param and add auth cookie
+                                        if (request.url.queryParameter(PRIVATE_STREAM_MARKER) != null) {
                                             val cleanUrl = request.url.newBuilder()
-                                                .removeAllQueryParameters("_metrolist_private")
+                                                .removeAllQueryParameters(PRIVATE_STREAM_MARKER)
                                                 .build()
                                             val builder = request.newBuilder().url(cleanUrl)
-                                            YouTube.cookie?.let { cookie ->
-                                                builder.header("Cookie", cookie)
-                                                Timber.tag("MusicService").d("Cookie attached (length=${cookie.length})")
-                                            } ?: Timber.tag("MusicService").w("No cookie available!")
+                                            YouTube.cookie?.let { builder.header("Cookie", it) }
                                             request = builder.build()
                                         }
                                         chain.proceed(request)
@@ -3104,7 +3097,7 @@ class MusicService :
                 // For privately-owned tracks, mark the URL so the interceptor attaches auth cookies
                 val finalUrl = if (nonNullPlayback.isPrivatelyOwned) {
                     val sep = if ("?" in streamUrl) "&" else "?"
-                    "${streamUrl}${sep}_metrolist_private=1"
+                    "${streamUrl}${sep}${PRIVATE_STREAM_MARKER}=1"
                 } else {
                     streamUrl
                 }
@@ -3764,6 +3757,7 @@ class MusicService :
         private const val MIN_GAIN_MB = -1500 // Minimum gain in millibels (-15 dB)
 
         private const val TAG = "MusicService"
+        private const val PRIVATE_STREAM_MARKER = "_metrolist_private"
 
         @Volatile
         var isRunning = false

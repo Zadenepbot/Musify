@@ -40,6 +40,9 @@ import timber.log.Timber
 object YTPlayerUtils {
     private const val logTag = "YTPlayerUtils"
     private const val TAG = "YTPlayerUtils"
+    private const val UPLOADED_TRACKS_PLAYLIST_PREFIX = "MLPT"
+
+    private val WEB_CLIENTS = listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")
 
     private val httpClient = OkHttpClient.Builder()
         .proxy(YouTube.proxy)
@@ -89,7 +92,7 @@ object YTPlayerUtils {
         Timber.tag(TAG).d("audioQuality: $audioQuality")
 
         // Check if this is an uploaded/privately owned track
-        val isUploadedTrack = isUploadedHint || playlistId == "MLPT" || playlistId?.contains("MLPT") == true
+        val isUploadedTrack = isUploadedHint || playlistId?.contains(UPLOADED_TRACKS_PLAYLIST_PREFIX) == true
         Timber.tag(TAG).d("Content type detection (preliminary):")
         Timber.tag(TAG).d("  isUploadedTrack (from playlistId): $isUploadedTrack")
 
@@ -120,12 +123,12 @@ object YTPlayerUtils {
         var mainPlayerResponse = YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp.timestamp, poToken?.playerRequestPoToken).getOrThrow()
 
         // Debug uploaded track response
-        if (isUploadedTrack || playlistId?.contains("MLPT") == true) {
-            println("[PLAYBACK_DEBUG] Main player response status: ${mainPlayerResponse.playabilityStatus.status}")
-            println("[PLAYBACK_DEBUG] Playability reason: ${mainPlayerResponse.playabilityStatus.reason}")
-            println("[PLAYBACK_DEBUG] Video details: title=${mainPlayerResponse.videoDetails?.title}, videoId=${mainPlayerResponse.videoDetails?.videoId}")
-            println("[PLAYBACK_DEBUG] Streaming data null? ${mainPlayerResponse.streamingData == null}")
-            println("[PLAYBACK_DEBUG] Adaptive formats count: ${mainPlayerResponse.streamingData?.adaptiveFormats?.size ?: 0}")
+        if (isUploadedTrack) {
+            Timber.tag(TAG).d("Uploaded track player response status: ${mainPlayerResponse.playabilityStatus.status}")
+            Timber.tag(TAG).d("Uploaded track playability reason: ${mainPlayerResponse.playabilityStatus.reason}")
+            Timber.tag(TAG).d("Uploaded track details: title=${mainPlayerResponse.videoDetails?.title}, videoId=${mainPlayerResponse.videoDetails?.videoId}")
+            Timber.tag(TAG).d("Uploaded track streaming data null? ${mainPlayerResponse.streamingData == null}")
+            Timber.tag(TAG).d("Uploaded track adaptive formats: ${mainPlayerResponse.streamingData?.adaptiveFormats?.size ?: 0}")
         }
 
         var usedAgeRestrictedClient: YouTubeClient? = null
@@ -285,13 +288,13 @@ object YTPlayerUtils {
 
                 // Apply n-transform and PoToken for web clients AND for private tracks
                 val needsNTransform = currentClient.useWebPoTokens ||
-                    currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5") ||
+                    currentClient.clientName in WEB_CLIENTS ||
                     isPrivatelyOwnedTrack
 
                 Timber.tag(TAG).d("N-transform decision:")
                 Timber.tag(TAG).d("  needsNTransform: $needsNTransform")
                 Timber.tag(TAG).d("  Reason: useWebPoTokens=${currentClient.useWebPoTokens}, " +
-                    "clientInList=${currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")}, " +
+                    "clientInList=${currentClient.clientName in WEB_CLIENTS}, " +
                     "isPrivatelyOwnedTrack=$isPrivatelyOwnedTrack")
 
                 if (needsNTransform) {
@@ -361,7 +364,7 @@ object YTPlayerUtils {
                     /** skip [validateStatus] for last client or private tracks */
                     if (isPrivatelyOwned) {
                         Timber.tag(logTag).d("Skipping validation for privately owned track: ${currentClient.clientName}")
-                        println("[PLAYBACK_DEBUG] Using stream without validation for PRIVATELY_OWNED_TRACK")
+                        Timber.tag(TAG).d("Using stream without validation for privately owned track")
                     } else {
                         Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
                     }
@@ -387,7 +390,7 @@ object YTPlayerUtils {
         if (streamPlayerResponse == null) {
             Timber.tag(logTag).e("Bad stream player response - all clients failed")
             if (isUploadedTrack) {
-                println("[PLAYBACK_DEBUG] FAILURE: All clients failed for uploaded track videoId=$videoId")
+                Timber.tag(TAG).e("All clients failed for uploaded track videoId=$videoId")
             }
             throw Exception("Bad stream player response")
         }
@@ -396,7 +399,7 @@ object YTPlayerUtils {
             val errorReason = streamPlayerResponse.playabilityStatus.reason
             Timber.tag(logTag).e("Playability status not OK: $errorReason")
             if (isUploadedTrack) {
-                println("[PLAYBACK_DEBUG] FAILURE: Playability not OK for uploaded track - status=${streamPlayerResponse.playabilityStatus.status}, reason=$errorReason")
+                Timber.tag(TAG).e("Playability not OK for uploaded track: status=${streamPlayerResponse.playabilityStatus.status}, reason=$errorReason")
             }
             throw PlaybackException(
                 errorReason,
@@ -422,7 +425,7 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).d("Successfully obtained playback data with format: ${format.mimeType}, bitrate: ${format.bitrate}")
         if (isUploadedTrack) {
-            println("[PLAYBACK_DEBUG] SUCCESS: Got playback data for uploaded track - format=${format.mimeType}, streamUrl=${streamUrl.take(100)}...")
+            Timber.tag(TAG).d("Got playback data for uploaded track: format=${format.mimeType}")
         }
         PlaybackData(
             audioConfig,
@@ -435,7 +438,7 @@ object YTPlayerUtils {
                 streamPlayerResponse?.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK,
         )
     }.onFailure { e ->
-        println("[PLAYBACK_DEBUG] EXCEPTION during playback for videoId=$videoId: ${e::class.simpleName}: ${e.message}")
+        Timber.tag(TAG).e(e, "Playback exception for videoId=$videoId")
         e.printStackTrace()
     }
     /**
@@ -496,7 +499,7 @@ object YTPlayerUtils {
             // Add authentication cookie for privately owned tracks
             YouTube.cookie?.let { cookie ->
                 requestBuilder.addHeader("Cookie", cookie)
-                println("[PLAYBACK_DEBUG] Added cookie to validation request")
+                Timber.tag(TAG).d("Added cookie to validation request")
             }
 
             val response = httpClient.newCall(requestBuilder.build()).execute()
