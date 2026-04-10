@@ -69,7 +69,29 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
     }
 
     override fun executeAsync(request: Request, callback: AsyncCallback?): CancellableCall {
-        TODO("Placeholder")
+        val httpRequest = okhttp3.Request.Builder()
+            .method(request.httpMethod(), request.dataToSend()?.toRequestBody())
+            .url(request.url())
+            .addHeader("User-Agent", YouTubeClient.USER_AGENT_WEB)
+            .apply {
+                request.headers().forEach { (name, values) ->
+                    values.forEach { addHeader(name, it) }
+                }
+            }
+            .build()
+        val call = client.newCall(httpRequest)
+        call.enqueue(object : okhttp3.Callback {
+            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                val body = response.body?.string()
+                callback?.onSuccess(
+                    Response(response.code, response.message, response.headers.toMultimap(), body, body?.toByteArray(), response.request.url.toString())
+                )
+            }
+            override fun onFailure(call: okhttp3.Call, e: IOException) {
+                callback?.onError(e)
+            }
+        })
+        return CancellableCall(call)
     }
 
 }
@@ -152,6 +174,14 @@ object NewPipeExtractor {
                 videoId,
                 url
             )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun getThrottlingDeobfuscatedUrl(videoId: String, url: String): String? {
+        return try {
+            YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(videoId, url)
         } catch (e: Exception) {
             null
         }

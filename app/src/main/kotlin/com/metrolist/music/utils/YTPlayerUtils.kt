@@ -24,6 +24,7 @@ import com.metrolist.innertube.models.YouTubeClient.Companion.TVHTML5_SIMPLY_EMB
 import com.metrolist.innertube.models.YouTubeClient.Companion.WEB
 import com.metrolist.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.metrolist.innertube.models.YouTubeClient.Companion.WEB_REMIX
+import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 import com.metrolist.innertube.models.response.PlayerResponse
 import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.utils.cipher.CipherDeobfuscator
@@ -68,6 +69,7 @@ object YTPlayerUtils {
         val format: PlayerResponse.StreamingData.Format,
         val streamUrl: String,
         val streamExpiresInSeconds: Int,
+        val isPrivatelyOwned: Boolean = false,
     )
     /**
      * Custom player response intended to use for playback.
@@ -77,6 +79,7 @@ object YTPlayerUtils {
     suspend fun playerResponseForPlayback(
         videoId: String,
         playlistId: String? = null,
+        isUploadedHint: Boolean = false,
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
     ): Result<PlaybackData> = runCatching {
@@ -86,7 +89,7 @@ object YTPlayerUtils {
         Timber.tag(TAG).d("audioQuality: $audioQuality")
 
         // Check if this is an uploaded/privately owned track
-        val isUploadedTrack = playlistId == "MLPT" || playlistId?.contains("MLPT") == true
+        val isUploadedTrack = isUploadedHint || playlistId == "MLPT" || playlistId?.contains("MLPT") == true
         Timber.tag(TAG).d("Content type detection (preliminary):")
         Timber.tag(TAG).d("  isUploadedTrack (from playlistId): $isUploadedTrack")
 
@@ -128,18 +131,25 @@ object YTPlayerUtils {
         var usedAgeRestrictedClient: YouTubeClient? = null
         val wasOriginallyAgeRestricted: Boolean
 
-        // Check if WEB_REMIX response indicates age-restricted
+        // Check if WEB_REMIX response indicates age-restricted or login-required
         val mainStatus = mainPlayerResponse.playabilityStatus.status
-        val isAgeRestrictedFromResponse = mainStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
-        wasOriginallyAgeRestricted = isAgeRestrictedFromResponse
+        val isAgeRestrictedFromResponse = mainStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "CONTENT_CHECK_REQUIRED")
+        val isLoginRequired = mainStatus == "LOGIN_REQUIRED"
 
-        if (isAgeRestrictedFromResponse && isLoggedIn) {
-            // Age-restricted: use WEB_CREATOR directly (no NewPipe needed from here)
-            Timber.tag(logTag).d("Age-restricted detected, using WEB_CREATOR")
-            Timber.tag(TAG).i("Age-restricted: using WEB_CREATOR for videoId=$videoId")
+        // LOGIN_REQUIRED can mean age-restricted (for catalog) or auth needed (for uploaded tracks).
+        // In both cases, WEB_CREATOR (which has loginRequired=true) is the right fallback to try.
+        wasOriginallyAgeRestricted = isAgeRestrictedFromResponse || (isLoginRequired && !isUploadedTrack)
+
+        if ((isAgeRestrictedFromResponse || isLoginRequired) && isLoggedIn) {
+            if (isUploadedTrack) {
+                Timber.tag(TAG).d("LOGIN_REQUIRED for uploaded track - trying WEB_CREATOR with full auth")
+            } else {
+                Timber.tag(logTag).d("Age-restricted detected, using WEB_CREATOR")
+            }
+            Timber.tag(TAG).i("Trying WEB_CREATOR for videoId=$videoId (uploaded=$isUploadedTrack)")
             val creatorResponse = YouTube.player(videoId, playlistId, WEB_CREATOR, null, null).getOrNull()
             if (creatorResponse?.playabilityStatus?.status == "OK") {
-                Timber.tag(logTag).d("WEB_CREATOR works for age-restricted content")
+                Timber.tag(logTag).d("WEB_CREATOR works for content")
                 mainPlayerResponse = creatorResponse
                 usedAgeRestrictedClient = WEB_CREATOR
             }
@@ -158,7 +168,8 @@ object YTPlayerUtils {
 
         // Check current status
         val currentStatus = mainPlayerResponse.playabilityStatus.status
-        val isAgeRestricted = currentStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
+        val isAgeRestricted = currentStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "CONTENT_CHECK_REQUIRED") ||
+            (!isUploadedTrack && currentStatus == "LOGIN_REQUIRED")
 
         if (isAgeRestricted) {
             Timber.tag(logTag).d("Content is still age-restricted (status: $currentStatus), will try fallback clients")
@@ -167,12 +178,15 @@ object YTPlayerUtils {
         }
 
         // Check if this is a privately owned track (uploaded song)
-        val isPrivateTrack = mainPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
+        val isPrivateTrack = isUploadedTrack ||
+            mainPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
-        // For private tracks: use TVHTML5 (index 1) with PoToken + n-transform
+        // For private tracks with a successful WEB_CREATOR response: try its streams first (index -1)
+        // For private tracks without a working response: use TVHTML5 (index 1)
         // For age-restricted: skip main client, start with fallbacks
         // For normal content: standard order
         val startIndex = when {
+            isPrivateTrack && usedAgeRestrictedClient != null -> -1  // WEB_CREATOR succeeded, try its streams
             isPrivateTrack -> 1  // TVHTML5
             isAgeRestricted -> 0
             else -> -1
@@ -215,9 +229,12 @@ object YTPlayerUtils {
             if (streamPlayerResponse?.playabilityStatus?.status == "OK") {
                 Timber.tag(logTag).d("Player response status OK for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
 
-                // Skip NewPipe for age-restricted content (NewPipe doesn't use our auth)
-                val responseToUse = if (wasOriginallyAgeRestricted) {
-                    Timber.tag(logTag).d("Skipping NewPipe for age-restricted content")
+                // Skip NewPipe for age-restricted or privately-owned content (NewPipe doesn't use our auth)
+                val isPrivateContent = isPrivateTrack ||
+                    streamPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
+                val skipNewPipe = wasOriginallyAgeRestricted || isPrivateContent
+                val responseToUse = if (skipNewPipe) {
+                    Timber.tag(logTag).d("Skipping NewPipe: ageRestricted=$wasOriginallyAgeRestricted, private=$isPrivateContent")
                     streamPlayerResponse
                 } else {
                     // Try to get streams using newPipePlayer method
@@ -239,7 +256,7 @@ object YTPlayerUtils {
 
                 Timber.tag(logTag).d("Format found: ${format.mimeType}, bitrate: ${format.bitrate}")
 
-                streamUrl = findUrlOrNull(format, videoId, responseToUse, skipNewPipe = wasOriginallyAgeRestricted)
+                streamUrl = findUrlOrNull(format, videoId, responseToUse, skipNewPipe = skipNewPipe)
                 if (streamUrl == null) {
                     Timber.tag(logTag).d("Stream URL not found for format")
                     continue
@@ -253,7 +270,7 @@ object YTPlayerUtils {
                 }
 
                 // Check if this is a privately owned track
-                val isPrivatelyOwnedTrack = streamPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
+                val isPrivatelyOwnedTrack = streamPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
                 val musicVideoType = streamPlayerResponse.videoDetails?.musicVideoType
 
                 Timber.tag(TAG).d("=== N-TRANSFORM DECISION ===")
@@ -266,7 +283,7 @@ object YTPlayerUtils {
                 Timber.tag(TAG).d("  currentClient: ${currentClient.clientName}")
                 Timber.tag(TAG).d("  useWebPoTokens: ${currentClient.useWebPoTokens}")
 
-                // Apply n-transform and PoToken for web clients OR for private tracks (including TVHTML5)
+                // Apply n-transform and PoToken for web clients AND for private tracks
                 val needsNTransform = currentClient.useWebPoTokens ||
                     currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5") ||
                     isPrivatelyOwnedTrack
@@ -284,8 +301,26 @@ object YTPlayerUtils {
                         Timber.tag(TAG).d("  Original URL preview: ${streamUrl.take(100)}...")
 
                         val originalUrl = streamUrl
-                        // Use CipherDeobfuscator for n-transform (fixed implementation)
+                        // Use CipherDeobfuscator for n-transform, fall back to NewPipe
                         streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
+
+                        if (originalUrl == streamUrl) {
+                            // CipherDeobfuscator didn't change the URL, try NewPipe's throttling deobfuscation
+                            Timber.tag(TAG).d("  CipherDeobfuscator failed, trying NewPipe throttling deobfuscation...")
+                            try {
+                                // Ensure NewPipe Downloader is initialized
+                                com.metrolist.innertube.NewPipeUtils
+                                val newPipeUrl = com.metrolist.innertube.NewPipeExtractor.getThrottlingDeobfuscatedUrl(videoId, streamUrl)
+                                if (newPipeUrl != null && newPipeUrl != streamUrl) {
+                                    streamUrl = newPipeUrl
+                                    Timber.tag(TAG).d("  N-transform via NewPipe succeeded")
+                                } else {
+                                    Timber.tag(TAG).d("  NewPipe returned null or unchanged URL")
+                                }
+                            } catch (e: Exception) {
+                                Timber.tag(TAG).d("  NewPipe n-transform also failed: ${e.message}")
+                            }
+                        }
 
                         Timber.tag(TAG).d("  Transformed URL length: ${streamUrl.length}")
                         Timber.tag(TAG).d("  URL changed: ${originalUrl != streamUrl}")
@@ -320,7 +355,7 @@ object YTPlayerUtils {
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
 
                 // Check if this is a privately owned track (uploaded song)
-                val isPrivatelyOwned = streamPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
+                val isPrivatelyOwned = streamPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
                 if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivatelyOwned) {
                     /** skip [validateStatus] for last client or private tracks */
@@ -396,6 +431,8 @@ object YTPlayerUtils {
             format,
             streamUrl,
             streamExpiresInSeconds,
+            isPrivatelyOwned = isPrivateTrack ||
+                streamPlayerResponse?.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK,
         )
     }.onFailure { e ->
         println("[PLAYBACK_DEBUG] EXCEPTION during playback for videoId=$videoId: ${e::class.simpleName}: ${e.message}")

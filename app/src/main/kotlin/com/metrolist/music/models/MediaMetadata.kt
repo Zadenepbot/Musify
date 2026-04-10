@@ -9,6 +9,7 @@ import androidx.compose.runtime.Immutable
 import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_ATV
+import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.ui.utils.resize
@@ -37,6 +38,7 @@ data class MediaMetadata(
 ) : Serializable {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
+                && musicVideoType != MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
     data class Artist(
         val id: String?,
@@ -64,6 +66,7 @@ data class MediaMetadata(
             libraryRemoveToken = libraryRemoveToken,
             isVideo = isVideoSong,
             isEpisode = isEpisode,
+            isUploaded = musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK,
             uploadEntityId = uploadEntityId
         )
 }
@@ -94,10 +97,14 @@ fun Song.toMediaMetadata() =
             )
         },
         explicit = song.explicit,
-        // Use a non-ATV type if isVideo is true to indicate it's a video song
-        musicVideoType = if (song.isVideo) "MUSIC_VIDEO_TYPE_OMV" else null,
+        musicVideoType = when {
+            song.isUploaded -> MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
+            song.isVideo -> "MUSIC_VIDEO_TYPE_OMV"
+            else -> null
+        },
         suggestedBy = null,
         isEpisode = song.isEpisode,
+        uploadEntityId = song.uploadEntityId,
     )
 
 fun SongItem.toMediaMetadata() =

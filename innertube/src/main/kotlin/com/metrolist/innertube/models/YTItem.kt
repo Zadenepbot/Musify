@@ -1,6 +1,7 @@
 package com.metrolist.innertube.models
 
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_ATV
+import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
 sealed class YTItem {
     abstract val id: String
@@ -41,6 +42,7 @@ data class SongItem(
 ) : YTItem() {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
+                && musicVideoType != MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
     override val shareLink: String
         get() = "https://music.youtube.com/watch?v=$id"
