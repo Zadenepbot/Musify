@@ -82,6 +82,11 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
         val call = client.newCall(httpRequest)
         call.enqueue(object : okhttp3.Callback {
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                if (response.code == 429) {
+                    response.close()
+                    callback?.onError(ReCaptchaException("reCaptcha Challenge requested", request.url()))
+                    return
+                }
                 val body = response.body?.string()
                 callback?.onSuccess(
                     Response(response.code, response.message, response.headers.toMultimap(), body, body?.toByteArray(), response.request.url.toString())
