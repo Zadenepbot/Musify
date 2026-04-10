@@ -3091,9 +3091,6 @@ class MusicService :
 
                 val streamUrl = nonNullPlayback.streamUrl
 
-                songUrlCache[mediaId] =
-                    streamUrl to System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
-
                 // For privately-owned tracks, mark the URL so the interceptor attaches auth cookies
                 val finalUrl = if (nonNullPlayback.isPrivatelyOwned) {
                     val sep = if ("?" in streamUrl) "&" else "?"
@@ -3101,6 +3098,9 @@ class MusicService :
                 } else {
                     streamUrl
                 }
+
+                songUrlCache[mediaId] =
+                    finalUrl to System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
 
                 return@Factory dataSpec.withUri(finalUrl.toUri()).subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
             }
