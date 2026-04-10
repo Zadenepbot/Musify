@@ -38,7 +38,7 @@ object NextPage {
                 longByLineRuns?.firstOrNull()?.oddElements()?.map {
                     Artist(
                         name = it.text,
-                        id = it.navigationEndpoint?.browseEndpoint?.browseId ?: "",
+                        id = it.navigationEndpoint?.browseEndpoint?.browseId,
                     )
                 } ?: emptyList(),
             album =
@@ -46,9 +46,11 @@ object NextPage {
                     ?.getOrNull(1)
                     ?.firstOrNull()
                     ?.let {
+                        val albumId = it.navigationEndpoint?.browseEndpoint?.browseId
+                            ?: return@let null
                         Album(
                             name = it.text,
-                            id = it.navigationEndpoint?.browseEndpoint?.browseId ?: "",
+                            id = albumId,
                         )
                     },
             duration =
