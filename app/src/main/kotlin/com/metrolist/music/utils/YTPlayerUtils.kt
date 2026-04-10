@@ -92,7 +92,7 @@ object YTPlayerUtils {
         Timber.tag(TAG).d("audioQuality: $audioQuality")
 
         // Check if this is an uploaded/privately owned track
-        val isUploadedTrack = isUploadedHint || playlistId?.contains(UPLOADED_TRACKS_PLAYLIST_PREFIX) == true
+        val isUploadedTrack = isUploadedHint || playlistId?.startsWith(UPLOADED_TRACKS_PLAYLIST_PREFIX) == true
         Timber.tag(TAG).d("Content type detection (preliminary):")
         Timber.tag(TAG).d("  isUploadedTrack (from playlistId): $isUploadedTrack")
 
