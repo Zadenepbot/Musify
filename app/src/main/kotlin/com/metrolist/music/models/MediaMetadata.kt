@@ -9,6 +9,7 @@ import androidx.compose.runtime.Immutable
 import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_ATV
+import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_OMV
 import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.db.entities.SongEntity
@@ -99,7 +100,7 @@ fun Song.toMediaMetadata() =
         explicit = song.explicit,
         musicVideoType = when {
             song.isUploaded -> MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
-            song.isVideo -> "MUSIC_VIDEO_TYPE_OMV"
+            song.isVideo -> MUSIC_VIDEO_TYPE_OMV
             else -> null
         },
         suggestedBy = null,
