@@ -61,9 +61,19 @@ import kotlinx.coroutines.plus
 import javax.inject.Inject
 import com.metrolist.music.constants.AndroidAutoSectionsOrderKey
 import com.metrolist.music.constants.AndroidAutoYouTubePlaylistsKey
+import com.metrolist.music.db.entities.LyricsEntity
+import com.metrolist.music.extensions.metadata
+import com.metrolist.music.lyrics.LyricsEntry
+import com.metrolist.music.lyrics.LyricsHelper
+import com.metrolist.music.lyrics.LyricsUtils
 import com.metrolist.music.ui.screens.settings.AndroidAutoSection
 import com.metrolist.music.ui.screens.settings.deserializeSections
 import com.metrolist.music.ui.screens.settings.serializeSections
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import kotlin.collections.firstOrNull
 
 class MediaLibrarySessionCallback
 @Inject
@@ -71,6 +81,7 @@ constructor(
     @ApplicationContext val context: Context,
     val database: MusicDatabase,
     val downloadUtil: DownloadUtil,
+    val lyricsHelper: LyricsHelper
 ) : MediaLibrarySession.Callback {
     private val scope = CoroutineScope(Dispatchers.Main) + Job()
     lateinit var service: MusicService
@@ -78,6 +89,62 @@ constructor(
     var toggleStartRadio: () -> Unit = {}
     var toggleLibrary: () -> Unit = {}
     var addToTargetPlaylist: () -> Unit = {}
+
+    private var lyricsSyncJob: Job? = null
+    private var lastLineIndex: Int = -1
+    private var lastMediaId: String? = null
+
+    private fun startLyricsSyncJob(session: MediaLibrarySession) {
+        if (lyricsSyncJob?.isActive == true) return
+
+        lyricsSyncJob = scope.launch(Dispatchers.Main) {
+            var currentLyrics: List<LyricsEntry>? = null
+            var currentOffset = 0L
+
+            while (isActive) {
+                val player = session.player
+                if (player.isPlaying) {
+                    val mediaId = player.currentMediaItem?.mediaId
+                    val position = player.currentPosition
+
+                    withContext(Dispatchers.IO) {
+                        if (mediaId != lastMediaId) {
+                            lastMediaId = mediaId
+                            lastLineIndex = -1
+
+                            if (mediaId != null) {
+                                val lyricsEntity = database.lyrics(mediaId).firstOrNull()
+                                val raw = lyricsEntity?.lyrics?.trim()
+                                currentLyrics = if (raw != null && raw.startsWith("[")) {
+                                    LyricsUtils.parseLyrics(raw)
+                                } else {
+                                    null
+                                }
+
+                                currentOffset = database.song(mediaId).firstOrNull()?.song?.lyricsOffset?.toLong() ?: 0L
+                            } else {
+                                currentLyrics = null
+                                currentOffset = 0L
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                session.notifyChildrenChanged(MusicService.LYRICS, 3, null)
+                            }
+                        }
+                    }
+
+                    if (!currentLyrics.isNullOrEmpty()) {
+                        val newIndex = LyricsUtils.findCurrentLineIndex(currentLyrics, position + currentOffset)
+                        if (newIndex != lastLineIndex) {
+                            lastLineIndex = newIndex
+                            session.notifyChildrenChanged(MusicService.LYRICS, 3, null)
+                        }
+                    }
+                }
+                delay(400)
+            }
+        }
+    }
 
     fun release() {
         scope.cancel()
@@ -208,6 +275,13 @@ constructor(
                                         drawableUri(R.drawable.queue_music),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
                                     )
+                                    AndroidAutoSection.LYRICS -> browsableMediaItem(
+                                        MusicService.LYRICS,
+                                        context.getString(R.string.lyrics),
+                                        null,
+                                        drawableUri(R.drawable.lyrics),
+                                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                                    )
                                 }
                             }
                     }
@@ -298,6 +372,200 @@ constructor(
                             }
                         }
                         localItems
+                    }
+
+                    MusicService.LYRICS -> {
+                        withContext(Dispatchers.Main) { startLyricsSyncJob(session) }
+                        val currentMedia = withContext(Dispatchers.Main) { session.player.currentMediaItem }
+                        val currentMediaId = currentMedia?.mediaId
+                        val songTitle = currentMedia?.mediaMetadata?.title
+                        val songArtist = currentMedia?.mediaMetadata?.artist
+                        val artworkUri = currentMedia?.mediaMetadata?.artworkUri
+
+                        val currentPosition = withContext(Dispatchers.Main) { session.player.currentPosition }
+
+                        if (currentMediaId == null) {
+                            return@future LibraryResult.ofItemList(
+                                listOf(
+                                    MediaItem.Builder()
+                                        .setMediaId("${MusicService.LYRICS}/no_song_playing")
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(context.getString(R.string.no_song_playing))
+                                                .setSubtitle(null)
+                                                .setIsPlayable(false)
+                                                .setIsBrowsable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                                .setArtworkUri(drawableUri(R.drawable.lyrics))
+                                                .build()
+                                        )
+                                        .build()
+                                ), params
+                            )
+                        }
+
+                        val lyricsEntity = database.lyrics(currentMediaId).firstOrNull()
+                        var rawLyrics = lyricsEntity?.lyrics?.trim()
+
+                        if (rawLyrics == null) {
+                            val metadata = withContext(Dispatchers.Main) { session.player.currentMediaItem?.metadata }
+                            if (metadata != null) {
+                                val lyricsWithProvider = lyricsHelper.getLyrics(metadata)
+                                rawLyrics = lyricsWithProvider.lyrics.trim()
+
+                                database.query {
+                                    upsert(
+                                        LyricsEntity(
+                                            id = metadata.id,
+                                            lyrics = lyricsWithProvider.lyrics,
+                                            provider = lyricsWithProvider.provider,
+                                        )
+                                    )
+                                }
+                                withContext(Dispatchers.Main) {
+                                    session.notifyChildrenChanged(
+                                        MusicService.LYRICS,
+                                        3,
+                                        null
+                                    )
+                                }
+                                lastMediaId = null
+                            }
+                        }
+
+                        if (rawLyrics == null || rawLyrics == LyricsEntity.LYRICS_NOT_FOUND) {
+                            return@future LibraryResult.ofItemList(
+                                listOf(
+                                    MediaItem.Builder()
+                                        .setMediaId("${MusicService.LYRICS}/lyrics_not_found")
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(context.getString(R.string.lyrics_not_found))
+                                                .setSubtitle(null)
+                                                .setIsPlayable(false)
+                                                .setIsBrowsable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                                .setArtworkUri(drawableUri(R.drawable.lyrics))
+                                                .build()
+                                        )
+                                        .build()
+                                ), params
+                            )
+                        }
+
+                        val items = mutableListOf<MediaItem>()
+
+                        if (songTitle != null) {
+                            items.add(
+                                MediaItem.Builder()
+                                    .setMediaId("${MusicService.LYRICS}/title_header")
+                                    .setMediaMetadata(
+                                        MediaMetadata.Builder()
+                                            .setTitle("$songTitle")
+                                            .setSubtitle("$songArtist")
+                                            .setIsPlayable(false)
+                                            .setIsBrowsable(false)
+                                            .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                            .setArtworkUri(artworkUri)
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }
+
+                        val allLangs = listOf("Japanese", "Korean", "Chinese", "Hindi", "Ukrainian", "Russian", "Serbian", "Bulgarian", "Belarusian", "Kyrgyz", "Macedonian")
+
+                        if (rawLyrics.startsWith("[")) {
+                            // TESTO SINCRONIZZATO
+                            val parsedLines = LyricsUtils.parseLyrics(rawLyrics)
+                            val lyricsOffset = database.song(currentMediaId).firstOrNull()?.song?.lyricsOffset?.toLong() ?: 0L
+
+                            val currentIndex = LyricsUtils.findCurrentLineIndex(parsedLines, currentPosition + lyricsOffset)
+
+                            // 3 rows (-1, current, +1)
+                            val start = (currentIndex - 1).coerceAtLeast(0)
+                            val end = (currentIndex + 1).coerceAtMost(parsedLines.size - 1)
+
+                            for (i in start..end) {
+                                val entry = parsedLines[i]
+                                val isCurrent = i == currentIndex
+
+                                val titleText = if (isCurrent) "▶ ${entry.text}" else entry.text
+                                val displayTitle = titleText.takeIf { entry.text.isNotBlank() } ?: (if (isCurrent) "▶ 🎶" else "🎶")
+
+                                val romanizedText = LyricsUtils.romanize(
+                                    text = rawLyrics,
+                                    line = entry.text,
+                                    enabledLanguages = allLangs,
+                                    romanizeCyrillicByLine = true
+                                )
+                                val subtitleText = romanizedText?.takeIf { it.isNotBlank() }
+
+                                items.add(
+                                    MediaItem.Builder()
+                                        .setMediaId("${MusicService.LYRICS}/lyrics_line_$i")
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(displayTitle)
+                                                .setSubtitle(subtitleText)
+                                                .setIsPlayable(false)
+                                                .setIsBrowsable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                                .setArtworkUri(drawableUri(R.drawable.lyrics))
+                                                .build()
+                                        )
+                                        .build()
+                                )
+                            }
+                        } else {
+                            // TESTO NON SINCRONIZZATO
+                            val lines = rawLyrics.lines().filter { it.isNotBlank() }
+                            lines.forEachIndexed { index, line ->
+                                val romanizedText = LyricsUtils.romanize(
+                                    text = rawLyrics,
+                                    line = line,
+                                    enabledLanguages = allLangs,
+                                    romanizeCyrillicByLine = true
+                                )
+                                val subtitleText = romanizedText?.takeIf { it.isNotBlank() }
+
+                                items.add(
+                                    MediaItem.Builder()
+                                        .setMediaId("${MusicService.LYRICS}/lyrics_line_$index")
+                                        .setMediaMetadata(
+                                            MediaMetadata.Builder()
+                                                .setTitle(line)
+                                                .setSubtitle(subtitleText)
+                                                .setIsPlayable(false)
+                                                .setIsBrowsable(false)
+                                                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                                .setArtworkUri(drawableUri(R.drawable.lyrics))
+                                                .build()
+                                        )
+                                        .build()
+                                )
+                            }
+                        }
+
+                        if (items.isEmpty()) {
+                            items.add(
+                                MediaItem.Builder()
+                                    .setMediaId("${MusicService.LYRICS}/lyrics_empty")
+                                    .setMediaMetadata(
+                                        MediaMetadata.Builder()
+                                            .setTitle("Testo vuoto")
+                                            .setSubtitle(null)
+                                            .setIsPlayable(false)
+                                            .setIsBrowsable(false)
+                                            .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                            .setArtworkUri(drawableUri(R.drawable.lyrics))
+                                            .build()
+                                    )
+                                    .build()
+                            )
+                        }
+
+                        items
                     }
 
                     else ->
@@ -418,8 +686,21 @@ constructor(
         mediaId: String,
     ): ListenableFuture<LibraryResult<MediaItem>> =
         scope.future(Dispatchers.IO) {
-            database.song(mediaId).first()?.toMediaItem()?.let {
-                LibraryResult.ofItem(it, null)
+            if (mediaId == MusicService.LYRICS) {
+                return@future LibraryResult.ofItem(
+                    browsableMediaItem(
+                        MusicService.LYRICS,
+                        context.getString(R.string.lyrics),
+                        null,
+                        null,
+                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                    ),
+                    null
+                )
+            }
+
+            database.song(mediaId).firstOrNull()?.toMediaItem()?.let {
+                return@future LibraryResult.ofItem(it, null)
             } ?: LibraryResult.ofError(SessionError.ERROR_UNKNOWN)
         }
 
