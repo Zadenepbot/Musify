@@ -307,8 +307,9 @@ object YTPlayerUtils {
                         // Use CipherDeobfuscator for n-transform, fall back to NewPipe
                         streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
 
-                        if (originalUrl == streamUrl) {
-                            // CipherDeobfuscator didn't change the URL, try NewPipe's throttling deobfuscation
+                        if (originalUrl == streamUrl && skipNewPipe) {
+                            // CipherDeobfuscator failed and NewPipe wasn't used for stream resolution
+                            // (private/uploaded tracks) — try NewPipe's throttling deobfuscation as fallback
                             Timber.tag(TAG).d("  CipherDeobfuscator failed, trying NewPipe throttling deobfuscation...")
                             try {
                                 // Ensure NewPipe Downloader is initialized
