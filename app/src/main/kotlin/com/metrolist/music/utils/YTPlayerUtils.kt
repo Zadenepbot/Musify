@@ -272,8 +272,9 @@ object YTPlayerUtils {
                     STREAM_FALLBACK_CLIENTS[clientIndex]
                 }
 
-                // Check if this is a privately owned track
-                val isPrivatelyOwnedTrack = streamPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
+                // Check if this is a privately owned track (from response or earlier detection)
+                val isPrivatelyOwnedTrack = isPrivateTrack ||
+                    streamPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
                 val musicVideoType = streamPlayerResponse.videoDetails?.musicVideoType
 
                 Timber.tag(TAG).d("=== N-TRANSFORM DECISION ===")
@@ -502,10 +503,10 @@ object YTPlayerUtils {
                 }
             }
 
-            val response = httpClient.newCall(requestBuilder.build()).execute()
-            val isSuccessful = response.isSuccessful
-            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
-            return isSuccessful
+            httpClient.newCall(requestBuilder.build()).execute().use { response ->
+                Timber.tag(logTag).d("Stream URL validation result: ${if (response.isSuccessful) "Success" else "Failed"} (${response.code})")
+                return response.isSuccessful
+            }
         } catch (e: Exception) {
             Timber.tag(logTag).e(e, "Stream URL validation failed with exception")
             reportException(e)
