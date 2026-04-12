@@ -489,17 +489,17 @@ object YTPlayerUtils {
      * If this returns true the url is likely to work.
      * If this returns false the url might cause an error during playback.
      */
-    private fun validateStatus(url: String): Boolean {
+    private fun validateStatus(url: String, includeAuth: Boolean = false): Boolean {
         Timber.tag(logTag).d("Validating stream URL status")
         try {
             val requestBuilder = okhttp3.Request.Builder()
                 .head()
                 .url(url)
 
-            // Add authentication cookie for privately owned tracks
-            YouTube.cookie?.let { cookie ->
-                requestBuilder.addHeader("Cookie", cookie)
-                Timber.tag(TAG).d("Added cookie to validation request")
+            if (includeAuth) {
+                YouTube.cookie?.let { cookie ->
+                    requestBuilder.addHeader("Cookie", cookie)
+                }
             }
 
             val response = httpClient.newCall(requestBuilder.build()).execute()

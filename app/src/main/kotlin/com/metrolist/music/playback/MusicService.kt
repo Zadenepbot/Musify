@@ -2875,7 +2875,10 @@ class MusicService :
                                                 .removeAllQueryParameters(PRIVATE_STREAM_MARKER)
                                                 .build()
                                             val builder = request.newBuilder().url(cleanUrl)
-                                            YouTube.cookie?.let { builder.header("Cookie", it) }
+                                            val host = cleanUrl.host
+                                            if (host.endsWith(".youtube.com") || host.endsWith(".googlevideo.com")) {
+                                                YouTube.cookie?.let { builder.header("Cookie", it) }
+                                            }
                                             request = builder.build()
                                         }
                                         chain.proceed(request)

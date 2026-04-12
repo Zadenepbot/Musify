@@ -1,5 +1,6 @@
 package com.metrolist.innertube
 
+import android.util.Log
 import com.metrolist.innertube.models.YouTubeClient
 import com.metrolist.innertube.models.response.PlayerResponse
 import io.ktor.http.URLBuilder
@@ -188,6 +189,7 @@ object NewPipeExtractor {
         return try {
             YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(videoId, url)
         } catch (e: Exception) {
+            Log.e("NewPipeExtractor", "getThrottlingDeobfuscatedUrl failed for videoId=$videoId: ${e.message}")
             null
         }
     }
