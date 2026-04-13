@@ -109,10 +109,10 @@ val LastUpdateCheckTimeKey = longPreferencesKey("lastUpdateCheckTime")
 val AudioQualityKey = stringPreferencesKey("audioQuality")
 
 enum class AudioQuality {
-    AUTO,
-    HIGH,
     LOW,
+    HIGH,
     VERY_HIGH,
+    AUTO,
 }
 
 val AudioOffload = booleanPreferencesKey("enableOffload")
