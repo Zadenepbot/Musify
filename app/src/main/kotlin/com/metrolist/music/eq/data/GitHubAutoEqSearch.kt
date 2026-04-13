@@ -179,7 +179,8 @@ class GitHubAutoEqSearch(private val context: Context) {
         return try {
             val request = Request.Builder()
                 .url(TREE_API_URL)
-                .header("Accept", "application/vnd.github.v3+json")
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
                 .build()
 
             client.newCall(request).execute().use { response ->
