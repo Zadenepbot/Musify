@@ -167,6 +167,12 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
+        // Tracks the last successful private-track candidate so the loop can keep iterating
+        // without losing a good result if a later client fails.
+        var privateCandidateStreamUrl: String? = null
+        var privateCandidateFormat: PlayerResponse.StreamingData.Format? = null
+        var privateCandidateExpiry: Int? = null
+        var privateCandidateResponse: PlayerResponse? = null
         val retryMainPlayerResponse: PlayerResponse? = if (usedAgeRestrictedClient != null) mainPlayerResponse else null
 
         // Check current status
@@ -362,22 +368,30 @@ object YTPlayerUtils {
                 // Skip validation for private tracks (cookie-based auth, not URL-verifiable)
                 // or for the last fallback client
                 val isPrivate = isPrivateTrack || isPrivatelyOwnedTrack
+                val isLastClient = clientIndex == STREAM_FALLBACK_CLIENTS.size - 1
 
-                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 || isPrivate) {
-                    if (isPrivate) {
-                        Timber.tag(logTag).d("Skipping validation for privately owned track: ${currentClient.clientName}")
-                    } else {
-                        Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
-                    }
-                    Timber.tag(TAG)
-                        .i("Playback: client=${currentClient.clientName}, videoId=$videoId, private=$isPrivate")
+                if (isLastClient) {
+                    Timber.tag(logTag).d("Using last fallback client without validation: ${currentClient.clientName}")
+                    Timber.tag(TAG).i("Playback: client=${currentClient.clientName}, videoId=$videoId, private=$isPrivate")
                     break
+                }
+
+                if (isPrivate) {
+                    // Private tracks can't be validated via HEAD request (cookie-based auth).
+                    // Save this client as the best candidate so far and keep iterating — a later
+                    // client may be better suited. The loop commits at isLastClient, or the
+                    // candidate is restored below if the loop exhausts without breaking.
+                    Timber.tag(logTag).d("Skipping validation for privately owned track, recording candidate and continuing: ${currentClient.clientName}")
+                    privateCandidateStreamUrl = streamUrl
+                    privateCandidateFormat = format
+                    privateCandidateExpiry = streamExpiresInSeconds
+                    privateCandidateResponse = streamPlayerResponse
+                    continue
                 }
 
                 if (validateStatus(streamUrl)) {
                     // working stream found
                     Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
-                    // Log for release builds
                     Timber.tag(TAG).i("Playback: client=${currentClient.clientName}, videoId=$videoId")
                     break
                 } else {
@@ -386,6 +400,16 @@ object YTPlayerUtils {
             } else {
                 Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}, reason: ${streamPlayerResponse?.playabilityStatus?.reason}")
             }
+        }
+
+        // If the loop exhausted without committing (streamUrl null) but accumulated a valid
+        // private-track candidate, restore it rather than throwing.
+        if (streamUrl == null && privateCandidateStreamUrl != null) {
+            Timber.tag(logTag).d("Loop exhausted; restoring best private-track candidate (${privateCandidateResponse?.videoDetails?.videoId})")
+            streamUrl = privateCandidateStreamUrl
+            format = privateCandidateFormat
+            streamExpiresInSeconds = privateCandidateExpiry
+            streamPlayerResponse = privateCandidateResponse
         }
 
         if (streamPlayerResponse == null) {
