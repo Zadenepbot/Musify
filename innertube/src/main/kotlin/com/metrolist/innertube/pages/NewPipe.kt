@@ -102,16 +102,26 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
 
 }
 
+/**
+ * Wrapper around NewPipe's [YoutubeJavaScriptPlayerManager] for signature/cipher operations.
+ * Initialises the NewPipe [Downloader] on first access, routing requests through the
+ * configured proxy.
+ */
 object NewPipeUtils {
 
     init {
         NewPipe.init(NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth))
     }
 
+    /** Returns the signature timestamp needed for InnerTube player requests. */
     fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
         YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId)
     }
 
+    /**
+     * Deobfuscates the signature cipher on [format] and applies throttling parameter
+     * deobfuscation to produce a playable stream URL.
+     */
     fun getStreamUrl(format: PlayerResponse.StreamingData.Format, videoId: String): Result<String> =
         runCatching {
             val url = format.url ?: format.signatureCipher?.let { signatureCipher ->
@@ -138,7 +148,16 @@ object NewPipeUtils {
 
 }
 
+/**
+ * Higher-level NewPipe integration that can resolve complete stream lists and perform
+ * individual deobfuscation steps. Unlike [NewPipeUtils], methods here return nullable
+ * values instead of [Result] and silently swallow exceptions.
+ */
 object NewPipeExtractor {
+    /**
+     * Fetches all available stream URLs for [videoId] via NewPipe's [StreamInfo].
+     * Returns a list of (itag, url) pairs, or an empty list on failure.
+     */
     fun newPipePlayer(videoId: String): List<Pair<Int, String>> {
         return try {
             val streamInfo = StreamInfo.getInfo(
@@ -154,10 +173,15 @@ object NewPipeExtractor {
         }
     }
 
+    /** Returns the signature timestamp needed for InnerTube player requests. */
     fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
         YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId)
     }
 
+    /**
+     * Deobfuscates the signature cipher on [format] and applies throttling parameter
+     * deobfuscation. Returns `null` on any failure.
+     */
     fun getStreamUrl(format: PlayerResponse.StreamingData.Format, videoId: String): String? {
         return try {
             val url = format.url ?: format.signatureCipher?.let { signatureCipher ->
@@ -185,6 +209,11 @@ object NewPipeExtractor {
         }
     }
 
+    /**
+     * Applies only the throttling (n-parameter) deobfuscation to an already-resolved [url].
+     * Useful as a fallback when [CipherDeobfuscator][com.metrolist.music.utils.cipher.CipherDeobfuscator]
+     * fails for privately-owned tracks.
+     */
     fun getThrottlingDeobfuscatedUrl(videoId: String, url: String): String? {
         return try {
             YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(videoId, url)

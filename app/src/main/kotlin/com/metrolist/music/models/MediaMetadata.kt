@@ -51,6 +51,10 @@ data class MediaMetadata(
         val title: String,
     ) : Serializable
 
+    /**
+     * Converts this [MediaMetadata] to a [SongEntity] suitable for Room database persistence.
+     * Maps [musicVideoType] to the [SongEntity.isUploaded] and [SongEntity.isVideo] flags.
+     */
     fun toSongEntity() =
         SongEntity(
             id = id,
@@ -72,6 +76,11 @@ data class MediaMetadata(
         )
 }
 
+/**
+ * Converts a database [Song] (entity + joined artists/album) into a [MediaMetadata] instance.
+ * Reconstructs the [MediaMetadata.musicVideoType] from the persisted boolean flags so that
+ * downstream consumers (e.g. the player) can distinguish uploaded, video, and audio-only tracks.
+ */
 fun Song.toMediaMetadata() =
     MediaMetadata(
         id = song.id,
@@ -108,6 +117,10 @@ fun Song.toMediaMetadata() =
         uploadEntityId = song.uploadEntityId,
     )
 
+/**
+ * Converts an InnerTube [SongItem] into a [MediaMetadata] instance for use in the UI and player.
+ * Thumbnails are resized to 544x544 for consistency.
+ */
 fun SongItem.toMediaMetadata() =
     MediaMetadata(
         id = id,
@@ -138,6 +151,10 @@ fun SongItem.toMediaMetadata() =
         uploadEntityId = uploadEntityId
     )
 
+/**
+ * Converts an InnerTube [EpisodeItem] into a [MediaMetadata] instance.
+ * The episode's podcast is mapped to [MediaMetadata.Album] and [MediaMetadata.isEpisode] is set.
+ */
 fun EpisodeItem.toMediaMetadata() =
     MediaMetadata(
         id = id,

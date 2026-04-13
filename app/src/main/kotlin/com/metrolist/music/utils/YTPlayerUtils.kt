@@ -65,6 +65,11 @@ object YTPlayerUtils {
         WEB,
         WEB_CREATOR
     )
+    /**
+     * Container for everything the player needs to begin streaming a track:
+     * audio config, video metadata, playback-tracking URLs, the resolved stream format/URL,
+     * and whether the track is a privately-owned (uploaded) item requiring cookie auth.
+     */
     data class PlaybackData(
         val audioConfig: PlayerResponse.PlayerConfig.AudioConfig?,
         val videoDetails: PlayerResponse.VideoDetails?,
@@ -480,6 +485,13 @@ object YTPlayerUtils {
             .onFailure { Timber.tag(logTag).e(it, "Failed to fetch metadata") }
     }
 
+    /**
+     * Selects the best audio format from the player response's adaptive formats
+     * based on the requested [audioQuality] and current network conditions.
+     * Prefers Opus (WebM) streams when bitrates are otherwise equal.
+     *
+     * @return the chosen format, or `null` if no audio-only original format is available.
+     */
     private fun findFormat(
         playerResponse: PlayerResponse,
         audioQuality: AudioQuality,
@@ -537,11 +549,19 @@ object YTPlayerUtils {
         }
         return false
     }
+    /**
+     * Result of attempting to obtain a signature timestamp from NewPipe.
+     * If the video is age-restricted, [timestamp] will be `null` and [isAgeRestricted] will be `true`.
+     */
     data class SignatureTimestampResult(
         val timestamp: Int?,
         val isAgeRestricted: Boolean
     )
 
+    /**
+     * Retrieves the signature timestamp required for player requests via NewPipe.
+     * Detects age-restricted content early if NewPipe reports it.
+     */
     private fun getSignatureTimestampOrNull(videoId: String): SignatureTimestampResult {
         Timber.tag(logTag).d("Getting signature timestamp for videoId: $videoId")
         val result = NewPipeExtractor.getSignatureTimestamp(videoId)
@@ -565,6 +585,18 @@ object YTPlayerUtils {
         )
     }
 
+    /**
+     * Resolves a playable stream URL for the given [format].
+     *
+     * Tries, in order:
+     * 1. The format's direct URL (if present).
+     * 2. Custom cipher deobfuscation of `signatureCipher`.
+     * 3. NewPipe signature deobfuscation (skipped when [skipNewPipe] is `true`,
+     *    e.g. for age-restricted or privately-owned content that requires our auth).
+     * 4. NewPipe `StreamInfo` as a last resort.
+     *
+     * @return the resolved URL, or `null` if all methods fail.
+     */
     private suspend fun findUrlOrNull(
         format: PlayerResponse.StreamingData.Format,
         videoId: String,
@@ -631,6 +663,7 @@ object YTPlayerUtils {
         return null
     }
 
+    /** Evicts cached data for [videoId], forcing a fresh player request on next playback. */
     fun forceRefreshForVideo(videoId: String) {
         Timber.tag(logTag).d("Force refreshing for videoId: $videoId")
     }

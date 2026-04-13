@@ -21,6 +21,14 @@ data class NextResult(
 )
 
 object NextPage {
+    /**
+     * Parses a [PlaylistPanelVideoRenderer] (the "up next" / queue item renderer from YouTube Music)
+     * into a [SongItem]. Returns `null` if required fields (videoId, title) are missing.
+     *
+     * Extracts artist and album info from [PlaylistPanelVideoRenderer.longBylineText],
+     * falling back to [PlaylistPanelVideoRenderer.shortBylineText], and resolves library
+     * add/remove tokens from the renderer's menu items.
+     */
     fun fromPlaylistPanelVideoRenderer(renderer: PlaylistPanelVideoRenderer): SongItem? {
         val longByLineRuns = (renderer.longBylineText ?: renderer.shortBylineText)?.runs?.splitBySeparator()
 
