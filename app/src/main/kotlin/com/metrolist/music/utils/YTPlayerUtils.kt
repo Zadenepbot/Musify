@@ -114,10 +114,24 @@ object YTPlayerUtils {
 
         // Try WEB_REMIX with signature timestamp and poToken (same as before)
         Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
-        var mainPlayerResponse = YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp.timestamp, poToken?.playerRequestPoToken).getOrThrow()
+        var firstPlayerFailure: Throwable? = null
+        val mainPlayerResult = YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp.timestamp, poToken?.playerRequestPoToken)
+            .onFailure { firstPlayerFailure = it }
+        var mainPlayerResponse = mainPlayerResult.getOrNull()
+        
+        // Check if main player response failed due to age-restriction or other playable issues
+        val mainStatus = mainPlayerResponse?.playabilityStatus?.status
+        val isAgeRestrictedFromMain = mainStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
+        
+        if (mainPlayerResponse == null || isAgeRestrictedFromMain) {
+            Timber.tag(logTag).d("Main client response failed or age-restricted, will try fallback clients")
+            if (mainPlayerResponse == null) {
+                Timber.tag(logTag).d("Main player response is null (possibly cancelled), checking if we can use fallback clients")
+            }
+        }
 
         // Debug uploaded track response
-        if (isUploadedTrack || playlistId?.contains("MLPT") == true) {
+        if ((isUploadedTrack || playlistId?.contains("MLPT") == true) && mainPlayerResponse != null) {
             println("[PLAYBACK_DEBUG] Main player response status: ${mainPlayerResponse.playabilityStatus.status}")
             println("[PLAYBACK_DEBUG] Playability reason: ${mainPlayerResponse.playabilityStatus.reason}")
             println("[PLAYBACK_DEBUG] Video details: title=${mainPlayerResponse.videoDetails?.title}, videoId=${mainPlayerResponse.videoDetails?.videoId}")
@@ -126,14 +140,10 @@ object YTPlayerUtils {
         }
 
         var usedAgeRestrictedClient: YouTubeClient? = null
-        val wasOriginallyAgeRestricted: Boolean
+        val wasOriginallyAgeRestricted: Boolean = mainPlayerResponse != null && isAgeRestrictedFromMain
 
         // Check if WEB_REMIX response indicates age-restricted
-        val mainStatus = mainPlayerResponse.playabilityStatus.status
-        val isAgeRestrictedFromResponse = mainStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
-        wasOriginallyAgeRestricted = isAgeRestrictedFromResponse
-
-        if (isAgeRestrictedFromResponse && isLoggedIn) {
+        if (mainPlayerResponse != null && wasOriginallyAgeRestricted && isLoggedIn) {
             // Age-restricted: use WEB_CREATOR directly (no NewPipe needed from here)
             Timber.tag(logTag).d("Age-restricted detected, using WEB_CREATOR")
             Timber.tag(TAG).i("Age-restricted: using WEB_CREATOR for videoId=$videoId")
@@ -145,11 +155,11 @@ object YTPlayerUtils {
             }
         }
 
-        // If we still don't have a valid response, throw
+        // If mainPlayerResponse is null, we continue to allow fallback clients to work
 
-        val audioConfig = mainPlayerResponse.playerConfig?.audioConfig
-        val videoDetails = mainPlayerResponse.videoDetails
-        val playbackTracking = mainPlayerResponse.playbackTracking
+        val audioConfig = mainPlayerResponse?.playerConfig?.audioConfig
+        val videoDetails = mainPlayerResponse?.videoDetails
+        val playbackTracking = mainPlayerResponse?.playbackTracking
         var format: PlayerResponse.StreamingData.Format? = null
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
@@ -157,7 +167,7 @@ object YTPlayerUtils {
         val retryMainPlayerResponse: PlayerResponse? = if (usedAgeRestrictedClient != null) mainPlayerResponse else null
 
         // Check current status
-        val currentStatus = mainPlayerResponse.playabilityStatus.status
+        val currentStatus = mainPlayerResponse?.playabilityStatus?.status
         val isAgeRestricted = currentStatus in listOf("AGE_CHECK_REQUIRED", "AGE_VERIFICATION_REQUIRED", "LOGIN_REQUIRED", "CONTENT_CHECK_REQUIRED")
 
         if (isAgeRestricted) {
@@ -167,7 +177,7 @@ object YTPlayerUtils {
         }
 
         // Check if this is a privately owned track (uploaded song)
-        val isPrivateTrack = mainPlayerResponse.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
+        val isPrivateTrack = mainPlayerResponse?.videoDetails?.musicVideoType == "MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK"
 
         // For private tracks: use TVHTML5 (index 1) with PoToken + n-transform
         // For age-restricted: skip main client, start with fallbacks
@@ -207,8 +217,9 @@ object YTPlayerUtils {
                 val clientPoToken = if (client.useWebPoTokens) poToken?.playerRequestPoToken else null
                 // Skip signature timestamp for age-restricted (faster), use it for normal content
                 val clientSigTimestamp = if (wasOriginallyAgeRestricted) null else signatureTimestamp.timestamp
-                streamPlayerResponse =
-                    YouTube.player(videoId, playlistId, client, clientSigTimestamp, clientPoToken).getOrNull()
+                val fallbackResult = YouTube.player(videoId, playlistId, client, clientSigTimestamp, clientPoToken)
+                    .onFailure { if (firstPlayerFailure == null) firstPlayerFailure = it }
+                streamPlayerResponse = fallbackResult.getOrNull()
             }
 
             // process current client response
@@ -354,7 +365,7 @@ object YTPlayerUtils {
             if (isUploadedTrack) {
                 println("[PLAYBACK_DEBUG] FAILURE: All clients failed for uploaded track videoId=$videoId")
             }
-            throw Exception("Bad stream player response")
+            throw firstPlayerFailure ?: Exception("Bad stream player response")
         }
 
         if (streamPlayerResponse.playabilityStatus.status != "OK") {
@@ -389,13 +400,15 @@ object YTPlayerUtils {
         if (isUploadedTrack) {
             println("[PLAYBACK_DEBUG] SUCCESS: Got playback data for uploaded track - format=${format.mimeType}, streamUrl=${streamUrl.take(100)}...")
         }
+        val metadataResponse = mainPlayerResponse ?: streamPlayerResponse
+
         PlaybackData(
-            audioConfig,
-            videoDetails,
-            playbackTracking,
-            format,
-            streamUrl,
-            streamExpiresInSeconds,
+            audioConfig = metadataResponse?.playerConfig?.audioConfig,
+            videoDetails = metadataResponse?.videoDetails,
+            playbackTracking = metadataResponse?.playbackTracking,
+            format = format,
+            streamUrl = streamUrl,
+            streamExpiresInSeconds = streamExpiresInSeconds,
         )
     }.onFailure { e ->
         println("[PLAYBACK_DEBUG] EXCEPTION during playback for videoId=$videoId: ${e::class.simpleName}: ${e.message}")
