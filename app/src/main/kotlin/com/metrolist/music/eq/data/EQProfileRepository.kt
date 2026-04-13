@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -79,7 +80,7 @@ class EQProfileRepository @Inject constructor(
                 _activeProfile.value = loadedProfiles.find { it.id == activeId }
             }
         } catch (e: Exception) {
-            println("Error loading EQ profiles: ${e.message}")
+            Timber.e(e, "Error loading EQ profiles")
             _profiles.value = emptyList()
             _activeProfile.value = null
         }

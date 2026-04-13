@@ -1,5 +1,6 @@
 package com.metrolist.music.eq.data
 
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -123,8 +124,7 @@ object ParametricEQParser {
                 q = q
             )
         } catch (e: Exception) {
-            println("Warning: Failed to parse filter line: $line")
-            println("Error: ${e.message}")
+            Timber.w(e, "Failed to parse filter line: %s", line)
             return null
         }
     }
