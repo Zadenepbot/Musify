@@ -424,15 +424,18 @@ object YTPlayerUtils {
 
         val adaptiveFormats = playerResponse.streamingData?.adaptiveFormats ?: return null
 
-        val maxBitrate = adaptiveFormats.maxOfOrNull { it.bitrate } ?: return null
+        val audioCapableFormats = adaptiveFormats.filter { it.isAudio }
+        if (audioCapableFormats.isEmpty()) return null
+
+        val maxBitrate = audioCapableFormats.maxOfOrNull { it.bitrate } ?: return null
 
         val targetBitrate = when (audioQuality) {
             AudioQuality.VERY_HIGH -> maxBitrate.toDouble()
-            AudioQuality.HIGH -> (maxBitrate * 0.67).coerceAtLeast(128000.0)
-            AudioQuality.LOW -> (maxBitrate * 0.33).coerceAtLeast(64000.0)
+            AudioQuality.HIGH -> minOf(maxBitrate.toDouble(), 256000.0)
+            AudioQuality.LOW -> minOf(maxBitrate.toDouble(), 128000.0)
             AudioQuality.AUTO -> {
                 if (connectivityManager.isActiveNetworkMetered) {
-                    (maxBitrate * 0.33).coerceAtLeast(64000.0)
+                    minOf(maxBitrate.toDouble(), 128000.0)
                 } else {
                     maxBitrate.toDouble()
                 }
@@ -441,14 +444,10 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).d("Finding format: maxBitrate=$maxBitrate, targetBitrate=$targetBitrate")
 
-        val format = if (audioQuality == AudioQuality.VERY_HIGH) {
-            adaptiveFormats.maxByOrNull { it.bitrate }
-        } else {
-            adaptiveFormats
-                .filter { it.isAudio && it.isOriginal }
-                .minByOrNull { kotlin.math.abs(it.bitrate - targetBitrate) }
-                ?: adaptiveFormats.maxByOrNull { it.bitrate }
-        }
+        val format = audioCapableFormats
+            .filter { it.bitrate >= targetBitrate && it.isOriginal }
+            .minByOrNull { it.bitrate }
+            ?: audioCapableFormats.maxByOrNull { it.bitrate }
 
         if (format != null) {
             Timber.tag(logTag).d("Selected format: ${format.mimeType}, bitrate: ${format.bitrate}")
