@@ -572,38 +572,6 @@ private fun VariantSelectionStep(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-
-//                Card(
-//                    colors = CardDefaults.cardColors(
-//                        containerColor = MaterialTheme.colorScheme.primaryContainer
-//                    ),
-//                    modifier = Modifier.padding(bottom = 16.dp)
-//                ) {
-//                    Column(modifier = Modifier.padding(12.dp)) {
-//                        Text(
-//                            text = "About EQ (Equalizer) Profiles",
-//                            style = MaterialTheme.typography.labelLarge,
-//                            fontWeight = FontWeight.Bold
-//                        )
-//                        Text(
-//                            text = "\u2022 Each profile provides device-specific sound quality enhancement to your music",
-//                            style = MaterialTheme.typography.bodySmall
-//                        )
-//                        Spacer(modifier = Modifier.height(4.dp))
-//                        Text(
-//                            text = "\u2022 Multiple profiles for your device may be available from different sources and measured with different rigs",
-//                            style = MaterialTheme.typography.bodySmall
-//                        )
-//                        Text(
-//                            text = "\u2022 If unsure, select the topmost item and continue",
-//                            style = MaterialTheme.typography.bodySmall
-//                        )
-//                        Text(
-//                            text = "\u2022 After saving, custom EQ profiles may be imported through the Equalizer screen",
-//                            style = MaterialTheme.typography.bodySmall
-//                        )
-//                    }
-//                }
             }
 
             items(variants) { variant ->
