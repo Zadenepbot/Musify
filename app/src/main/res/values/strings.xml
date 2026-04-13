@@ -348,19 +348,13 @@
     <string name="clear_translation_models">Clear translation models</string>
 
     <!-- EQ Wizard -->
-    <string name="wizard_select_brand">Select Brand</string>
     <string name="wizard_select_model">Select Model</string>
     <string name="wizard_select_profiles">Select Profiles</string>
-    <string name="wizard_step_brand">Brand</string>
     <string name="wizard_step_model">Model</string>
     <string name="wizard_step_profiles">Profiles</string>
-    <string name="wizard_search_brand_hint">Search for your headphone or earphone brand</string>
-    <string name="wizard_brand_name">Brand Name</string>
-    <string name="wizard_brand_placeholder">e.g., Sony, Bose, Beats</string>
-    <string name="wizard_no_brands">No brands found</string>
-    <string name="wizard_search_model_hint">Search for your %s model</string>
+    <string name="wizard_search_model_hint">Search for your headphone or earphone model</string>
     <string name="wizard_model_name">Model Name</string>
-    <string name="wizard_model_placeholder">e.g., Galaxy Buds, QuietComfort 45, WH-1000XM4</string>
+    <string name="wizard_model_placeholder">e.g., Sony WH-1000XM4, Bose QuietComfort 45</string>
     <string name="wizard_no_models">No models found</string>
     <string name="wizard_multiple_variants">Multiple variants available</string>
     <string name="wizard_select_eq_profiles">Select EQ profiles for %s</string>

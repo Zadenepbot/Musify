@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -53,72 +54,12 @@ class WizardViewModel @Inject constructor(
                 }
             } else {
                 _state.update { it.copy(isLoading = false, isDatabaseReady = true) }
-                searchBrands("")
+                searchModels("")
             }
         }
     }
 
-    // STEP 1: BRAND SELECTION
-
-    fun onBrandSearchQueryChanged(query: String) {
-        _state.update { it.copy(brandSearchQuery = query) }
-
-        // Debounce search
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(300) // Wait 300ms after user stops typing
-            searchBrands(query)
-        }
-    }
-
-    private fun searchBrands(query: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-
-            try {
-                // Search for brands in the AutoEQ database
-                // Empty query returns all brands
-                val brandNames = autoEqSearch.searchBrands(query)
-
-                val brands = brandNames.map { brandName ->
-                    DeviceBrand(
-                        id = brandName.lowercase().replace(" ", "_"),
-                        name = brandName
-                    )
-                }
-
-                _state.update {
-                    it.copy(
-                        brands = brands,
-                        isLoading = false
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        brands = emptyList(),
-                        isLoading = false,
-                        error = "Failed to search brands: ${e.message}"
-                    )
-                }
-            }
-        }
-    }
-
-    fun onBrandSelected(brand: DeviceBrand) {
-        _state.update {
-            it.copy(
-                selectedBrand = brand,
-                currentStep = WizardStep.MODEL_SELECTION,
-                modelSearchQuery = "",
-                models = emptyList()
-            )
-        }
-        // Load all models for this brand immediately
-        searchModels("")
-    }
-
-    // STEP 2: MODEL SELECTION
+    // STEP 1: MODEL SELECTION
 
     fun onModelSearchQueryChanged(query: String) {
         _state.update { it.copy(modelSearchQuery = query) }
@@ -131,23 +72,15 @@ class WizardViewModel @Inject constructor(
     }
 
     private fun searchModels(query: String) {
-        val selectedBrand = _state.value.selectedBrand ?: return
-
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // Search for models by brand in the AutoEQ database
-                // Empty query returns all models for the brand
-                val entries = autoEqSearch.searchModelsByBrand(selectedBrand.name, query)
-
-                // Group by unique model names (since same model can have multiple variants)
-                val groupedEntries = autoEqSearch.groupEntriesByModel(entries)
+                val groupedEntries = autoEqSearch.searchModels(query)
 
                 val models = groupedEntries.map { (modelName, entriesForModel) ->
                     DeviceModel(
                         id = modelName.lowercase().replace(" ", "_").replace("[^a-z0-9_]".toRegex(), ""),
-                        brandId = selectedBrand.id,
                         name = modelName,
                         hasMultipleVariants = entriesForModel.size > 1
                     )
@@ -174,7 +107,6 @@ class WizardViewModel @Inject constructor(
     fun onModelSelected(model: DeviceModel) {
         _state.update { it.copy(selectedModel = model) }
 
-        // Load variants for this model
         loadVariants(model.id)
     }
 
@@ -185,7 +117,6 @@ class WizardViewModel @Inject constructor(
             try {
                 val modelName = _state.value.selectedModel?.name ?: ""
 
-                // Get all variants (different sources/rigs) for this model
                 val entries = autoEqSearch.getVariantsForModel(modelName)
 
                 if (entries.isEmpty()) {
@@ -199,7 +130,6 @@ class WizardViewModel @Inject constructor(
                 }
 
                 val variants = entries.mapIndexed { index, entry ->
-                    // Parse label to detect variant types
                     val label = entry.label
                     val isANC = label.contains("(ANC", ignoreCase = true) ||
                             label.contains("ANC ON", ignoreCase = true) ||
@@ -211,7 +141,7 @@ class WizardViewModel @Inject constructor(
                     EQProfileVariant(
                         id = "${modelId}_${index}",
                         modelId = modelId,
-                        name = entry.label,  // Keep full original label for matching
+                        name = entry.label,
                         variant = if (entries.size > 1) {
                             "${entry.source} - ${entry.rig}"
                         } else {
@@ -244,7 +174,7 @@ class WizardViewModel @Inject constructor(
         }
     }
 
-    // STEP 3: VARIANT SELECTION
+    // STEP 2: VARIANT SELECTION
 
     fun onVariantToggled(variantId: String) {
         _state.update { currentState ->
@@ -262,9 +192,6 @@ class WizardViewModel @Inject constructor(
 
     fun onNextClicked() {
         when (_state.value.currentStep) {
-            WizardStep.BRAND_SELECTION -> {
-                // Already handled in onBrandSelected
-            }
             WizardStep.MODEL_SELECTION -> {
                 // Already handled in onModelSelected
             }
@@ -277,18 +204,7 @@ class WizardViewModel @Inject constructor(
     fun onBackClicked() {
         _state.update { currentState ->
             when (currentState.currentStep) {
-                WizardStep.MODEL_SELECTION -> {
-                    // Reload all brands when going back
-                    searchBrands(currentState.brandSearchQuery)
-                    currentState.copy(
-                        currentStep = WizardStep.BRAND_SELECTION,
-                        selectedModel = null,
-                        modelSearchQuery = "",
-                        models = emptyList()
-                    )
-                }
                 WizardStep.VARIANT_SELECTION -> {
-                    // Reload all models when going back
                     searchModels(currentState.modelSearchQuery)
                     currentState.copy(
                         currentStep = WizardStep.MODEL_SELECTION,
@@ -313,7 +229,6 @@ class WizardViewModel @Inject constructor(
 
                 val modelName = currentState.selectedModel?.name ?: "Unknown"
 
-                // Create SavedEQProfile objects from selected variants
                 val profiles = mutableListOf<SavedEQProfile>()
                 val entries = autoEqSearch.getVariantsForModel(modelName)
 
@@ -326,7 +241,6 @@ class WizardViewModel @Inject constructor(
                         }
 
                         if (matchingEntry != null) {
-                            // Load the ParametricEQ data
                             val parametricEQ = autoEqSearch.loadEQ(matchingEntry)
 
                             if (parametricEQ != null) {
@@ -345,7 +259,7 @@ class WizardViewModel @Inject constructor(
                             }
                         }
                     } catch (e: Exception) {
-                        println("Warning: Failed to load EQ for variant ${variant.id}: ${e.message}")
+                        Timber.w(e, "Failed to load EQ for variant %s", variant.id)
                     }
                 }
 

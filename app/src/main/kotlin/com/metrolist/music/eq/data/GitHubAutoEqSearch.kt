@@ -46,23 +46,6 @@ class GitHubAutoEqSearch(private val context: Context) {
         private const val RAW_BASE_URL =
             "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/$BRANCH"
         private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
-
-        private val KNOWN_MULTI_WORD_BRANDS = listOf(
-            "Bowers & Wilkins",
-            "Bang & Olufsen",
-            "Master & Dynamic",
-            "Astell & Kern",
-            "64 Audio",
-            "Campfire Audio",
-            "Empire Ears",
-            "Final Audio",
-            "Noble Audio",
-            "Periodic Audio",
-            "Status Audio",
-            "Unique Melody",
-            "Vision Ears",
-            "Tin HiFi",
-        ).sortedByDescending { it.length }
     }
 
     @Serializable
@@ -253,87 +236,40 @@ class GitHubAutoEqSearch(private val context: Context) {
     // SEARCH / FILTER METHODS
 
     /**
-     * Search for headphones by brand name.
-     * Returns unique brands found in the database.
-     * If query is blank, returns all brands.
+     * Search for models by label substring.
+     * Returns a map of normalized model name -> entries for that model,
+     * ordered by relevance (exact match > prefix match > substring match).
+     * An empty query returns all models.
      */
-    fun searchBrands(query: String, maxResults: Int = 50): List<String> {
+    fun searchModels(query: String, maxResults: Int = 100): Map<String, List<Entry>> {
         if (!isIndexed) {
             Timber.w("Index not built. Call buildIndex() first.")
-            return emptyList()
+            return emptyMap()
         }
 
         val lowerQuery = query.lowercase().trim()
 
-        val allBrands = entries
-            .map { entry -> extractBrand(entry.label) }
-            .filter { it.isNotBlank() }
-            .distinct()
-
-        if (lowerQuery.isBlank()) {
-            return allBrands.sorted().take(maxResults)
+        val filtered = if (lowerQuery.isBlank()) {
+            entries
+        } else {
+            entries.filter { normalizeModelName(it.label).lowercase().contains(lowerQuery) }
         }
 
-        return allBrands
-            .filter { it.lowercase().contains(lowerQuery) }
-            .sortedWith(compareByDescending<String> { brand ->
+        val grouped = filtered.groupBy { normalizeModelName(it.label) }
+
+        val sortedNames = grouped.keys.sortedWith(
+            compareByDescending<String> { name ->
+                val lower = name.lowercase()
                 when {
-                    brand.lowercase() == lowerQuery -> 1000
-                    brand.lowercase().startsWith(lowerQuery) -> 500
+                    lowerQuery.isEmpty() -> 0
+                    lower == lowerQuery -> 2000
+                    lower.startsWith(lowerQuery) -> 1000
                     else -> 100
                 }
-            }.thenBy { it })
-            .take(maxResults)
-    }
+            }.thenBy { it }
+        ).take(maxResults)
 
-    /**
-     * Search for models by brand name.
-     * Returns entries that match the brand.
-     */
-    fun searchModelsByBrand(brandName: String, modelQuery: String = ""): List<Entry> {
-        if (!isIndexed) {
-            Timber.w("Index not built. Call buildIndex() first.")
-            return emptyList()
-        }
-
-        if (brandName.isBlank()) return emptyList()
-
-        val lowerBrand = brandName.lowercase().trim()
-        val lowerModelQuery = modelQuery.lowercase().trim()
-
-        return entries
-            .filter { entry ->
-                val labelLower = entry.label.lowercase()
-                val matchesBrand = labelLower.startsWith(lowerBrand) ||
-                        labelLower.startsWith("$lowerBrand ") ||
-                        labelLower.contains(" $lowerBrand ") ||
-                        labelLower.contains("-$lowerBrand-")
-
-                val matchesModel = if (lowerModelQuery.isNotEmpty()) {
-                    val normalizedLabel = normalizeModelName(entry.label).lowercase()
-                    normalizedLabel.contains(lowerModelQuery)
-                } else {
-                    true
-                }
-
-                matchesBrand && matchesModel
-            }
-            .sortedWith(compareByDescending<Entry> { entry ->
-                val labelLower = entry.label.lowercase()
-                when {
-                    lowerModelQuery.isNotEmpty() && labelLower == "$lowerBrand $lowerModelQuery" -> 2000
-                    lowerModelQuery.isNotEmpty() && labelLower.startsWith("$lowerBrand $lowerModelQuery") -> 1500
-                    labelLower.startsWith("$lowerBrand ") -> 1000
-                    else -> 100
-                }
-            }.thenBy { it.label })
-    }
-
-    /**
-     * Group entries by normalized model name.
-     */
-    fun groupEntriesByModel(entries: List<Entry>): Map<String, List<Entry>> {
-        return entries.groupBy { normalizeModelName(it.label) }
+        return sortedNames.associateWith { grouped.getValue(it) }
     }
 
     /**
@@ -368,42 +304,6 @@ class GitHubAutoEqSearch(private val context: Context) {
     fun getAllEntries(): List<Entry> = entries.toList()
 
     // PRIVATE HELPERS
-
-    /**
-     * Extract the brand name from a headphone label.
-     * Uses a whitelist for known multi-word brands, then falls back to
-     * heuristic extraction that preserves hyphenated brands like "Audio-Technica".
-     */
-    private fun extractBrand(label: String): String {
-        val trimmed = label.trim()
-        if (trimmed.isEmpty()) return trimmed
-
-        // 1. Check whitelist of known multi-word brands (longest match first)
-        for (brand in KNOWN_MULTI_WORD_BRANDS) {
-            if (trimmed.startsWith(brand, ignoreCase = true) &&
-                (trimmed.length == brand.length || !trimmed[brand.length].isLetterOrDigit())
-            ) {
-                return brand
-            }
-        }
-
-        // 2. Clean the label: strip parenthesized content, normalize spaced separators
-        val cleaned = trimmed
-            .replace(Regex("""\s*\([^)]*\)\s*"""), " ")
-            .replace(Regex("""\s+[-\u2014:]\s+"""), " ")  // " - ", " — ", " : "
-            .trim()
-
-        // 3. Split on whitespace only (preserving hyphens within tokens)
-        val tokens = cleaned.split(Regex("\\s+"))
-        if (tokens.isEmpty()) return trimmed
-
-        // 4. If second token is "&", include it and the following word
-        if (tokens.size >= 3 && tokens[1] == "&") {
-            return "${tokens[0]} & ${tokens[2]}"
-        }
-
-        return tokens[0]
-    }
 
     private fun normalizeModelName(modelName: String): String {
         return modelName.replace(Regex("""\s*\([^)]*\)\s*"""), "").trim()

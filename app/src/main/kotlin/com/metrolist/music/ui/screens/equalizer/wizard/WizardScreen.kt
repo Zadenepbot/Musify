@@ -24,7 +24,7 @@ import com.metrolist.music.R
 
 /**
  * EQ Wizard - Device Setup Flow
- * Three steps: Brand → Model → Variants
+ * Two steps: Model → Variants
  */
 @Composable
 fun WizardScreen(
@@ -33,7 +33,6 @@ fun WizardScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // Handle completion
     LaunchedEffect(state.isComplete) {
         if (state.isComplete) {
             onNavigateBack()
@@ -43,8 +42,6 @@ fun WizardScreen(
     WizardScreenContent(
         state = state,
         onDownloadDatabase = { viewModel.downloadDatabase() },
-        onBrandSearchQueryChanged = { viewModel.onBrandSearchQueryChanged(it) },
-        onBrandSelected = { viewModel.onBrandSelected(it) },
         onModelSearchQueryChanged = { viewModel.onModelSearchQueryChanged(it) },
         onModelSelected = { viewModel.onModelSelected(it) },
         onVariantToggled = { viewModel.onVariantToggled(it) },
@@ -59,8 +56,6 @@ fun WizardScreen(
 private fun WizardScreenContent(
     state: WizardState,
     onDownloadDatabase: () -> Unit,
-    onBrandSearchQueryChanged: (String) -> Unit,
-    onBrandSelected: (DeviceBrand) -> Unit,
     onModelSearchQueryChanged: (String) -> Unit,
     onModelSelected: (DeviceModel) -> Unit,
     onVariantToggled: (String) -> Unit,
@@ -74,7 +69,6 @@ private fun WizardScreenContent(
                 title = {
                     Text(
                         text = when (state.currentStep) {
-                            WizardStep.BRAND_SELECTION -> stringResource(R.string.wizard_select_brand)
                             WizardStep.MODEL_SELECTION -> stringResource(R.string.wizard_select_model)
                             WizardStep.VARIANT_SELECTION -> stringResource(R.string.wizard_select_profiles)
                         }
@@ -99,10 +93,8 @@ private fun WizardScreenContent(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Progress Indicator
                 WizardProgressIndicator(currentStep = state.currentStep)
 
-                // Step Content
                 AnimatedContent(
                     targetState = state.currentStep,
                     label = "wizard_step",
@@ -111,20 +103,12 @@ private fun WizardScreenContent(
                     }
                 ) { step ->
                     when (step) {
-                        WizardStep.BRAND_SELECTION -> BrandSelectionStep(
-                            searchQuery = state.brandSearchQuery,
-                            brands = state.brands,
-                            isLoading = state.isLoading,
-                            isDatabaseReady = state.isDatabaseReady,
-                            onDownloadDatabase = onDownloadDatabase,
-                            onSearchQueryChanged = onBrandSearchQueryChanged,
-                            onBrandSelected = onBrandSelected
-                        )
                         WizardStep.MODEL_SELECTION -> ModelSelectionStep(
-                            brandName = state.selectedBrand?.name ?: "",
                             searchQuery = state.modelSearchQuery,
                             models = state.models,
                             isLoading = state.isLoading,
+                            isDatabaseReady = state.isDatabaseReady,
+                            onDownloadDatabase = onDownloadDatabase,
                             onSearchQueryChanged = onModelSearchQueryChanged,
                             onModelSelected = onModelSelected
                         )
@@ -141,7 +125,6 @@ private fun WizardScreenContent(
                 }
             }
 
-            // Error Snackbar
             if (state.error != null) {
                 Snackbar(
                     modifier = Modifier
@@ -166,24 +149,6 @@ private fun WizardProgressIndicator(currentStep: WizardStep) {
     ) {
         StepIndicator(
             stepNumber = 1,
-            label = stringResource(R.string.wizard_step_brand),
-            isActive = currentStep == WizardStep.BRAND_SELECTION,
-            isCompleted = currentStep.ordinal > WizardStep.BRAND_SELECTION.ordinal
-        )
-
-        HorizontalDivider(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp),
-            thickness = DividerDefaults.Thickness, color = if (currentStep.ordinal > WizardStep.BRAND_SELECTION.ordinal) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
-
-        StepIndicator(
-            stepNumber = 2,
             label = stringResource(R.string.wizard_step_model),
             isActive = currentStep == WizardStep.MODEL_SELECTION,
             isCompleted = currentStep.ordinal > WizardStep.MODEL_SELECTION.ordinal
@@ -201,7 +166,7 @@ private fun WizardProgressIndicator(currentStep: WizardStep) {
         )
 
         StepIndicator(
-            stepNumber = 3,
+            stepNumber = 2,
             label = stringResource(R.string.wizard_step_profiles),
             isActive = currentStep == WizardStep.VARIANT_SELECTION,
             isCompleted = false
@@ -262,22 +227,21 @@ private fun StepIndicator(
     }
 }
 
-// STEP 1: BRAND SELECTION
+// STEP 1: MODEL SELECTION
 
 @Composable
-private fun BrandSelectionStep(
+private fun ModelSelectionStep(
     searchQuery: String,
-    brands: List<DeviceBrand>,
+    models: List<DeviceModel>,
     isLoading: Boolean,
     isDatabaseReady: Boolean,
     onDownloadDatabase: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
-    onBrandSelected: (DeviceBrand) -> Unit
+    onModelSelected: (DeviceModel) -> Unit
 ) {
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
 
-    // Clear focus (hide keyboard) when user starts scrolling
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             focusManager.clearFocus()
@@ -320,126 +284,7 @@ private fun BrandSelectionStep(
             .padding(16.dp)
     ) {
         Text(
-            text = stringResource(R.string.wizard_search_brand_hint),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChanged,
-            label = { Text(stringResource(R.string.wizard_brand_name)) },
-            placeholder = { Text(stringResource(R.string.wizard_brand_placeholder)) },
-            leadingIcon = {
-                Icon(painterResource(R.drawable.search), contentDescription = null)
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (brands.isEmpty() && searchQuery.isNotBlank()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stringResource(R.string.wizard_no_brands),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(brands) { brand ->
-                    BrandItem(
-                        brand = brand,
-                        onClick = { onBrandSelected(brand) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BrandItem(
-    brand: DeviceBrand,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.music_note),
-                contentDescription = null,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = brand.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                painter = painterResource(R.drawable.navigate_next),
-                contentDescription = null
-            )
-        }
-    }
-}
-
-// STEP 2: MODEL SELECTION
-
-@Composable
-private fun ModelSelectionStep(
-    brandName: String,
-    searchQuery: String,
-    models: List<DeviceModel>,
-    isLoading: Boolean,
-    onSearchQueryChanged: (String) -> Unit,
-    onModelSelected: (DeviceModel) -> Unit
-) {
-    val listState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
-
-    // Clear focus (hide keyboard) when user starts scrolling
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            focusManager.clearFocus()
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.wizard_search_model_hint, brandName),
+            text = stringResource(R.string.wizard_search_model_hint),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 16.dp)
         )
@@ -539,7 +384,7 @@ private fun ModelItem(
     }
 }
 
-// STEP 3: VARIANT SELECTION
+// STEP 2: VARIANT SELECTION
 
 @Composable
 private fun VariantSelectionStep(
@@ -577,7 +422,6 @@ private fun VariantSelectionStep(
             }
         }
 
-        // Bottom button
         Surface(
             tonalElevation = 3.dp,
             shadowElevation = 8.dp
@@ -643,7 +487,6 @@ private fun VariantItem(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
-                // Show source and rig information
                 if (variant.sourceDisplay.isNotEmpty() || variant.rigDisplay.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     if (variant.sourceDisplay.isNotEmpty()) {
