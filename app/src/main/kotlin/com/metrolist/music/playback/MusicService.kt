@@ -1671,10 +1671,14 @@ class MusicService :
                 val nextBlock = (insertIndex until (insertIndex + items.size)).toList()
                 val finalOrder = IntArray(size)
                 var pos = 0
-                prevList.forEach { if (it in 0 until size) finalOrder[pos++] = it }
+                prevList
+                    .filter { it !in newIndices }
+                    .forEach { if (it in 0 until size) finalOrder[pos++] = it }
                 finalOrder[pos++] = currentIndex
                 nextBlock.forEach { if (it in 0 until size) finalOrder[pos++] = it }
-                orderAfter.filter { it !in newIndices }.forEach { if (pos < size) finalOrder[pos++] = it }
+                orderAfter
+                    .filter { it !in newIndices }
+                    .forEach { if (pos < size) finalOrder[pos++] = it }
 
                 // Fill any missing indices (safety) to ensure a full permutation
                 if (pos < size) {
