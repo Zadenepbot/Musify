@@ -774,6 +774,47 @@
     <string name="recently_converted">Recently converted</string>
     <string name="column_label">Column %d</string>
 
+    <!-- Matrix Integration -->
+    <string name="matrix_integration">Matrix integration</string>
+    <string name="enable_matrix_rpc">Enable Matrix presence</string>
+    <string name="matrix_add_account">Add account</string>
+    <string name="matrix_edit_account">Edit account</string>
+    <string name="matrix_account_save">Save</string>
+    <string name="matrix_account_cancel">Cancel</string>
+    <string name="matrix_account_delete">Delete</string>
+    <string name="matrix_account_duplicate_error">An account with this homeserver and user ID already exists.</string>
+    <string name="matrix_homeserver">Homeserver</string>
+    <string name="matrix_homeserver_placeholder">https://matrix.server.domain</string>
+    <string name="matrix_user_id">User ID</string>
+    <string name="matrix_user_id_hint">e.g. @user:matrix.org</string>
+    <string name="matrix_user_id_placeholder">@user:server.domain</string>
+    <string name="matrix_access_token">Access Token</string>
+    <string name="matrix_access_token_hint">Your Matrix access token</string>
+    <string name="matrix_status_format">Status format</string>
+    <string name="matrix_status_format_description">Variables: {song_name}, {artist_name}, {album_name}, {current_time}, {total_time}</string>
+    <string name="matrix_status_format_default">Listening to: {song_name} by {artist_name} [{current_time} / {total_time}] | Metrolist Android</string>
+    <string name="matrix_listening_prefix">Listening to:</string>
+    <string name="matrix_paused_prefix">Paused:</string>
+    <string name="matrix_status_format_hint">e.g. Listening to {song_name}</string>
+
+    <string name="matrix_update_interval">Update interval</string>
+    <string name="matrix_update_interval_description">How often to update your Matrix status (seconds)</string>
+    <plurals name="seconds_unit">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <string name="matrix_new_account">New Account</string>
+    <string name="matrix_account_sync_error">Account sync error</string>
+    <string name="action_reset">Reset</string>
+    <string name="matrix_clear_status">Clear status &amp; set offline</string>
+    <string name="matrix_clear_status_description">Clears your presence status message and sets you as offline for all accounts</string>
+    <plurals name="matrix_status_cleared">
+        <item quantity="one">Status cleared for %1$d account</item>
+        <item quantity="other">Status cleared for %1$d accounts</item>
+    </plurals>
+    <string name="matrix_information_warning">This feature updates your Matrix presence using the standard Client-Server API. Your access token is stored locally and sent only to your specified homeserver.</string>
+
+
     <!-- Discord Integration -->
     <string name="discord_status">Status</string>
     <string name="discord_status_online">Online</string>

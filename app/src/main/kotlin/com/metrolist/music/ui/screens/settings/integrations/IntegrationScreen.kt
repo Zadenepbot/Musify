@@ -49,6 +49,13 @@ fun IntegrationScreen(
                     }
                 ),
                 IntegrationCardItem(
+                    icon = painterResource(R.drawable.matrix_icon),
+                    title = { Text(stringResource(R.string.matrix_integration)) },
+                    onClick = {
+                        navController.navigate("settings/integrations/matrix")
+                    }
+                ),
+                IntegrationCardItem(
                     icon = painterResource(R.drawable.music_note),
                     title = { Text(stringResource(R.string.lastfm_integration)) },
                     onClick = {
