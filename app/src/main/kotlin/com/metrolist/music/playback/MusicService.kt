@@ -76,6 +76,7 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.metrolist.innertube.YouTube
@@ -461,6 +462,14 @@ class MusicService :
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+
+        setListener(
+            object : MediaSessionService.Listener {
+                override fun onForegroundServiceStartNotAllowedException() {
+                    handleForegroundServiceStartNotAllowed(null)
+                }
+            },
+        )
 
         // Player rediness reset to false
         playerInitialized.value = false
@@ -2100,7 +2109,7 @@ class MusicService :
             }
 
             val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
-            
+
             // Handle Repeat All mode
             if (repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0) {
                 player.seekTo(0, 0)
@@ -2108,7 +2117,7 @@ class MusicService :
                 player.play()
                 return
             }
-            
+
             // Handle Repeat One mode - restart current song
             if (repeatMode == REPEAT_MODE_ONE) {
                 player.seekTo(player.currentMediaItemIndex, 0)
@@ -2116,7 +2125,7 @@ class MusicService :
                 player.play()
                 return
             }
-            
+
             // Handle autoplay - check if there's a next item to play
             val autoplay = runBlocking { dataStore.get(AutoplayKey, true) }
             if (autoplay && player.hasNextMediaItem()) {
@@ -3368,6 +3377,23 @@ class MusicService :
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
+    override fun onUpdateNotification(
+        session: MediaSession,
+        startInForegroundRequired: Boolean,
+    ) {
+        try {
+            super.onUpdateNotification(session, startInForegroundRequired)
+        } catch (e: ForegroundServiceStartNotAllowedException) {
+            handleForegroundServiceStartNotAllowed(e)
+        } catch (e: IllegalStateException) {
+            if (isForegroundServiceStartNotAllowedException(e)) {
+                handleForegroundServiceStartNotAllowed(e)
+            } else {
+                throw e
+            }
+        }
+    }
+
     override fun onStartCommand(
         intent: Intent?,
         flags: Int,
@@ -3494,6 +3520,24 @@ class MusicService :
             }
         }
     }
+
+    private fun handleForegroundServiceStartNotAllowed(error: Throwable?) {
+        if (error != null) {
+            Timber.tag(TAG).w(error, "Foreground service start denied during notification update")
+        } else {
+            Timber.tag(TAG).w("Foreground service start denied by MediaSessionService listener")
+        }
+        runCatching {
+            pauseAllPlayersAndStopSelf()
+        }.onFailure {
+            Timber.tag(TAG).w(it, "Failed to stop service after foreground start denial")
+            stopSelf()
+        }
+    }
+
+    private fun isForegroundServiceStartNotAllowedException(error: IllegalStateException): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            error.javaClass.name == ForegroundServiceStartNotAllowedException::class.java.name
 
     /**
      * Updates all app widgets with current playback state
