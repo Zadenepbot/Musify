@@ -84,6 +84,7 @@ fun AiSettings(navController: NavController) {
             "XAi" to "https://api.x.ai/v1/chat/completions",
             "Mistral" to "https://api.mistral.ai/v1/chat/completions",
             "DeepL" to "https://api.deepl.com/v2/translate",
+            "Google" to "",
             "Custom" to "",
         )
 
@@ -97,6 +98,7 @@ fun AiSettings(navController: NavController) {
             "XAi" to stringResource(R.string.ai_provider_xai_help),
             "Mistral" to stringResource(R.string.ai_provider_mistral_help),
             "DeepL" to stringResource(R.string.ai_provider_deepl_help),
+            "Google" to "Uses translate.googleapis.com (no API key required).",
             "Custom" to "",
         )
 
@@ -153,6 +155,7 @@ fun AiSettings(navController: NavController) {
                     "mistral-tiny-latest",
                 ),
             "DeepL" to listOf(),
+            "Google" to listOf(),
             "Custom" to listOf(),
         )
 
@@ -279,7 +282,7 @@ fun AiSettings(navController: NavController) {
             onDismiss = { showProviderDialog = false },
             onSelect = {
                 aiProvider = it
-                if (it != "Custom" && it != "DeepL") {
+                if (it != "Custom" && it != "DeepL" && it != "Google") {
                     openRouterBaseUrl = aiProviders[it] ?: ""
                 } else {
                     openRouterBaseUrl = ""
@@ -555,6 +558,15 @@ fun AiSettings(navController: NavController) {
                                 onClick = { showDeeplFormalityDialog = true },
                             ),
                         )
+                    } else if (aiProvider == "Google") {
+                        add(
+                            Material3SettingsItem(
+                                icon = painterResource(R.drawable.translate),
+                                title = { Text(stringResource(R.string.ai_api_key)) },
+                                description = { Text("Not required") },
+                                onClick = {},
+                            ),
+                        )
                     } else {
                         add(
                             Material3SettingsItem(
@@ -590,7 +602,7 @@ fun AiSettings(navController: NavController) {
             title = stringResource(R.string.ai_translation_mode),
             items =
                 buildList {
-                    if (aiProvider != "DeepL") {
+                    if (aiProvider != "DeepL" && aiProvider != "Google") {
                         add(
                             Material3SettingsItem(
                                 icon = painterResource(R.drawable.translate),

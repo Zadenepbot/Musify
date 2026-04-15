@@ -10,6 +10,7 @@ import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.LyricsEntity
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.api.DeepLService
+import com.metrolist.music.api.GoogleTranslateService
 import com.metrolist.music.api.MistralService
 import com.metrolist.music.api.OpenRouterService
 import com.metrolist.music.api.OpenRouterStreamingService
@@ -196,8 +197,9 @@ object LyricsTranslationHelper {
             scope.launch(Dispatchers.IO) {
                 try {
                     // Validate inputs
+                    val requiresApiKey = provider != "DeepL" && provider != "Google"
                     val effectiveApiKey = if (provider == "DeepL") deeplApiKey else apiKey
-                    if (effectiveApiKey.isBlank()) {
+                    if (requiresApiKey && effectiveApiKey.isBlank()) {
                         _status.value = TranslationStatus.Error(context.getString(com.metrolist.music.R.string.ai_error_api_key_required))
                         return@launch
                     }
@@ -299,6 +301,12 @@ object LyricsTranslationHelper {
                                 model = model,
                                 mode = mode,
                                 customSystemPrompt = systemPrompt,
+                            )
+                        } else if (provider == "Google") {
+                            Timber.d("Using Google Translate for translation")
+                            GoogleTranslateService.translate(
+                                text = fullText,
+                                targetLanguage = targetLanguage,
                             )
                         } else if (useStreaming && provider != "Custom") {
                             Timber.d("Using streaming for translation with provider: $provider")
