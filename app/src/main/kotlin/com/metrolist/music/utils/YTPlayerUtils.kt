@@ -172,12 +172,13 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
-        // Tracks the last successful private-track candidate so the loop can keep iterating
-        // without losing a good result if a later client fails.
+        // Tracks the best private-track candidate (first authenticated client wins).
+        // Set inferredAsPrivate when a 403 on validation reveals an undeclared private track.
         var privateCandidateStreamUrl: String? = null
         var privateCandidateFormat: PlayerResponse.StreamingData.Format? = null
         var privateCandidateExpiry: Int? = null
         var privateCandidateResponse: PlayerResponse? = null
+        var inferredAsPrivate = false
         val retryMainPlayerResponse: PlayerResponse? = if (usedAgeRestrictedClient != null) mainPlayerResponse else null
 
         // Check current status
@@ -385,24 +386,38 @@ object YTPlayerUtils {
 
                 if (isPrivate) {
                     // Private tracks can't be validated via HEAD request (cookie-based auth).
-                    // Save this client as the best candidate so far and keep iterating — a later
-                    // client may be better suited. The loop commits at isLastClient, or the
-                    // candidate is restored below if the loop exhausts without breaking.
-                    Timber.tag(logTag).d("Skipping validation for privately owned track, recording candidate and continuing: ${currentClient.clientName}")
+                    // Keep the first (highest-priority, usually WEB_REMIX) candidate — its
+                    // authenticated stream URL is more likely to work than later unauthenticated ones.
+                    if (privateCandidateStreamUrl == null) {
+                        Timber.tag(logTag).d("Skipping validation for privately owned track, recording first candidate: ${currentClient.clientName}")
+                        privateCandidateStreamUrl = streamUrl
+                        privateCandidateFormat = format
+                        privateCandidateExpiry = streamExpiresInSeconds
+                        privateCandidateResponse = streamPlayerResponse
+                    } else {
+                        Timber.tag(logTag).d("Already have private candidate, skipping: ${currentClient.clientName}")
+                    }
+                    continue
+                }
+
+                val httpStatus = validateStatus(streamUrl)
+                if (httpStatus != null && httpStatus in 200..299) {
+                    // working stream found
+                    Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
+                    Timber.tag(TAG).i("Playback: client=${currentClient.clientName}, videoId=$videoId")
+                    break
+                } else if (httpStatus == 403 && isLoggedIn && privateCandidateStreamUrl == null) {
+                    // 403 with no prior private candidate — this stream likely requires cookie auth
+                    // even though the API didn't flag it as PRIVATELY_OWNED. Treat as private.
+                    Timber.tag(logTag).d("403 on validation, inferring private track, recording candidate: ${currentClient.clientName}")
+                    inferredAsPrivate = true
                     privateCandidateStreamUrl = streamUrl
                     privateCandidateFormat = format
                     privateCandidateExpiry = streamExpiresInSeconds
                     privateCandidateResponse = streamPlayerResponse
                     continue
-                }
-
-                if (validateStatus(streamUrl)) {
-                    // working stream found
-                    Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
-                    Timber.tag(TAG).i("Playback: client=${currentClient.clientName}, videoId=$videoId")
-                    break
                 } else {
-                    Timber.tag(logTag).d("Stream validation failed for client: ${currentClient.clientName}")
+                    Timber.tag(logTag).d("Stream validation failed ($httpStatus) for client: ${currentClient.clientName}")
                 }
             } else {
                 Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}, reason: ${streamPlayerResponse?.playabilityStatus?.reason}")
@@ -466,7 +481,7 @@ object YTPlayerUtils {
             format,
             streamUrl,
             streamExpiresInSeconds,
-            isPrivatelyOwned = isPrivateTrack ||
+            isPrivatelyOwned = isPrivateTrack || inferredAsPrivate ||
                 streamPlayerResponse?.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK,
         )
     }.onFailure { e ->
@@ -527,8 +542,9 @@ object YTPlayerUtils {
      * Checks if the stream url returns a successful status.
      * If this returns true the url is likely to work.
      * If this returns false the url might cause an error during playback.
+     * Returns the HTTP status code, or null on network error.
      */
-    private fun validateStatus(url: String, includeAuth: Boolean = false): Boolean {
+    private fun validateStatus(url: String, includeAuth: Boolean = false): Int? {
         Timber.tag(logTag).d("Validating stream URL status")
         try {
             val requestBuilder = okhttp3.Request.Builder()
@@ -543,13 +559,13 @@ object YTPlayerUtils {
 
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
                 Timber.tag(logTag).d("Stream URL validation result: ${if (response.isSuccessful) "Success" else "Failed"} (${response.code})")
-                return response.isSuccessful
+                return response.code
             }
         } catch (e: Exception) {
             Timber.tag(logTag).e(e, "Stream URL validation failed with exception")
             reportException(e)
         }
-        return false
+        return null
     }
     /**
      * Result of attempting to obtain a signature timestamp from NewPipe.

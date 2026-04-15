@@ -80,7 +80,6 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
-import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
@@ -3013,10 +3012,7 @@ class MusicService :
             }
 
             Timber.tag("MusicService").i("FETCHING STREAM: $mediaId | quality=$audioQuality")
-            val dbSong = database.getSongByIdBlocking(mediaId)
-            val queueItemMusicVideoType = player.findNextMediaItemById(mediaId)?.metadata?.musicVideoType
-            val isUploaded = dbSong?.song?.isUploaded == true
-                || queueItemMusicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
+            val isUploaded = database.getSongByIdBlocking(mediaId)?.song?.isUploaded == true
             val playbackData =
                 runBlocking(Dispatchers.IO) {
                     YTPlayerUtils.playerResponseForPlayback(
