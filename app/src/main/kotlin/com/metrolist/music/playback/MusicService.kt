@@ -80,6 +80,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
+import com.metrolist.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
@@ -2876,7 +2877,7 @@ class MusicService :
                                                 .build()
                                             val builder = request.newBuilder().url(cleanUrl)
                                             val host = cleanUrl.host
-                                            if (host.endsWith(".youtube.com") || host.endsWith(".googlevideo.com")) {
+                                            if (host == "youtube.com" || host.endsWith(".youtube.com") || host.endsWith(".googlevideo.com")) {
                                                 YouTube.cookie?.let { builder.header("Cookie", it) }
                                             }
                                             request = builder.build()
@@ -3012,7 +3013,10 @@ class MusicService :
             }
 
             Timber.tag("MusicService").i("FETCHING STREAM: $mediaId | quality=$audioQuality")
-            val isUploaded = database.getSongByIdBlocking(mediaId)?.song?.isUploaded == true
+            val dbSong = database.getSongByIdBlocking(mediaId)
+            val queueItemMusicVideoType = player.findNextMediaItemById(mediaId)?.metadata?.musicVideoType
+            val isUploaded = dbSong?.song?.isUploaded == true
+                || queueItemMusicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
             val playbackData =
                 runBlocking(Dispatchers.IO) {
                     YTPlayerUtils.playerResponseForPlayback(
