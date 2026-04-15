@@ -196,12 +196,14 @@ object YTPlayerUtils {
             mainPlayerResponse.videoDetails?.musicVideoType == MUSIC_VIDEO_TYPE_PRIVATELY_OWNED_TRACK
 
         // For private tracks with a successful WEB_CREATOR response: try its streams first (index -1)
-        // For private tracks without a working response: use TVHTML5 (index 1)
+        // For private tracks where WEB_REMIX already returned OK streams: try those first (index -1)
+        // For private tracks where the main client failed: skip to TVHTML5 (index 1)
         // For age-restricted: skip main client, start with fallbacks
         // For normal content: standard order
         val startIndex = when {
             isPrivateTrack && usedAgeRestrictedClient != null -> -1  // WEB_CREATOR succeeded, try its streams
-            isPrivateTrack -> 1  // TVHTML5
+            isPrivateTrack && mainPlayerResponse.playabilityStatus.status == "OK" -> -1  // WEB_REMIX works for this upload
+            isPrivateTrack -> 1  // TVHTML5 (main client could not serve this upload)
             isAgeRestricted -> 0
             else -> -1
         }
@@ -564,6 +566,7 @@ object YTPlayerUtils {
      */
     private fun getSignatureTimestampOrNull(videoId: String): SignatureTimestampResult {
         Timber.tag(logTag).d("Getting signature timestamp for videoId: $videoId")
+        com.metrolist.innertube.NewPipeUtils  // Ensure NewPipe downloader is initialized before use
         val result = NewPipeExtractor.getSignatureTimestamp(videoId)
         return result.fold(
             onSuccess = { timestamp ->
