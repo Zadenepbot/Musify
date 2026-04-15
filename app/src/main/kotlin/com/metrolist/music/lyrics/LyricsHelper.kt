@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -188,14 +190,19 @@ constructor(
             val enabledProviders = allProviders.filter { it.isEnabled(context) }
 
             // Fetch from all providers concurrently; callback fires as each one finishes
+            val callbackMutex = Mutex()
             val jobs = enabledProviders.map { provider ->
                 launch {
                     try {
                         provider.getAllLyrics(context, mediaId, cleanedTitle, songArtists, duration, album) { lyrics ->
                             val filteredLyrics = LyricsUtils.filterLyricsCreditLines(lyrics)
                             val result = LyricsResult(provider.name, filteredLyrics)
-                            synchronized(allResult) { allResult += result }
-                            callback(result)
+                            launch {
+                                callbackMutex.withLock {
+                                    allResult += result
+                                    callback(result)
+                                }
+                            }
                         }
                     } catch (e: CancellationException) {
                         throw e
