@@ -26,6 +26,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -52,6 +53,41 @@ constructor(
 
     private val cache = LruCache<String, List<LyricsResult>>(MAX_CACHE_SIZE)
     private var currentLyricsJob: Job? = null
+
+    private fun CoroutineScope.launchProviderJob(
+        provider: LyricsProvider,
+        index: Int,
+        channel: Channel<Pair<Int, LyricsWithProvider?>>,
+        mediaMetadata: MediaMetadata,
+        cleanedTitle: String,
+    ): Job = launch {
+        try {
+            val providerResult = provider.getLyrics(
+                context,
+                mediaMetadata.id,
+                cleanedTitle,
+                mediaMetadata.artists.joinToString { it.name },
+                mediaMetadata.duration,
+                mediaMetadata.album?.title,
+            )
+            if (providerResult.isSuccess) {
+                Timber.tag("LyricsHelper").i("Got lyrics from ${provider.name}")
+                val filtered = LyricsUtils.filterLyricsCreditLines(providerResult.getOrNull()!!)
+                channel.send(Pair(index, LyricsWithProvider(filtered, provider.name)))
+            } else {
+                Timber.tag("LyricsHelper")
+                    .w("${provider.name} failed: ${providerResult.exceptionOrNull()?.message}")
+                channel.send(Pair(index, null))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag("LyricsHelper").w("${provider.name} threw: ${e.message}")
+            channel.send(Pair(index, null))
+        }
+    }
+
+
 
     suspend fun getLyrics(mediaMetadata: MediaMetadata): LyricsWithProvider {
         currentLyricsJob?.cancel()
@@ -82,73 +118,55 @@ constructor(
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
             val enabledProviders = orderedProviders.filter { it.isEnabled(context) }
 
-            // Launch ALL providers concurrently, indexed so we can sort by priority later
+            // Try first provider
+            val GRACE_PERIOD_MS = 4000L
+            val TIER_SIZE = 2 // berapa provider per tier
+
             val channel = Channel<Pair<Int, LyricsWithProvider?>>(
                 capacity = enabledProviders.size
             )
-            val jobs = enabledProviders.mapIndexed { index, provider ->
-                launch {
-                    try {
-                        Timber.tag("LyricsHelper")
-                            .d("Trying provider concurrently: ${provider.name} for $cleanedTitle")
-                        val providerResult = provider.getLyrics(
-                            context,
-                            mediaMetadata.id,
-                            cleanedTitle,
-                            mediaMetadata.artists.joinToString { it.name },
-                            mediaMetadata.duration,
-                            mediaMetadata.album?.title,
-                        )
-                        if (providerResult.isSuccess) {
-                            Timber.tag("LyricsHelper").i("Got lyrics from ${provider.name}")
-                            val filteredLyrics = LyricsUtils.filterLyricsCreditLines(providerResult.getOrNull()!!)
-                            channel.send(Pair(index, LyricsWithProvider(filteredLyrics, provider.name)))
-                        } else {
-                            Timber.tag("LyricsHelper")
-                                .w("${provider.name} failed: ${providerResult.exceptionOrNull()?.message}")
-                            channel.send(Pair(index, null))
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.tag("LyricsHelper").w("${provider.name} threw exception: ${e.message}")
-                        channel.send(Pair(index, null))
-                    }
-                }
+            val launchedJobs = mutableListOf<Job>()
+
+            for (i in 0 until minOf(TIER_SIZE, enabledProviders.size)) {
+                launchedJobs += launchProviderJob(enabledProviders[i], i, channel, mediaMetadata, cleanedTitle)
             }
 
-            // Close channel once all provider jobs finish
-            val closer = launch {
-                jobs.forEach { it.join() }
-                channel.close()
-            }
-
-            // Collect results as they arrive; return immediately once the highest-priority
-            // provider that can still win has responded (no lower-index result can come after)
+            var nextTierIndex = TIER_SIZE
             var bestIndex = Int.MAX_VALUE
             var bestResult: LyricsWithProvider? = null
-            val remaining = enabledProviders.indices.toMutableSet()
+            val remaining = (0 until enabledProviders.size).toMutableSet()
 
-            try {
-                for ((index, result) in channel) {
+            // Collect timeout between priority
+            val collectJob = launch {
+                for ((index, res) in channel) {
                     remaining.remove(index)
-                    if (result != null && index < bestIndex) {
+                    if (res != null && index < bestIndex) {
                         bestIndex = index
-                        bestResult = result
+                        bestResult = res
                     }
-                    // If no pending provider has a lower index than our current best, stop waiting
-                    if (remaining.none { it < bestIndex }) break
+                    if (remaining.none { it < bestIndex }) {
+                        channel.cancel()
+                        break
+                    }
                 }
-            } finally {
-                jobs.forEach { it.cancel() }
-                closer.cancel()
-                channel.cancel()
             }
 
-            bestResult ?: run {
-                Timber.tag("LyricsHelper").w("All providers failed for ${mediaMetadata.title}")
-                LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
+            // launch if prev tier return none
+            while (nextTierIndex < enabledProviders.size && collectJob.isActive) {
+                delay(GRACE_PERIOD_MS)
+                if (bestResult == null && collectJob.isActive) {
+                    //previous still doesnt have them, do again
+                    for (i in nextTierIndex until minOf(nextTierIndex + TIER_SIZE, enabledProviders.size)) {
+                        launchedJobs += launchProviderJob(enabledProviders[i], i, channel, mediaMetadata, cleanedTitle)
+                    }
+                    nextTierIndex += TIER_SIZE
+                } else break // we got them skip it
             }
+
+            collectJob.join()
+            launchedJobs.forEach { it.cancel() }
+
+            bestResult ?: LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
         }
 
         return result ?: LyricsWithProvider(LYRICS_NOT_FOUND, PROVIDER_NONE)
