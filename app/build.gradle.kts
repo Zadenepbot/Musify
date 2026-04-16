@@ -192,6 +192,27 @@ android {
 
 val protocVersion = libs.versions.protobuf.get()
 
+fun getProtocUrl(): String {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = System.getProperty("os.arch").lowercase()
+
+    val osName = when {
+        os.contains("linux") -> "linux"
+        os.contains("mac") || os.contains("darwin") -> "osx"
+        os.contains("windows") -> "windows"
+        else -> "linux"
+    }
+
+    val archName = when {
+        arch.contains("x86_64") || arch.contains("amd64") -> "x86_64"
+        arch.contains("aarch64") || arch.contains("arm64") -> "aarch_64"
+        arch.contains("x86") -> "x86_32"
+        else -> "x86_64"
+    }
+
+    return "https://repo1.maven.org/maven2/com/google/protobuf/protoc/$protocVersion/protoc-$protocVersion-$osName-$archName.exe"
+}
+
 val generateProto by tasks.registering(Exec::class) {
     group = "build"
     description = "Generate Kotlin protobuf files"
@@ -208,11 +229,11 @@ val generateProto by tasks.registering(Exec::class) {
 
     outDir.mkdirs()
 
-    val protocUrl = "https://repo1.maven.org/maven2/com/google/protobuf/protoc/$protocVersion/protoc-$protocVersion-linux-x86_64.exe"
+    val protocUrl = getProtocUrl()
     val protocFile = file("${layout.buildDirectory.get().asFile}/protoc-$protocVersion")
 
     doFirst {
-        logger.lifecycle("Downloading protoc $protocVersion")
+        logger.lifecycle("Downloading protoc $protocVersion from $protocUrl")
         protocFile.parentFile.mkdirs()
         if (!protocFile.exists() || protocFile.length() == 0L) {
             protocFile.writeBytes(URL(protocUrl).readBytes())
