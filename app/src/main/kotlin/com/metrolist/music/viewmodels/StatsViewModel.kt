@@ -319,8 +319,8 @@ constructor(
         }
     }
 
-    private fun clearMostPlaylists() {
-        database.transaction {
+    private suspend fun clearMostPlaylists() {
+        database.withTransaction {
             clearPlaylist(PlaylistEntity.WEEKLY_MOST_PLAYLIST_ID)
             clearPlaylist(PlaylistEntity.MONTHLY_MOST_PLAYLIST_ID)
             delete(
