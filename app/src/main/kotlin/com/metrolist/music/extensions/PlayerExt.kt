@@ -33,20 +33,24 @@ fun Player.toggleRepeatMode() {
         }
 }
 
-fun Player.getQueueWindows(): List<Timeline.Window> {
-    val timeline = currentTimeline
+fun Player.getQueueWindows(): List<Timeline.Window> =
+    getQueueWindows(currentTimeline, currentMediaItemIndex, shuffleModeEnabled)
+
+fun getQueueWindows(
+    timeline: Timeline,
+    currentMediaItemIndex: Int,
+    shuffleModeEnabled: Boolean,
+): List<Timeline.Window> {
     if (timeline.isEmpty) {
         return emptyList()
     }
     val queue = ArrayDeque<Timeline.Window>()
     val queueSize = timeline.windowCount
 
-    val currentMediaItemIndex: Int = currentMediaItemIndex
     queue.add(timeline.getWindow(currentMediaItemIndex, Timeline.Window()))
 
     var firstMediaItemIndex = currentMediaItemIndex
     var lastMediaItemIndex = currentMediaItemIndex
-    val shuffleModeEnabled = shuffleModeEnabled
     while ((firstMediaItemIndex != C.INDEX_UNSET || lastMediaItemIndex != C.INDEX_UNSET) && queue.size < queueSize) {
         if (lastMediaItemIndex != C.INDEX_UNSET) {
             lastMediaItemIndex =
@@ -69,19 +73,26 @@ fun Player.getQueueWindows(): List<Timeline.Window> {
     return queue.toList()
 }
 
-fun Player.getCurrentQueueIndex(): Int {
-    if (currentTimeline.isEmpty) {
+fun Player.getCurrentQueueIndex(): Int =
+    getCurrentQueueIndex(currentTimeline, currentMediaItemIndex, shuffleModeEnabled)
+
+fun getCurrentQueueIndex(
+    timeline: Timeline,
+    currentMediaItemIndex: Int,
+    shuffleModeEnabled: Boolean,
+): Int {
+    if (timeline.isEmpty) {
         return -1
     }
     var index = 0
-    var currentMediaItemIndex = currentMediaItemIndex
-    while (currentMediaItemIndex != C.INDEX_UNSET) {
-        currentMediaItemIndex = currentTimeline.getPreviousWindowIndex(
-            currentMediaItemIndex,
+    var currentIndex = currentMediaItemIndex
+    while (currentIndex != C.INDEX_UNSET) {
+        currentIndex = timeline.getPreviousWindowIndex(
+            currentIndex,
             REPEAT_MODE_OFF,
             shuffleModeEnabled
         )
-        if (currentMediaItemIndex != C.INDEX_UNSET) {
+        if (currentIndex != C.INDEX_UNSET) {
             index++
         }
     }

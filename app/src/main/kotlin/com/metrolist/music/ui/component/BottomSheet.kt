@@ -116,16 +116,18 @@ fun BottomSheet(
         }
 
         // main content
-        if (!state.isCollapsed) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = ((state.progress - 0.15f) * 4).coerceIn(0f, 1f)
-                    },
-                content = content
-            )
-        }
+        // Removed if (!state.isCollapsed) to keep the player tree composed and avoid an initial render spike when opened.
+        // It remains hidden using graphicsLayer translationY from the parent Box and alpha here.
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // Only render visually if we are past a minimal progress threshold to save GPU,
+                    // but keeping it composed saves CPU.
+                    alpha = ((state.progress - 0.15f) * 4).coerceIn(0f, 1f)
+                },
+            content = content
+        )
 
         if (!state.isExpanded && (onDismiss == null || !state.isDismissed)) {
             Box(

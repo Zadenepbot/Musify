@@ -72,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -150,6 +151,7 @@ import com.metrolist.music.constants.SelectedThemeColorKey
 import com.metrolist.music.constants.SimpMusicMigrationDoneKey
 import com.metrolist.music.constants.SlimNavBarHeight
 import com.metrolist.music.constants.SlimNavBarKey
+import com.metrolist.music.constants.SwipeToSongKey
 import com.metrolist.music.constants.StopMusicOnTaskClearKey
 import com.metrolist.music.constants.UpdateNotificationsEnabledKey
 import com.metrolist.music.constants.UseNewMiniPlayerDesignKey
@@ -199,6 +201,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -243,6 +249,30 @@ class MainActivity : ComponentActivity() {
     // This is the snapshot we pass to Compose - changes here trigger recomposition
     private var playerConnectionSnapshot by mutableStateOf<PlayerConnection?>(null)
     
+    private var cachedAppLanguage by mutableStateOf(SYSTEM_DEFAULT)
+    private var cachedDisableScreenshot by mutableStateOf(false)
+    private var cachedCheckForUpdates by mutableStateOf(true)
+    private var cachedUpdateNotificationsEnabled by mutableStateOf(true)
+    private var cachedDynamicTheme by mutableStateOf(true)
+    private var cachedEnableHighRefreshRate by mutableStateOf(true)
+    private var cachedDarkMode by mutableStateOf(DarkMode.AUTO)
+    private var cachedPureBlack by mutableStateOf(false)
+    private var cachedSelectedThemeColor by mutableIntStateOf(DefaultThemeColor.toArgb())
+    private var cachedLastSeenVersion by mutableStateOf("")
+    private var cachedSimpMusicMigrationDone by mutableStateOf(false)
+    private var cachedLyricsProviderOrder by mutableStateOf("")
+    private var cachedPreferredLyricsProvider by mutableStateOf(PreferredLyricsProvider.LRCLIB.name)
+    private var cachedDefaultOpenTab by mutableStateOf(NavigationTab.HOME)
+    private var cachedPauseSearchHistory by mutableStateOf(false)
+    private var cachedPauseListenHistory by mutableStateOf(false)
+    private var cachedSlimNavBar by mutableStateOf(false)
+    private var cachedUseNewMiniPlayerDesign by mutableStateOf(true)
+    private var cachedListenTogetherInTopBar by mutableStateOf(true)
+    private var cachedListenTogetherUsername by mutableStateOf("")
+    private var cachedSwipeToSong by mutableStateOf(false)
+    
+    private val themeColorCache = mutableMapOf<String, Color>()
+
     private var isServiceBound = false
 
     private val serviceConnection =
@@ -370,22 +400,123 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Pre-cache settings to avoid runBlocking/first() in composition
+        lifecycleScope.launch(Dispatchers.IO) {
+            val settings = dataStore.data.first()
+            val language = settings[AppLanguageKey] ?: SYSTEM_DEFAULT
+            val disableScreenshot = settings[DisableScreenshotKey] ?: false
+            val checkForUpdates = settings[CheckForUpdatesKey] ?: true
+            val updateNotifs = settings[UpdateNotificationsEnabledKey] ?: true
+            val dynamicTheme = settings[DynamicThemeKey] ?: true
+            val highRefresh = settings[EnableHighRefreshRateKey] ?: true
+            val darkMode = settings[DarkModeKey]?.toEnum(DarkMode.AUTO) ?: DarkMode.AUTO
+            val pureBlack = settings[PureBlackKey] ?: false
+            val themeColorInt = settings[SelectedThemeColorKey] ?: DefaultThemeColor.toArgb()
+            val lastVersion = settings[LastSeenVersionKey] ?: ""
+            val migrationDone = settings[SimpMusicMigrationDoneKey] ?: false
+            val lyricsOrder = settings[LyricsProviderOrderKey] ?: ""
+            val prefLyrics = settings[PreferredLyricsProviderKey] ?: PreferredLyricsProvider.LRCLIB.name
+            val defTab = settings[DefaultOpenTabKey]?.toEnum(NavigationTab.HOME) ?: NavigationTab.HOME
+            val pauseSearch = settings[PauseSearchHistoryKey] ?: false
+            val pauseListen = settings[PauseListenHistoryKey] ?: false
+            val slimNav = settings[SlimNavBarKey] ?: false
+            val newMini = settings[UseNewMiniPlayerDesignKey] ?: true
+            val listenTop = settings[ListenTogetherInTopBarKey] ?: true
+            val listenUser = settings[ListenTogetherUsernameKey] ?: ""
+            val swipeSong = settings[SwipeToSongKey] ?: false
+
+            withContext(Dispatchers.Main) {
+                cachedAppLanguage = language
+                cachedDisableScreenshot = disableScreenshot
+                cachedCheckForUpdates = checkForUpdates
+                cachedUpdateNotificationsEnabled = updateNotifs
+                cachedDynamicTheme = dynamicTheme
+                cachedEnableHighRefreshRate = highRefresh
+                cachedDarkMode = darkMode
+                cachedPureBlack = pureBlack
+                cachedSelectedThemeColor = themeColorInt
+                cachedLastSeenVersion = lastVersion
+                cachedSimpMusicMigrationDone = migrationDone
+                cachedLyricsProviderOrder = lyricsOrder
+                cachedPreferredLyricsProvider = prefLyrics
+                cachedDefaultOpenTab = defTab
+                cachedPauseSearchHistory = pauseSearch
+                cachedPauseListenHistory = pauseListen
+                cachedSlimNavBar = slimNav
+                cachedUseNewMiniPlayerDesign = newMini
+                cachedListenTogetherInTopBar = listenTop
+                cachedListenTogetherUsername = listenUser
+                cachedSwipeToSong = swipeSong
+
+                // Re-apply locale if it was cached (for Android < 13)
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                    val locale = if (cachedAppLanguage == SYSTEM_DEFAULT) Locale.getDefault() else Locale.forLanguageTag(cachedAppLanguage)
+                    setAppLocale(this@MainActivity, locale)
+                }
+            }
+
+            // Sync with updates
+            dataStore.data.collect { prefs ->
+                val language = prefs[AppLanguageKey] ?: SYSTEM_DEFAULT
+                val disableScreenshot = prefs[DisableScreenshotKey] ?: false
+                val checkForUpdates = prefs[CheckForUpdatesKey] ?: true
+                val updateNotifs = prefs[UpdateNotificationsEnabledKey] ?: true
+                val dynamicTheme = prefs[DynamicThemeKey] ?: true
+                val highRefresh = prefs[EnableHighRefreshRateKey] ?: true
+                val darkMode = prefs[DarkModeKey]?.toEnum(DarkMode.AUTO) ?: DarkMode.AUTO
+                val pureBlack = prefs[PureBlackKey] ?: false
+                val themeColorInt = prefs[SelectedThemeColorKey] ?: DefaultThemeColor.toArgb()
+                val lastVersion = prefs[LastSeenVersionKey] ?: ""
+                val migrationDone = prefs[SimpMusicMigrationDoneKey] ?: false
+                val lyricsOrder = prefs[LyricsProviderOrderKey] ?: ""
+                val prefLyrics = prefs[PreferredLyricsProviderKey] ?: PreferredLyricsProvider.LRCLIB.name
+                val defTab = prefs[DefaultOpenTabKey]?.toEnum(NavigationTab.HOME) ?: NavigationTab.HOME
+                val pauseSearch = prefs[PauseSearchHistoryKey] ?: false
+                val pauseListen = prefs[PauseListenHistoryKey] ?: false
+                val slimNav = prefs[SlimNavBarKey] ?: false
+                val newMini = prefs[UseNewMiniPlayerDesignKey] ?: true
+                val listenTop = prefs[ListenTogetherInTopBarKey] ?: true
+                val listenUser = prefs[ListenTogetherUsernameKey] ?: ""
+                val swipeSong = prefs[SwipeToSongKey] ?: false
+
+                withContext(Dispatchers.Main) {
+                    cachedAppLanguage = language
+                    cachedDisableScreenshot = disableScreenshot
+                    cachedCheckForUpdates = checkForUpdates
+                    cachedUpdateNotificationsEnabled = updateNotifs
+                    cachedDynamicTheme = dynamicTheme
+                    cachedEnableHighRefreshRate = highRefresh
+                    cachedDarkMode = darkMode
+                    cachedPureBlack = pureBlack
+                    cachedSelectedThemeColor = themeColorInt
+                    cachedLastSeenVersion = lastVersion
+                    cachedSimpMusicMigrationDone = migrationDone
+                    cachedLyricsProviderOrder = lyricsOrder
+                    cachedPreferredLyricsProvider = prefLyrics
+                    cachedDefaultOpenTab = defTab
+                    cachedPauseSearchHistory = pauseSearch
+                    cachedPauseListenHistory = pauseListen
+                    cachedSlimNavBar = slimNav
+                    cachedUseNewMiniPlayerDesign = newMini
+                    cachedListenTogetherInTopBar = listenTop
+                    cachedListenTogetherUsername = listenUser
+                    cachedSwipeToSong = swipeSong
+                }
+            }
+        }
+
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         // Initialize Listen Together manager
-        listenTogetherManager.initialize()
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            val locale =
-                dataStore[AppLanguageKey]
-                    ?.takeUnless { it == SYSTEM_DEFAULT }
-                    ?.let { Locale.forLanguageTag(it) }
-                    ?: Locale.getDefault()
-            setAppLocale(this, locale)
+        lifecycleScope.launch(Dispatchers.IO) {
+            listenTogetherManager.initialize()
         }
 
         lifecycleScope.launch {
+            // Observe changes and update window flags
+            // Using a flow to ensure we react to changes during activity lifetime
             dataStore.data
                 .map { it[DisableScreenshotKey] ?: false }
                 .distinctUntilChanged()
@@ -424,14 +555,14 @@ class MainActivity : ComponentActivity() {
         downloadUtil: DownloadUtil,
         syncUtils: SyncUtils,
     ) {
-        val checkForUpdates by rememberPreference(CheckForUpdatesKey, defaultValue = true)
+        val checkForUpdates = cachedCheckForUpdates
 
         if (BuildConfig.UPDATER_AVAILABLE) {
             LaunchedEffect(checkForUpdates) {
                 if (checkForUpdates) {
                     withContext(Dispatchers.IO) {
-                        val updatesEnabled = dataStore.get(CheckForUpdatesKey, true)
-                        val notifEnabled = dataStore.get(UpdateNotificationsEnabledKey, true)
+                        val updatesEnabled = cachedCheckForUpdates
+                        val notifEnabled = cachedUpdateNotificationsEnabled
                         if (!updatesEnabled) return@withContext
 
                         Updater.checkForUpdate().onSuccess { (releaseInfo, hasUpdate) ->
@@ -474,8 +605,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
-        val enableHighRefreshRate by rememberPreference(EnableHighRefreshRateKey, defaultValue = true)
+        val enableDynamicTheme = cachedDynamicTheme
+        val enableHighRefreshRate = cachedEnableHighRefreshRate
 
         LaunchedEffect(enableHighRefreshRate) {
             val window = this@MainActivity.window
@@ -505,7 +636,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+        val darkTheme = cachedDarkMode
         val isSystemInDarkTheme = isSystemInDarkTheme()
         val useDarkTheme =
             remember(darkTheme, isSystemInDarkTheme) {
@@ -516,13 +647,13 @@ class MainActivity : ComponentActivity() {
             setSystemBarAppearance(useDarkTheme)
         }
 
-        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val pureBlackEnabled = cachedPureBlack
         val pureBlack =
             remember(pureBlackEnabled, useDarkTheme) {
                 pureBlackEnabled && useDarkTheme
             }
 
-        val (selectedThemeColorInt) = rememberPreference(SelectedThemeColorKey, defaultValue = DefaultThemeColor.toArgb())
+        val selectedThemeColorInt = cachedSelectedThemeColor
         val selectedThemeColor = Color(selectedThemeColorInt)
 
         val showChangelog = rememberSaveable { mutableStateOf(false) }
@@ -546,25 +677,39 @@ class MainActivity : ComponentActivity() {
 
             playerConnection.service.currentMediaMetadata.collectLatest { song ->
                 if (song?.thumbnailUrl != null) {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val result =
-                                imageLoader.execute(
-                                    ImageRequest
-                                        .Builder(this@MainActivity)
-                                        .data(song.thumbnailUrl)
-                                        .allowHardware(false)
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .networkCachePolicy(CachePolicy.ENABLED)
-                                        .crossfade(false)
-                                        .build(),
-                                )
-                            themeColor = result.image?.toBitmap()?.extractThemeColor() ?: selectedThemeColor
-                        } catch (e: Exception) {
-                            // Fallback to default on error
-                            themeColor = selectedThemeColor
+                    // Small delay to prevent theme thrashing during rapid skips
+                    delay(500)
+
+                    val cached = themeColorCache[song.thumbnailUrl]
+                    if (cached != null) {
+                        themeColor = cached
+                        return@collectLatest
+                    }
+
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            imageLoader.execute(
+                                ImageRequest.Builder(this@MainActivity)
+                                    .data(song.thumbnailUrl)
+                                    .size(128, 128) // Smaller size is enough for color extraction
+                                    .allowHardware(false)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .crossfade(false)
+                                    .build()
+                            )
                         }
+                        
+                        val bitmap = result.image?.toBitmap()
+                        if (bitmap != null) {
+                            val extracted = withContext(Dispatchers.Default) {
+                                bitmap.extractThemeColor()
+                            }
+                            themeColorCache[song.thumbnailUrl] = extracted
+                            themeColor = extracted
+                        }
+                    } catch (e: Exception) {
+                        themeColor = selectedThemeColor
                     }
                 } else {
                     themeColor = selectedThemeColor
@@ -593,17 +738,17 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
 
                 LaunchedEffect(Unit) {
-                    val lastSeenVersion = dataStore.data.first()[LastSeenVersionKey] ?: ""
+                    val lastSeenVersion = cachedLastSeenVersion
                     val currentVersion = BuildConfig.VERSION_NAME
                     if (lastSeenVersion != currentVersion) {
                         showChangelog.value = true
                     }
 
                     // SimpMusic Removal Migration
-                    if (dataStore.data.first()[SimpMusicMigrationDoneKey] != true) {
+                    if (!cachedSimpMusicMigrationDone) {
                         dataStore.edit { settings ->
                             // Remove SimpMusic from serialized order string and append Paxsenix if missing
-                            val currentOrder = settings[LyricsProviderOrderKey] ?: ""
+                            val currentOrder = cachedLyricsProviderOrder
                             if (currentOrder.contains("SimpMusic") || !currentOrder.contains("Paxsenix")) {
                                 val orderList = currentOrder.split(",")
                                     .map { it.trim() }
@@ -636,7 +781,7 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val (previousTab, setPreviousTab) = rememberSaveable { mutableStateOf("home") }
 
-                val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
+                val listenTogetherInTopBar = cachedListenTogetherInTopBar
                 val navigationItems =
                     remember(listenTogetherInTopBar) {
                         if (listenTogetherInTopBar) {
@@ -645,12 +790,9 @@ class MainActivity : ComponentActivity() {
                             Screens.MainScreens
                         }
                     }
-                val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
-                val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
-                val defaultOpenTab =
-                    remember {
-                        dataStore[DefaultOpenTabKey].toEnum(defaultValue = NavigationTab.HOME)
-                    }
+                val slimNav = cachedSlimNavBar
+                val useNewMiniPlayerDesign = cachedUseNewMiniPlayerDesign
+                val defaultOpenTab = cachedDefaultOpenTab
                 val tabOpenedFromShortcut =
                     remember {
                         when (intent?.action) {
@@ -681,7 +823,7 @@ class MainActivity : ComponentActivity() {
                             if (searchQuery.isNotEmpty()) {
                                 navController.navigate("search/${URLEncoder.encode(searchQuery, "UTF-8")}")
 
-                                if (dataStore[PauseSearchHistoryKey] != true) {
+                                if (!cachedPauseSearchHistory) {
                                     lifecycleScope.launch(Dispatchers.IO) {
                                         database.query {
                                             insert(SearchHistory(query = searchQuery))
@@ -895,7 +1037,7 @@ class MainActivity : ComponentActivity() {
 
                 var showAccountDialog by remember { mutableStateOf(false) }
 
-                val pauseListenHistory by rememberPreference(PauseListenHistoryKey, defaultValue = false)
+                val pauseListenHistory = cachedPauseListenHistory
                 val eventCount by database.eventCount().collectAsStateWithLifecycle(initialValue = 0)
                 val showHistoryButton =
                     remember(pauseListenHistory, eventCount) {
@@ -913,6 +1055,7 @@ class MainActivity : ComponentActivity() {
                     LocalShimmerTheme provides ShimmerTheme,
                     LocalSyncUtils provides syncUtils,
                     LocalListenTogetherManager provides listenTogetherManager,
+                    LocalSwipeToSong provides cachedSwipeToSong,
                     LocalChangelogState provides showChangelog,
                 ) {
                     if (showChangelog.value) {
@@ -1369,7 +1512,7 @@ class MainActivity : ComponentActivity() {
                 ?: uri.pathSegments.getOrNull(1)
         val isListenLink = uri.pathSegments.firstOrNull() == "listen" || uri.host?.equals("listen", ignoreCase = true) == true
         if (!listenCode.isNullOrBlank() && isListenLink) {
-            val username = dataStore.get(ListenTogetherUsernameKey, "").ifBlank { "Guest" }
+            val username = cachedListenTogetherUsername.ifBlank { "Guest" }
             listenTogetherManager.joinRoom(listenCode, username)
             return
         }
@@ -1484,5 +1627,6 @@ val LocalPlayerAwareWindowInsets = compositionLocalOf<WindowInsets> { error("No 
 val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No DownloadUtil provided") }
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
 val LocalListenTogetherManager = staticCompositionLocalOf<com.metrolist.music.listentogether.ListenTogetherManager?> { null }
+val LocalSwipeToSong = compositionLocalOf { false }
 val LocalChangelogState = staticCompositionLocalOf<MutableState<Boolean>> { error("No LocalChangelogState provided") }
 val LocalIsPlayerExpanded = compositionLocalOf { false }

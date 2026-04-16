@@ -22,6 +22,8 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     private var channelCount = 0
     private var encoding = C.ENCODING_INVALID
     private var isActive = false
+    
+    @Volatile
     private var equalizerEnabled = false
 
     private var inputBuffer: ByteBuffer = EMPTY_BUFFER
@@ -30,7 +32,12 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
 
     private var filters: List<BiquadFilter> = emptyList()
     private var preampGain: Double = 1.0  // Linear preamp gain multiplier
-    private var pendingProfile: ParametricEQ? = null
+    
+    @Volatile
+    private var nextProfile: ParametricEQ? = null
+    
+    @Volatile
+    private var shouldDisable = false
 
     companion object {
         private const val TAG = "CustomEqualizerAudioProcessor"
@@ -38,41 +45,19 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     }
 
     /**
-     * Apply an EQ profile
+     * Apply an EQ profile. This is now non-blocking.
      */
-    @Synchronized
     fun applyProfile(parametricEQ: ParametricEQ) {
-        if (sampleRate == 0) {
-            // Audio processor not configured yet, store as pending
-            Timber.tag(TAG)
-                .d("Audio processor not configured yet. Storing profile as pending with ${parametricEQ.bands.size} bands")
-            pendingProfile = parametricEQ
-            return
-        }
-
-        // Convert preamp from dB to linear gain
-        preampGain = 10.0.pow(parametricEQ.preamp / 20.0)
-
-        createFilters(parametricEQ.bands)
-        equalizerEnabled = true
-
-        // Reset filter states to ensure clean transition
-        filters.forEach { it.reset() }
-
-        Timber.tag(TAG)
-            .d("Applied EQ profile with ${filters.size} bands and ${parametricEQ.preamp} dB preamp")
+        nextProfile = parametricEQ
+        shouldDisable = false
     }
 
     /**
-     * Disable the equalizer
+     * Disable the equalizer. This is now non-blocking.
      */
-    @Synchronized
     fun disable() {
-        equalizerEnabled = false
-        filters = emptyList()
-        preampGain = 1.0
-        pendingProfile = null
-        Timber.tag(TAG).d("Equalizer disabled")
+        shouldDisable = true
+        nextProfile = null
     }
 
     /**
@@ -108,6 +93,28 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
             .d("Created ${filters.size} biquad filters from ${bands.size} bands (PK/LSC/HSC)")
     }
 
+    private fun checkPendingUpdates() {
+        if (shouldDisable) {
+            equalizerEnabled = false
+            filters = emptyList()
+            preampGain = 1.0
+            shouldDisable = false
+            nextProfile = null
+            Timber.tag(TAG).d("Equalizer disabled on audio thread")
+            return
+        }
+
+        val profile = nextProfile
+        if (profile != null && sampleRate != 0) {
+            preampGain = 10.0.pow(profile.preamp / 20.0)
+            createFilters(profile.bands)
+            equalizerEnabled = true
+            filters.forEach { it.reset() }
+            nextProfile = null
+            Timber.tag(TAG).d("Applied new EQ profile on audio thread: ${filters.size} filters")
+        }
+    }
+
     override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         sampleRate = inputAudioFormat.sampleRate
         channelCount = inputAudioFormat.channelCount
@@ -116,20 +123,20 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
         Timber.tag(TAG)
             .d("Configured: sampleRate=$sampleRate, channels=$channelCount, encoding=$encoding")
 
+        // Only support 16-bit PCM stereo/mono
+        if (encoding != C.ENCODING_PCM_16BIT || channelCount > 2) {
+            throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        }
+
         // Apply pending profile if one exists
-        pendingProfile?.let { profile ->
+        val profile = nextProfile
+        if (profile != null) {
             preampGain = 10.0.pow(profile.preamp / 20.0)
             createFilters(profile.bands)
             equalizerEnabled = true
-            pendingProfile = null
+            nextProfile = null
             Timber.tag(TAG)
-                .d("Applied pending profile with ${filters.size} bands and ${profile.preamp} dB preamp")
-        }
-
-        // Only support 16-bit PCM stereo/mono
-        if (encoding != C.ENCODING_PCM_16BIT || channelCount > 2) {
-            val exception = AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
-            throw exception // Rethrow, unsupported
+                .d("Applied pending profile during configuration: ${filters.size} filters")
         }
 
         isActive = true
@@ -139,6 +146,8 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     override fun isActive(): Boolean = isActive
 
     override fun queueInput(inputBuffer: ByteBuffer) {
+        checkPendingUpdates()
+        
         if (!equalizerEnabled || filters.isEmpty()) {
             // Passthrough mode - directly use input as output
             val remaining = inputBuffer.remaining()

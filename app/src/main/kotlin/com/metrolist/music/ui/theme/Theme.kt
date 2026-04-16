@@ -10,12 +10,18 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -25,6 +31,10 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import com.materialkolor.score.Score
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+import com.materialkolor.dynamicColorScheme
 
 val DefaultThemeColor = Color(0xFFED5564)
 
@@ -36,25 +46,36 @@ fun MetrolistTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    // Determine if system dynamic colors should be used (Android S+ and default theme color)
     val useSystemDynamicColor = (themeColor == DefaultThemeColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
 
-    // Select the appropriate color scheme generation method
-    val baseColorScheme = if (useSystemDynamicColor) {
-        // Use standard Material 3 dynamic color functions for system wallpaper colors
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else {
-        // Use materialKolor only when a specific seed color is provided
-        rememberDynamicColorScheme(
-            seedColor = themeColor, // themeColor is guaranteed non-default here
-            isDark = darkTheme,
-            specVersion = ColorSpec.SpecVersion.SPEC_2025,
-            style = PaletteStyle.TonalSpot // Keep existing style
-        )
+    // Initial scheme so we have something to render immediately
+    val initialScheme = remember(darkTheme, useSystemDynamicColor) {
+        if (useSystemDynamicColor) {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else {
+            // Fast fallback before async computation finishes
+            if (darkTheme) darkColorScheme() else lightColorScheme()
+        }
     }
 
-    // Apply pureBlack modification if needed, similar to original logic
-    val colorScheme = remember(baseColorScheme, pureBlack, darkTheme) {
+    var baseColorScheme by remember { mutableStateOf(initialScheme) }
+
+    LaunchedEffect(themeColor, darkTheme, useSystemDynamicColor) {
+        if (useSystemDynamicColor) {
+            baseColorScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else {
+            withContext(Dispatchers.Default) {
+                baseColorScheme = dynamicColorScheme(
+                    seedColor = themeColor,
+                    isDark = darkTheme,
+                    style = PaletteStyle.TonalSpot,
+                    specVersion = ColorSpec.SpecVersion.SPEC_2025
+                )
+            }
+        }
+    }
+
+    val finalColorScheme = remember(baseColorScheme, pureBlack, darkTheme) {
         if (darkTheme && pureBlack) {
             baseColorScheme.pureBlack(true)
         } else {
@@ -62,10 +83,9 @@ fun MetrolistTheme(
         }
     }
 
-    // Use standard MaterialTheme instead of MaterialExpressiveTheme
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography, // Use the defined AppTypography
+        colorScheme = finalColorScheme,
+        typography = AppTypography,
         content = content
     )
 }

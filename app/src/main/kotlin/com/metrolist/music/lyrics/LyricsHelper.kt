@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -131,7 +132,12 @@ constructor(
 
         val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
-            val enabledProviders = lyricsProviders.filter { it.isEnabled(context) }
+            val enabledProviders = lyricsProviders.map { 
+                async { it to it.isEnabled(context) } 
+            }.awaitAll()
+                .filter { it.second }
+                .map { it.first }
+            
             val perProviderTimeout = MAX_LYRICS_FETCH_MS / enabledProviders.size.coerceAtLeast(1)
 
             for (provider in enabledProviders) {
@@ -208,19 +214,24 @@ constructor(
         val allResult = mutableListOf<LyricsResult>()
         currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(songTitle)
-            lyricsProviders.forEach { provider ->
-                if (provider.isEnabled(context)) {
-                    try {
-                        provider.getAllLyrics(context, mediaId, cleanedTitle, songArtists, duration, album) { lyrics ->
-                            val filteredLyrics = LyricsUtils.filterLyricsCreditLines(lyrics)
-                            val result = LyricsResult(provider.name, filteredLyrics)
-                            allResult += result
-                            callback(result)
-                        }
-                    } catch (e: Exception) {
-                        // Catch network-related exceptions like UnresolvedAddressException
-                        reportException(e)
+            
+            val enabledProviders = lyricsProviders.map { 
+                async { it to it.isEnabled(context) } 
+            }.awaitAll()
+                .filter { it.second }
+                .map { it.first }
+
+            enabledProviders.forEach { provider ->
+                try {
+                    provider.getAllLyrics(context, mediaId, cleanedTitle, songArtists, duration, album) { lyrics ->
+                        val filteredLyrics = LyricsUtils.filterLyricsCreditLines(lyrics)
+                        val result = LyricsResult(provider.name, filteredLyrics)
+                        allResult += result
+                        callback(result)
                     }
+                } catch (e: Exception) {
+                    // Catch network-related exceptions like UnresolvedAddressException
+                    reportException(e)
                 }
             }
             cache.put(cacheKey, allResult)

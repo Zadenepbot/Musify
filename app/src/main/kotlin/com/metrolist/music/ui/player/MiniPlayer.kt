@@ -242,14 +242,20 @@ private fun NewMiniPlayer(
         }
 
     LaunchedEffect(mediaMetadata?.id, miniPlayerBackground) {
-        gradientColors = emptyList()
         if (miniPlayerBackground == MiniPlayerBackgroundStyle.GRADIENT) {
             val url = mediaMetadata?.thumbnailUrl
-            if (url != null) {
+            val id = mediaMetadata?.id
+            if (url != null && id != null) {
+                val cached = PlayerColorExtractor.getCachedColors(id)
+                if (cached != null) {
+                    gradientColors = cached
+                    return@LaunchedEffect
+                }
+
                 withContext(Dispatchers.IO) {
                     val request = ImageRequest.Builder(context)
                         .data(url)
-                        .size(100, 100)
+                        .size(128, 128)
                         .allowHardware(false)
                         .build()
                     val result = runCatching { context.imageLoader.execute(request) }.getOrNull()
@@ -258,13 +264,14 @@ private fun NewMiniPlayer(
                         val palette = withContext(Dispatchers.Default) {
                             Palette.from(bitmap)
                                 .maximumColorCount(8)
-                                .resizeBitmapArea(100 * 100)
+                                .resizeBitmapArea(128 * 128)
                                 .generate()
                         }
                         val extracted = PlayerColorExtractor.extractGradientColors(
                             palette = palette,
                             fallbackColor = 0xFF000000.toInt(),
                         )
+                        PlayerColorExtractor.putColors(id, extracted)
                         withContext(Dispatchers.Main) {
                             gradientColors = extracted
                         }
@@ -274,6 +281,8 @@ private fun NewMiniPlayer(
                         }
                     }
                 }
+            } else {
+                gradientColors = emptyList()
             }
         } else {
             gradientColors = emptyList()

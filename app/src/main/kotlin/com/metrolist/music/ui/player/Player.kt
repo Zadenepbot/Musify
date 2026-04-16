@@ -92,6 +92,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -375,7 +376,6 @@ fun BottomSheetPlayer(
     var gradientColors by remember {
         mutableStateOf<List<Color>>(emptyList())
     }
-    val gradientColorsCache = remember { mutableMapOf<String, List<Color>>() }
 
     if (!canSkipNext && automix.isNotEmpty()) {
         playerConnection.service.addToQueueAutomix(automix[0], 0)
@@ -388,7 +388,7 @@ fun BottomSheetPlayer(
         if (playerBackground == PlayerBackgroundStyle.GRADIENT) {
             val currentMetadata = mediaMetadata
             if (currentMetadata != null && currentMetadata.thumbnailUrl != null) {
-                val cachedColors = gradientColorsCache[currentMetadata.id]
+                val cachedColors = PlayerColorExtractor.getCachedColors(currentMetadata.id)
                 if (cachedColors != null) {
                     gradientColors = cachedColors
                     return@LaunchedEffect
@@ -398,31 +398,29 @@ fun BottomSheetPlayer(
                         ImageRequest
                             .Builder(context)
                             .data(currentMetadata.thumbnailUrl)
-                            .size(100, 100)
+                            .size(128, 128)
                             .allowHardware(false)
                             .memoryCacheKey("gradient_${currentMetadata.id}")
                             .build()
 
                     val result = runCatching { context.imageLoader.execute(request) }.getOrNull()
-                    if (result != null) {
-                        val bitmap = result.image?.toBitmap()
-                        if (bitmap != null) {
-                            val palette =
-                                withContext(Dispatchers.Default) {
-                                    Palette
-                                        .from(bitmap)
-                                        .maximumColorCount(8)
-                                        .resizeBitmapArea(100 * 100)
-                                        .generate()
-                                }
-                            val extractedColors =
-                                PlayerColorExtractor.extractGradientColors(
-                                    palette = palette,
-                                    fallbackColor = fallbackColor,
-                                )
-                            gradientColorsCache[currentMetadata.id] = extractedColors
-                            withContext(Dispatchers.Main) { gradientColors = extractedColors }
-                        }
+                    val bitmap = result?.image?.toBitmap()
+                    if (bitmap != null) {
+                        val palette =
+                            withContext(Dispatchers.Default) {
+                                Palette
+                                    .from(bitmap)
+                                    .maximumColorCount(8)
+                                    .resizeBitmapArea(128 * 128)
+                                    .generate()
+                            }
+                        val extractedColors =
+                            PlayerColorExtractor.extractGradientColors(
+                                palette = palette,
+                                fallbackColor = fallbackColor,
+                            )
+                        PlayerColorExtractor.putColors(currentMetadata.id, extractedColors)
+                        withContext(Dispatchers.Main) { gradientColors = extractedColors }
                     }
                 }
             }
@@ -778,8 +776,6 @@ fun BottomSheetPlayer(
             }
         }
 
-    val backgroundAlpha = state.progress.coerceIn(0f, 1f)
-
     BottomSheet(
         state = state,
         modifier = modifier,
@@ -800,7 +796,7 @@ fun BottomSheetPlayer(
                             label = "blurBackground",
                         ) { thumbnailUrl ->
                             if (thumbnailUrl != null) {
-                                Box(modifier = Modifier.alpha(backgroundAlpha)) {
+                                Box(modifier = Modifier.graphicsLayer { alpha = state.progress.coerceIn(0f, 1f) }) {
                                     AsyncImage(
                                         model =
                                             ImageRequest
@@ -853,7 +849,7 @@ fun BottomSheetPlayer(
                                 Box(
                                     Modifier
                                         .fillMaxSize()
-                                        .alpha(backgroundAlpha)
+                                        .graphicsLayer { alpha = state.progress.coerceIn(0f, 1f) }
                                         .background(Brush.verticalGradient(colorStops = gradientColorStops))
                                         .background(Color.Black.copy(alpha = 0.2f)),
                                 )

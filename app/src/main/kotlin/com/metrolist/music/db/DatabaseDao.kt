@@ -600,6 +600,9 @@ interface DatabaseDao {
     @Query("SELECT count from playCount WHERE song = :songId AND year = :year AND month = :month")
     fun getPlayCountByMonth(songId: String?, year: Int, month: Int): Flow<Int>
 
+    @Query("SELECT count from playCount WHERE song = :songId AND year = :year AND month = :month")
+    suspend fun getPlayCountByMonthSuspend(songId: String?, year: Int, month: Int): Int?
+
     @Transaction
     @Query(
         """
@@ -1489,12 +1492,9 @@ interface DatabaseDao {
     /**
      * Increment by one the play count with today's year and month.
      */
-    fun incrementPlayCount(songId: String) {
+    suspend fun incrementPlayCount(songId: String) {
         val time = LocalDateTime.now().atOffset(ZoneOffset.UTC)
-        var oldCount: Int
-        runBlocking {
-            oldCount = getPlayCountByMonth(songId, time.year, time.monthValue).first()
-        }
+        val oldCount = getPlayCountByMonthSuspend(songId, time.year, time.monthValue) ?: 0
 
         // add new
         if (oldCount <= 0) {
@@ -1888,6 +1888,10 @@ interface DatabaseDao {
     fun raw(supportSQLiteQuery: SupportSQLiteQuery): Int
 
     fun checkpoint() {
+        raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
+    }
+
+    suspend fun checkpointSuspend() {
         raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
     }
 

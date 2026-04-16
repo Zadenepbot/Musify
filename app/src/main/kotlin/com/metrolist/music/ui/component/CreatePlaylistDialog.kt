@@ -115,23 +115,31 @@ fun CreatePlaylistDialog(
                         Switch(
                             checked = syncedPlaylist,
                             onCheckedChange = {
-                                val isYtmSyncEnabled = context.isSyncEnabled()
-                                if (!isSignedIn && !syncedPlaylist) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            notLoggedInYoutubeStr,
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                } else if (!isYtmSyncEnabled) {
-                                    Toast
-                                        .makeText(
-                                            context,
-                                            syncDisabledStr,
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                } else {
-                                    syncedPlaylist = !syncedPlaylist
+                                coroutineScope.launch {
+                                    val isYtmSyncEnabled = context.isSyncEnabled()
+                                    if (!isSignedIn && !syncedPlaylist) {
+                                        withContext(Dispatchers.Main) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    notLoggedInYoutubeStr,
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        return@launch
+                                    }
+                                    if (!isYtmSyncEnabled && !syncedPlaylist) {
+                                        withContext(Dispatchers.Main) {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    syncDisabledStr,
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        return@launch
+                                    }
+                                    syncedPlaylist = it
                                 }
                             },
                         )

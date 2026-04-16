@@ -96,6 +96,7 @@ import com.metrolist.innertube.models.YTItem
 import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalDownloadUtil
 import com.metrolist.music.LocalPlayerConnection
+import com.metrolist.music.LocalSwipeToSong
 import com.metrolist.music.R
 import com.metrolist.music.constants.CropAlbumArtKey
 import com.metrolist.music.constants.GridItemSize
@@ -121,6 +122,7 @@ import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.utils.reportException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -399,7 +401,7 @@ fun SongListItem(
     isSwipeable: Boolean = true,
     trailingContent: @Composable RowScope.() -> Unit = {},
 ) {
-    val swipeEnabled by rememberPreference(SwipeToSongKey, defaultValue = false)
+    val swipeEnabled = LocalSwipeToSong.current
 
     val content: @Composable () -> Unit = {
         ListItem(
@@ -586,25 +588,21 @@ fun AlbumListItem(
         val database = LocalDatabase.current
 
         val songs by produceState<List<Song>>(initialValue = emptyList(), album.id) {
-            withContext(Dispatchers.IO) {
-                value = database.albumSongs(album.id).first()
-            }
+            database.albumSongs(album.id).collectLatest { value = it }
         }
 
         val allDownloads by downloadUtil.downloads.collectAsStateWithLifecycle()
 
-        val downloadState by remember(songs, allDownloads) {
-            androidx.compose.runtime.mutableIntStateOf(
-                if (songs.isEmpty()) {
-                    Download.STATE_STOPPED
-                } else {
-                    when {
-                        songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                        songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
-                        else -> Download.STATE_STOPPED
-                    }
+        val downloadState = remember(songs, allDownloads) {
+            if (songs.isEmpty()) {
+                Download.STATE_STOPPED
+            } else {
+                when {
+                    songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
+                    songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
+                    else -> Download.STATE_STOPPED
                 }
-            )
+            }
         }
 
         if (showLikedIcon && album.album.bookmarkedAt != null) {
@@ -649,25 +647,21 @@ fun AlbumGridItem(
         val database = LocalDatabase.current
 
         val songs by produceState<List<Song>>(initialValue = emptyList(), album.id) {
-            withContext(Dispatchers.IO) {
-                value = database.albumSongs(album.id).first()
-            }
+            database.albumSongs(album.id).collectLatest { value = it }
         }
 
         val allDownloads by downloadUtil.downloads.collectAsStateWithLifecycle()
 
-        val downloadState by remember(songs, allDownloads) {
-            androidx.compose.runtime.mutableIntStateOf(
-                if (songs.isEmpty()) {
-                    Download.STATE_STOPPED
-                } else {
-                    when {
-                        songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                        songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
-                        else -> Download.STATE_STOPPED
-                    }
+        val downloadState = remember(songs, allDownloads) {
+            if (songs.isEmpty()) {
+                Download.STATE_STOPPED
+            } else {
+                when {
+                    songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
+                    songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
+                    else -> Download.STATE_STOPPED
                 }
-            )
+            }
         }
 
         if (album.album.bookmarkedAt != null) {
@@ -742,25 +736,23 @@ fun PlaylistListItem(
         val database = LocalDatabase.current
 
         val songs by produceState<List<Song>>(initialValue = emptyList(), playlist.id) {
-            withContext(Dispatchers.IO) {
-                value = database.playlistSongs(playlist.id).first().map { it.song }
+            database.playlistSongs(playlist.id).collectLatest { list: List<com.metrolist.music.db.entities.PlaylistSong> -> 
+                value = list.map { item -> item.song } 
             }
         }
 
         val allDownloads by downloadUtil.downloads.collectAsStateWithLifecycle()
 
-        val downloadState by remember(songs, allDownloads) {
-            androidx.compose.runtime.mutableIntStateOf(
-                if (songs.isEmpty()) {
-                    Download.STATE_STOPPED
-                } else {
-                    when {
-                        songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                        songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
-                        else -> Download.STATE_STOPPED
-                    }
+        val downloadState = remember(songs, allDownloads) {
+            if (songs.isEmpty()) {
+                Download.STATE_STOPPED
+            } else {
+                when {
+                    songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
+                    songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
+                    else -> Download.STATE_STOPPED
                 }
-            )
+            }
         }
 
         Icon.Download(downloadState)
@@ -823,25 +815,23 @@ fun PlaylistGridItem(
         val database = LocalDatabase.current
 
         val songs by produceState<List<Song>>(initialValue = emptyList(), playlist.id) {
-            withContext(Dispatchers.IO) {
-                value = database.playlistSongs(playlist.id).first().map { it.song }
+            database.playlistSongs(playlist.id).collectLatest { list: List<com.metrolist.music.db.entities.PlaylistSong> -> 
+                value = list.map { item -> item.song } 
             }
         }
 
         val allDownloads by downloadUtil.downloads.collectAsStateWithLifecycle()
 
-        val downloadState by remember(songs, allDownloads) {
-            mutableIntStateOf(
-                if (songs.isEmpty()) {
-                    Download.STATE_STOPPED
-                } else {
-                    when {
-                        songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                        songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
-                        else -> Download.STATE_STOPPED
-                    }
+        val downloadState = remember(songs, allDownloads) {
+            if (songs.isEmpty()) {
+                Download.STATE_STOPPED
+            } else {
+                when {
+                    songs.all { allDownloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
+                    songs.any { allDownloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING) } -> STATE_DOWNLOADING
+                    else -> Download.STATE_STOPPED
                 }
-            )
+            }
         }
 
         Icon.Download(downloadState)
@@ -979,10 +969,10 @@ fun YouTubeListItem(
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
         val song by produceState<Song?>(initialValue = null, item.id) {
-            if (item is SongItem) value = database.song(item.id).firstOrNull()
+            if (item is SongItem) database.song(item.id).collectLatest { song: Song? -> value = song }
         }
         val album by produceState<Album?>(initialValue = null, item.id) {
-            if (item is AlbumItem) value = database.album(item.id).firstOrNull()
+            if (item is AlbumItem) database.album(item.id).collectLatest { album: Album? -> value = album }
         }
 
         if ((item is SongItem && song?.song?.liked == true) ||
@@ -1000,7 +990,7 @@ fun YouTubeListItem(
         }
     },
 ) {
-    val swipeEnabled by rememberPreference(SwipeToSongKey, defaultValue = false)
+    val swipeEnabled = LocalSwipeToSong.current
 
     val content: @Composable () -> Unit = {
         ListItem(
@@ -1051,10 +1041,10 @@ fun YouTubeGridItem(
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
         val song by produceState<Song?>(initialValue = null, item.id) {
-            if (item is SongItem) value = database.song(item.id).firstOrNull()
+            if (item is SongItem) database.song(item.id).collectLatest { song: Song? -> value = song }
         }
         val album by produceState<Album?>(initialValue = null, item.id) {
-            if (item is AlbumItem) value = database.album(item.id).firstOrNull()
+            if (item is AlbumItem) database.album(item.id).collectLatest { album: Album? -> value = album }
         }
 
         if (item is SongItem && song?.song?.liked == true ||

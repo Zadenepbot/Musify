@@ -44,6 +44,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
@@ -145,12 +146,15 @@ class SyncUtils @Inject constructor(
         (playlistsBeingModified[playlistId]?.get() ?: 0) > 0 ||
                 pendingRemovals.any { (_, set) -> set.any { it.third == playlistId } }
     init {
-        context.dataStore.data
-            .map { it[LastFMUseSendLikes] ?: false }
-            .distinctUntilChanged()
-            .collectLatest(syncScope) {
-                lastfmSendLikes = it
-            }
+        syncScope.launch {
+            delay(5000) // Defer preference collection to let app startup finish
+            context.dataStore.data
+                .map { it[LastFMUseSendLikes] ?: false }
+                .distinctUntilChanged()
+                .collectLatest {
+                    lastfmSendLikes = it
+                }
+        }
 
         startProcessingQueue()
     }
@@ -259,7 +263,7 @@ class SyncUtils @Inject constructor(
                 return@launch
             }
 
-            val lastSync = context.dataStore.get(LastFullSyncKey, 0L)
+            val lastSync = context.dataStore.data.first()[LastFullSyncKey] ?: 0L
             val currentTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
             if (lastSync > 0 && (currentTime - lastSync) < SYNC_COOLDOWN) {
                 return@launch
@@ -1753,10 +1757,9 @@ class SyncUtils @Inject constructor(
         getSetVideoId: suspend () -> String?
     ) {
         markPlaylistModifying(playlistId)
-        Thread {
-            runBlocking {
-                try {
-                    var setVideoId = getSetVideoId()
+        syncScope.launch {
+            try {
+                var setVideoId = getSetVideoId()
 
                     // setVideoId is only written to DB after first sync.
                     // If not available locally, fetch it directly from YouTube.
@@ -1770,15 +1773,14 @@ class SyncUtils @Inject constructor(
 
                     if (setVideoId == null) {
                         Timber.w("scheduleRemoveFromPlaylist: setVideoId not found on YouTube either, skipping remove for songId=$songId")
-                        return@runBlocking
+                        return@launch
                     }
 
                     removeFromPlaylistAndAwaitSync(browseId, songId, setVideoId, playlistId)
                 } finally {
                     unmarkPlaylistModifying(playlistId)
                 }
-            }
-        }.start()
+        }
     }
 
     fun cancelAllSyncs() {

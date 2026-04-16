@@ -160,13 +160,14 @@ constructor(
         params: MediaLibraryService.LibraryParams?,
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
         scope.future(Dispatchers.IO) {
+            val preferences = context.dataStore.data.first()
+            val hideExplicit = preferences[HideExplicitKey] ?: false
+            val hideVideoSongs = preferences[HideVideoSongsKey] ?: false
+
             LibraryResult.ofItemList(
                 when (parentId) {
                     MusicService.ROOT -> {
-                        val sectionsRaw = context.dataStore.get(
-                            AndroidAutoSectionsOrderKey,
-                            serializeSections(AndroidAutoSection.values().map { it to true })
-                        )
+                        val sectionsRaw = preferences[AndroidAutoSectionsOrderKey] ?: serializeSections(AndroidAutoSection.values().map { it to true })
                         val sections = deserializeSections(sectionsRaw)
                         sections
                             .filter { (_, enabled) -> enabled }
@@ -247,7 +248,7 @@ constructor(
                     MusicService.PLAYLIST -> {
                         val likedSongCount = database.likedSongsCount().first()
                         val downloadedSongCount = downloadUtil.downloads.value.size
-                        val showYoutubePlaylists = context.dataStore.get(AndroidAutoYouTubePlaylistsKey, false)
+                        val showYoutubePlaylists = preferences[AndroidAutoYouTubePlaylistsKey] ?: false
 
                         // Build local playlists immediately
                         val localItems = listOf(
@@ -366,8 +367,8 @@ constructor(
                                 try {
                                     val songs = YouTube.playlist(playlistId).getOrNull()?.songs
                                         ?.take(100)
-                                        ?.filterExplicit(context.dataStore.get(HideExplicitKey, false))
-                                        ?.filterVideoSongs(context.dataStore.get(HideVideoSongsKey, false))
+                                        ?.filterExplicit(hideExplicit)
+                                        ?.filterVideoSongs(hideVideoSongs)
                                         ?: emptyList()
 
                                     // Add shuffle item at the top
@@ -446,6 +447,10 @@ constructor(
                 return@future LibraryResult.ofItemList(emptyList(), params)
             }
 
+            val preferences = context.dataStore.data.first()
+            val hideExplicit = preferences[HideExplicitKey] ?: false
+            val hideVideoSongs = preferences[HideVideoSongsKey] ?: false
+
             try {
                 val searchResults = mutableListOf<MediaItem>()
 
@@ -483,8 +488,8 @@ constructor(
                         .getOrNull()
                         ?.items
                         ?.filterIsInstance<SongItem>()
-                        ?.filterExplicit(context.dataStore.get(HideExplicitKey, false))
-                        ?.filterVideoSongs(context.dataStore.get(HideVideoSongsKey, false))
+                        ?.filterExplicit(hideExplicit)
+                        ?.filterVideoSongs(hideVideoSongs)
                         ?.filter { onlineSong ->
                             !allLocalSongs.any { localSong ->
                                 localSong.id == onlineSong.id ||
@@ -541,6 +546,10 @@ constructor(
         startPositionMs: Long,
     ): ListenableFuture<MediaItemsWithStartPosition> =
         scope.future {
+            val preferences = context.dataStore.data.first()
+            val hideExplicit = preferences[HideExplicitKey] ?: false
+            val hideVideoSongs = preferences[HideVideoSongsKey] ?: false
+
             val defaultResult = MediaItemsWithStartPosition(emptyList(), startIndex, startPositionMs)
             val voiceQuery = mediaItems.firstOrNull()?.requestMetadata?.searchQuery
 
@@ -688,8 +697,8 @@ constructor(
                             .getOrNull()
                             ?.items
                             ?.filterIsInstance<SongItem>()
-                            ?.filterExplicit(context.dataStore.get(HideExplicitKey, false))
-                            ?.filterVideoSongs(context.dataStore.get(HideVideoSongsKey, false))
+                            ?.filterExplicit(hideExplicit)
+                            ?.filterVideoSongs(hideVideoSongs)
                             ?.filter { onlineSong ->
                                 !allLocalSongs.any { localSong ->
                                     localSong.id == onlineSong.id ||
@@ -765,17 +774,6 @@ constructor(
         ).build()
 
     private fun Song.toMediaItem(path: String, isPlayable: Boolean = true, isBrowsable: Boolean = false): MediaItem {
-        val artworkBytes = song.thumbnailUrl?.let { url ->
-            val request = coil3.request.ImageRequest.Builder(context)
-                .data(url)
-                .build()
-            context.imageLoader.enqueue(request)
-
-            context.imageLoader.diskCache?.openSnapshot(url)?.use { snapshot ->
-                snapshot.data.toFile().readBytes()
-            }
-        }
-
         return MediaItem
             .Builder()
             .setMediaId("$path/$id")
@@ -785,7 +783,7 @@ constructor(
                     .setTitle(song.title)
                     .setSubtitle(artists.joinToString { it.name })
                     .setArtist(artists.joinToString { it.name })
-                    .setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_ILLUSTRATION)
+                    .setArtworkUri(song.thumbnailUrl?.toUri())
                     .setIsPlayable(isPlayable)
                     .setIsBrowsable(isBrowsable)
                     .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)

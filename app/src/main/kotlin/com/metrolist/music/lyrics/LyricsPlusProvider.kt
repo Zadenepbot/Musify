@@ -9,6 +9,7 @@ import android.content.Context
 import com.metrolist.music.betterlyrics.TTMLParser
 import com.metrolist.music.constants.EnableLyricsPlus
 import com.metrolist.music.utils.dataStore
+import kotlinx.coroutines.flow.first
 import com.metrolist.music.utils.get
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -155,8 +156,8 @@ object LyricsPlusProvider : LyricsProvider {
         }
     }
 
-    override fun isEnabled(context: Context): Boolean =
-        context.dataStore[EnableLyricsPlus] ?: false
+    override suspend fun isEnabled(context: Context): Boolean =
+        context.dataStore.data.first()[EnableLyricsPlus] ?: false
 
     private suspend fun fetchFromUrl(
         url: String,

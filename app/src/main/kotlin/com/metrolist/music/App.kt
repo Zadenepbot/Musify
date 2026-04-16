@@ -61,6 +61,8 @@ class App :
     @ApplicationScope
     lateinit var applicationScope: CoroutineScope
 
+    private var cachedMaxImageCacheSize: Int = 512
+
     override fun onCreate() {
         super.onCreate()
 
@@ -78,12 +80,14 @@ class App :
         }
 
         // Initialize cipher deobfuscator for WEB_REMIX streaming
-        CipherDeobfuscator.initialize(this)
+        applicationScope.launch(Dispatchers.IO) {
+            CipherDeobfuscator.initialize(this@App)
+        }
 
         Timber.plant(Timber.DebugTree())
 
         // تهيئة إعدادات التطبيق عند الإقلاع
-        applicationScope.launch {
+        applicationScope.launch(Dispatchers.IO) {
             initializeSettings()
             observeSettingsChanges()
         }
@@ -91,6 +95,7 @@ class App :
 
     private suspend fun initializeSettings() {
         val settings = dataStore.data.first()
+        cachedMaxImageCacheSize = settings[MaxImageCacheSizeKey] ?: 512
         val locale = Locale.getDefault()
         val languageTag = locale.language
 
@@ -161,6 +166,13 @@ class App :
     }
 
     private fun observeSettingsChanges() {
+        applicationScope.launch(Dispatchers.IO) {
+            dataStore.data
+                .map { it[MaxImageCacheSizeKey] ?: 512 }
+                .distinctUntilChanged()
+                .collect { cachedMaxImageCacheSize = it }
+        }
+
         applicationScope.launch(Dispatchers.IO) {
             dataStore.data
                 .map { it[VisitorDataKey] }
@@ -251,10 +263,7 @@ class App :
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val cacheSize =
-            runBlocking {
-                dataStore.data.map { it[MaxImageCacheSizeKey] ?: 512 }.first()
-            }
+        val cacheSize = cachedMaxImageCacheSize
         return ImageLoader
             .Builder(this)
             .apply {

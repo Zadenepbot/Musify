@@ -19,6 +19,15 @@ import kotlinx.coroutines.withContext
  */
 object PlayerColorExtractor {
 
+    private val colorCache = mutableMapOf<String, List<Color>>()
+    private val themeColorCache = mutableMapOf<String, Int>()
+
+    fun getCachedColors(id: String): List<Color>? = colorCache[id]
+    fun putColors(id: String, colors: List<Color>) {
+        if (colorCache.size > 50) colorCache.clear() // Prevent memory leaks
+        colorCache[id] = colors
+    }
+
     /**
      * Extracts colors from a palette and creates a gradient
      * 
