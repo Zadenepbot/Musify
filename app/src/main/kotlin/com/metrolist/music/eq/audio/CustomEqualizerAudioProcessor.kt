@@ -8,6 +8,7 @@ import com.metrolist.music.eq.data.ParametricEQBand
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.pow
 
 /**
@@ -39,6 +40,8 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     @Volatile
     private var shouldDisable = false
 
+    private val profileLock = ReentrantLock()
+
     companion object {
         private const val TAG = "CustomEqualizerAudioProcessor"
         private val EMPTY_BUFFER: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
@@ -48,16 +51,26 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
      * Apply an EQ profile. This is now non-blocking.
      */
     fun applyProfile(parametricEQ: ParametricEQ) {
-        nextProfile = parametricEQ
-        shouldDisable = false
+        profileLock.lock()
+        try {
+            nextProfile = parametricEQ
+            shouldDisable = false
+        } finally {
+            profileLock.unlock()
+        }
     }
 
     /**
      * Disable the equalizer. This is now non-blocking.
      */
     fun disable() {
-        shouldDisable = true
-        nextProfile = null
+        profileLock.lock()
+        try {
+            shouldDisable = true
+            nextProfile = null
+        } finally {
+            profileLock.unlock()
+        }
     }
 
     /**
@@ -94,24 +107,29 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     }
 
     private fun checkPendingUpdates() {
-        if (shouldDisable) {
-            equalizerEnabled = false
-            filters = emptyList()
-            preampGain = 1.0
-            shouldDisable = false
-            nextProfile = null
-            Timber.tag(TAG).d("Equalizer disabled on audio thread")
-            return
-        }
+        profileLock.lock()
+        try {
+            if (shouldDisable) {
+                equalizerEnabled = false
+                filters = emptyList()
+                preampGain = 1.0
+                shouldDisable = false
+                nextProfile = null
+                Timber.tag(TAG).d("Equalizer disabled on audio thread")
+                return
+            }
 
-        val profile = nextProfile
-        if (profile != null && sampleRate != 0) {
-            preampGain = 10.0.pow(profile.preamp / 20.0)
-            createFilters(profile.bands)
-            equalizerEnabled = true
-            filters.forEach { it.reset() }
-            nextProfile = null
-            Timber.tag(TAG).d("Applied new EQ profile on audio thread: ${filters.size} filters")
+            val profile = nextProfile
+            if (profile != null && sampleRate != 0) {
+                preampGain = 10.0.pow(profile.preamp / 20.0)
+                createFilters(profile.bands)
+                equalizerEnabled = true
+                filters.forEach { it.reset() }
+                nextProfile = null
+                Timber.tag(TAG).d("Applied new EQ profile on audio thread: ${filters.size} filters")
+            }
+        } finally {
+            profileLock.unlock()
         }
     }
 
@@ -129,14 +147,19 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
         }
 
         // Apply pending profile if one exists
-        val profile = nextProfile
-        if (profile != null) {
-            preampGain = 10.0.pow(profile.preamp / 20.0)
-            createFilters(profile.bands)
-            equalizerEnabled = true
-            nextProfile = null
-            Timber.tag(TAG)
-                .d("Applied pending profile during configuration: ${filters.size} filters")
+        profileLock.lock()
+        try {
+            val profile = nextProfile
+            if (profile != null) {
+                preampGain = 10.0.pow(profile.preamp / 20.0)
+                createFilters(profile.bands)
+                equalizerEnabled = true
+                nextProfile = null
+                Timber.tag(TAG)
+                    .d("Applied pending profile during configuration: ${filters.size} filters")
+            }
+        } finally {
+            profileLock.unlock()
         }
 
         isActive = true

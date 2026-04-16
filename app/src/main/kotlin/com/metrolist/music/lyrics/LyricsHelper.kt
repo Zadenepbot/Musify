@@ -20,6 +20,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -132,12 +133,13 @@ constructor(
 
         val result = withTimeoutOrNull(MAX_LYRICS_FETCH_MS) {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(mediaMetadata.title)
-            val enabledProviders = lyricsProviders.map { 
-                async { it to it.isEnabled(context) } 
-            }.awaitAll()
-                .filter { it.second }
+            val enabledProviders = coroutineScope {
+                lyricsProviders.map { provider ->
+                    async { provider to provider.isEnabled(context) }
+                }.awaitAll()
+            }.filter { it.second }
                 .map { it.first }
-            
+
             val perProviderTimeout = MAX_LYRICS_FETCH_MS / enabledProviders.size.coerceAtLeast(1)
 
             for (provider in enabledProviders) {
@@ -215,10 +217,11 @@ constructor(
         currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
             val cleanedTitle = LyricsUtils.cleanTitleForSearch(songTitle)
             
-            val enabledProviders = lyricsProviders.map { 
-                async { it to it.isEnabled(context) } 
-            }.awaitAll()
-                .filter { it.second }
+            val enabledProviders = coroutineScope {
+                lyricsProviders.map { provider ->
+                    async { provider to provider.isEnabled(context) }
+                }.awaitAll()
+            }.filter { it.second }
                 .map { it.first }
 
             enabledProviders.forEach { provider ->

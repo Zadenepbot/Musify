@@ -1494,13 +1494,13 @@ interface DatabaseDao {
      */
     suspend fun incrementPlayCount(songId: String) {
         val time = LocalDateTime.now().atOffset(ZoneOffset.UTC)
-        val oldCount = getPlayCountByMonthSuspend(songId, time.year, time.monthValue) ?: 0
+        val existingCount = getPlayCountByMonthSuspend(songId, time.year, time.monthValue)
 
-        // add new
-        if (oldCount <= 0) {
-            insert(PlayCountEntity(songId, time.year, time.monthValue, 0))
+        if (existingCount == null) {
+            insert(PlayCountEntity(songId, time.year, time.monthValue, 1))
+        } else {
+            incrementPlayCount(songId, time.year, time.monthValue)
         }
-        incrementPlayCount(songId, time.year, time.monthValue)
     }
 
     @Transaction
