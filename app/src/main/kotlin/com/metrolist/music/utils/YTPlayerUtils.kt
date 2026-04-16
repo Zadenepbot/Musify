@@ -444,14 +444,50 @@ object YTPlayerUtils {
 
         Timber.tag(logTag).d("Finding format: maxBitrate=$maxBitrate, targetBitrate=$targetBitrate")
 
-        val format = audioCapableFormats
-            .filter { it.bitrate >= targetBitrate && it.isOriginal }
-            .maxByOrNull { it.bitrate }
-            ?: audioCapableFormats.maxByOrNull { it.bitrate }
+        val format = when (audioQuality) {
+            AudioQuality.VERY_HIGH -> {
+                val opus338 = audioCapableFormats.find { it.itag == 338 }
+                if (opus338 != null) {
+                    Timber.tag(logTag).d("Selected Opus itag 338: bitrate=${opus338.bitrate}")
+                    return opus338
+                }
 
-        if (format != null) {
+                val opus141 = audioCapableFormats.find { it.itag == 141 }
+                if (opus141 != null) {
+                    Timber.tag(logTag).d("Selected AAC itag 141: bitrate=${opus141.bitrate}")
+                    return opus141
+                }
+
+                audioCapableFormats
+                    .filter { it.isOriginal }
+                    .maxByOrNull { it.bitrate }
+                    ?: audioCapableFormats.maxByOrNull { it.bitrate }
+            }
+
+            else -> {
+                val cappedFormats = audioCapableFormats.filter { it.bitrate <= targetBitrate }
+                val format = cappedFormats
+                    .filter { it.isOriginal }
+                    .maxByOrNull { it.bitrate }
+                    ?: cappedFormats.maxByOrNull { it.bitrate }
+                    ?: audioCapableFormats
+                        .filter { it.isOriginal }
+                        .minByOrNull { kotlin.math.abs(it.bitrate - targetBitrate) }
+                    ?: audioCapableFormats.maxByOrNull { it.bitrate }
+
+                if (format != null) {
+                    Timber.tag(logTag).d("Selected format: ${format.mimeType}, bitrate: ${format.bitrate}")
+                } else {
+                    Timber.tag(logTag).d("No suitable audio format found")
+                }
+
+                format
+            }
+        }
+
+        if (format != null && audioQuality == AudioQuality.VERY_HIGH) {
             Timber.tag(logTag).d("Selected format: ${format.mimeType}, bitrate: ${format.bitrate}")
-        } else {
+        } else if (format == null) {
             Timber.tag(logTag).d("No suitable audio format found")
         }
 
