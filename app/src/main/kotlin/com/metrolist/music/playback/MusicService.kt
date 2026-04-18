@@ -28,6 +28,7 @@ import android.media.audiofx.LoudnessEnhancer
 import android.net.ConnectivityManager
 import android.os.Binder
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -75,9 +76,11 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.MoreExecutors
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.SongItem
@@ -380,6 +383,9 @@ class MusicService :
     private var lastPlaybackSpeed = 1.0f
     private var discordUpdateJob: kotlinx.coroutines.Job? = null
 
+    @Volatile
+    private var latestMediaNotification: Notification? = null
+
     private var scrobbleManager: ScrobbleManager? = null
 
     val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
@@ -481,7 +487,7 @@ class MusicService :
             return
         }
 
-        setMediaNotificationProvider(
+        val defaultMediaNotificationProvider =
             DefaultMediaNotificationProvider(
                 this,
                 { NOTIFICATION_ID },
@@ -489,6 +495,38 @@ class MusicService :
                 R.string.music_player,
             ).apply {
                 setSmallIcon(R.drawable.small_icon)
+            }
+
+        setMediaNotificationProvider(
+            object : MediaNotification.Provider {
+                override fun createNotification(
+                    mediaSession: MediaSession,
+                    mediaButtonPreferences: ImmutableList<CommandButton>,
+                    actionFactory: MediaNotification.ActionFactory,
+                    onNotificationChangedCallback: MediaNotification.Provider.Callback,
+                ): MediaNotification {
+                    val trackingCallback =
+                        MediaNotification.Provider.Callback { notification ->
+                            latestMediaNotification = notification.notification
+                            onNotificationChangedCallback.onNotificationChanged(notification)
+                        }
+
+                    return defaultMediaNotificationProvider
+                        .createNotification(
+                            mediaSession,
+                            mediaButtonPreferences,
+                            actionFactory,
+                            trackingCallback,
+                        ).also { mediaNotification ->
+                            latestMediaNotification = mediaNotification.notification
+                        }
+                }
+
+                override fun handleCustomCommand(
+                    session: MediaSession,
+                    action: String,
+                    extras: Bundle,
+                ): Boolean = defaultMediaNotificationProvider.handleCustomCommand(session, action, extras)
             },
         )
         player = createExoPlayer()
@@ -2841,23 +2879,25 @@ class MusicService :
                                                 .header("Proxy-Authorization", auth)
                                                 .build()
                                         } ?: response.request
-                                    }
-                                    .addInterceptor { chain ->
+                                    }.addInterceptor { chain ->
                                         var request = chain.request()
                                         if (request.url.queryParameter(PRIVATE_STREAM_MARKER) != null) {
-                                            val cleanUrl = request.url.newBuilder()
-                                                .removeAllQueryParameters(PRIVATE_STREAM_MARKER)
-                                                .build()
+                                            val cleanUrl =
+                                                request.url
+                                                    .newBuilder()
+                                                    .removeAllQueryParameters(PRIVATE_STREAM_MARKER)
+                                                    .build()
                                             val builder = request.newBuilder().url(cleanUrl)
                                             val host = cleanUrl.host
-                                            if (host == "youtube.com" || host.endsWith(".youtube.com") || host.endsWith(".googlevideo.com")) {
+                                            if (host == "youtube.com" || host.endsWith(".youtube.com") ||
+                                                host.endsWith(".googlevideo.com")
+                                            ) {
                                                 YouTube.cookie?.let { builder.header("Cookie", it) }
                                             }
                                             request = builder.build()
                                         }
                                         chain.proceed(request)
-                                    }
-                                    .build(),
+                                    }.build(),
                             ),
                         ),
                     ),
@@ -3069,12 +3109,13 @@ class MusicService :
                 val streamUrl = nonNullPlayback.streamUrl
 
                 // For privately-owned tracks, mark the URL so the interceptor attaches auth cookies
-                val finalUrl = if (nonNullPlayback.isPrivatelyOwned) {
-                    val sep = if ("?" in streamUrl) "&" else "?"
-                    "${streamUrl}${sep}${PRIVATE_STREAM_MARKER}=1"
-                } else {
-                    streamUrl
-                }
+                val finalUrl =
+                    if (nonNullPlayback.isPrivatelyOwned) {
+                        val sep = if ("?" in streamUrl) "&" else "?"
+                        "${streamUrl}${sep}${PRIVATE_STREAM_MARKER}=1"
+                    } else {
+                        streamUrl
+                    }
 
                 songUrlCache[mediaId] =
                     finalUrl to System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
@@ -3245,31 +3286,55 @@ class MusicService :
      * enter the foreground state, stop immediately so the system does not ANR the app process.
      */
     private fun ensureStartedAsForegroundOrStop(): Boolean =
-        try {
-            val nm = getSystemService(NotificationManager::class.java)
-            nm?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    getString(R.string.music_player),
-                    NotificationManager.IMPORTANCE_LOW,
-                ),
+        startForegroundSafely(
+            notification = createFallbackForegroundNotification(),
+            deniedMessage = "Foreground service start not allowed; stopping service to avoid ANR",
+            failureMessage = "Failed to enter foreground; stopping service to avoid ANR",
+        )
+
+    private fun ensureForegroundWithLatestNotificationOrStop(): Boolean =
+        startForegroundSafely(
+            notification = latestMediaNotification ?: createFallbackForegroundNotification(),
+            deniedMessage = "Foreground promotion denied during notification update; stopping service",
+            failureMessage = "Failed to promote service during notification update; stopping service",
+        )
+
+    private fun ensureForegroundChannelExists() {
+        val nm = getSystemService(NotificationManager::class.java)
+        nm?.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.music_player),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
+    }
+
+    private fun createFallbackForegroundNotification(): Notification {
+        ensureForegroundChannelExists()
+        val pending =
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
             )
-            val pending =
-                PendingIntent.getActivity(
-                    this,
-                    0,
-                    Intent(this, MainActivity::class.java),
-                    PendingIntent.FLAG_IMMUTABLE,
-                )
-            val notification: Notification =
-                NotificationCompat
-                    .Builder(this, CHANNEL_ID)
-                    .setContentTitle(getString(R.string.music_player))
-                    .setContentText("")
-                    .setSmallIcon(R.drawable.small_icon)
-                    .setContentIntent(pending)
-                    .setOngoing(true)
-                    .build()
+        return NotificationCompat
+            .Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.music_player))
+            .setContentText("")
+            .setSmallIcon(R.drawable.small_icon)
+            .setContentIntent(pending)
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun startForegroundSafely(
+        notification: Notification,
+        deniedMessage: String,
+        failureMessage: String,
+    ): Boolean =
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
@@ -3281,11 +3346,11 @@ class MusicService :
             }
             true
         } catch (e: ForegroundServiceStartNotAllowedException) {
-            Timber.tag(TAG).w(e, "Foreground service start not allowed; stopping service to avoid ANR")
+            Timber.tag(TAG).w(e, deniedMessage)
             stopSelf()
             false
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Failed to enter foreground; stopping service to avoid ANR")
+            Timber.tag(TAG).e(e, failureMessage)
             reportException(e)
             stopSelf()
             false
@@ -3382,7 +3447,15 @@ class MusicService :
         startInForegroundRequired: Boolean,
     ) {
         try {
-            super.onUpdateNotification(session, startInForegroundRequired)
+            // Media3 1.7.x promotes with ContextCompat.startForegroundService() from an async
+            // callback, which can throw ForegroundServiceStartNotAllowedException on newer
+            // Android versions outside MediaSessionService's internal try/catch path.
+            // Always request a background-safe notification update and promote manually with
+            // startForeground() so we can fail gracefully instead of crashing the process.
+            super.onUpdateNotification(session, false)
+            if (startInForegroundRequired) {
+                ensureForegroundWithLatestNotificationOrStop()
+            }
         } catch (e: ForegroundServiceStartNotAllowedException) {
             handleForegroundServiceStartNotAllowed(e)
         } catch (e: IllegalStateException) {
