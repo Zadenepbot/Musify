@@ -33,6 +33,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
@@ -508,7 +509,15 @@ class MusicService :
                     val trackingCallback =
                         MediaNotification.Provider.Callback { notification ->
                             latestMediaNotification = notification.notification
-                            onNotificationChangedCallback.onNotificationChanged(notification)
+                            Handler(Looper.getMainLooper()).post {
+                                runCatching {
+                                    NotificationManagerCompat
+                                        .from(this@MusicService)
+                                        .notify(notification.notificationId, notification.notification)
+                                }.onFailure { error ->
+                                    Timber.tag(TAG).w(error, "Failed to post async media notification update")
+                                }
+                            }
                         }
 
                     return defaultMediaNotificationProvider
@@ -527,6 +536,9 @@ class MusicService :
                     action: String,
                     extras: Bundle,
                 ): Boolean = defaultMediaNotificationProvider.handleCustomCommand(session, action, extras)
+
+                override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
+                    defaultMediaNotificationProvider.notificationChannelInfo
             },
         )
         player = createExoPlayer()
