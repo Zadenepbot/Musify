@@ -1508,6 +1508,7 @@ class MusicService :
 
                 currentQueue = radioQueue
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // Fallback: try with related endpoint
                 try {
                     val nextResult =
