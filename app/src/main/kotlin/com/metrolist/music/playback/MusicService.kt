@@ -193,6 +193,7 @@ import com.metrolist.music.widget.MetrolistWidgetManager
 import com.metrolist.music.widget.MusicWidgetReceiver
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -215,6 +216,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -228,6 +231,9 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val INSTANT_SILENCE_SKIP_STEP_MS = 15_000L
 private const val INSTANT_SILENCE_SKIP_SETTLE_MS = 350L
+
+private class NoRadioRecommendationsException :
+    IllegalStateException("No radio recommendations available for current track")
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -397,6 +403,10 @@ class MusicService :
     private var retryJob: Job? = null
     private var retryCount = 0
     private var silenceSkipJob: Job? = null
+    private val likeToggleMutex = Mutex()
+    private val libraryToggleMutex = Mutex()
+    private val addToTargetPlaylistMutex = Mutex()
+    private val startRadioMutex = Mutex()
 
     // URL cache for stream URLs - class-level so it can be invalidated on errors
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
@@ -546,10 +556,10 @@ class MusicService :
 
         mediaLibrarySessionCallback.apply {
             service = this@MusicService
-            toggleLike = ::toggleLike
-            toggleStartRadio = ::toggleStartRadio
-            toggleLibrary = ::toggleLibrary
-            addToTargetPlaylist = ::addToTargetPlaylist
+            toggleLike = ::toggleLikeInternal
+            toggleStartRadio = ::toggleStartRadioInternal
+            toggleLibrary = ::toggleLibraryInternal
+            addToTargetPlaylist = ::addToTargetPlaylistInternal
         }
         mediaSession =
             MediaLibrarySession
@@ -718,10 +728,22 @@ class MusicService :
             }
         }
 
-        currentSong.debounce(1000).collect(scope) { song ->
-            updateNotification()
-            updateWidgetUI(player.isPlaying)
-        }
+        currentSong
+            .distinctUntilChangedBy { song ->
+                song?.let {
+                    listOf(
+                        it.song.id,
+                        it.song.liked,
+                        it.song.inLibrary,
+                        it.song.title,
+                        it.song.thumbnailUrl,
+                        it.artists.joinToString("|") { artist -> artist.name },
+                    )
+                }
+            }.collect(scope) {
+                updateNotification()
+                updateWidgetUI(player.isPlaying)
+            }
 
         combine(
             currentMediaMetadata.distinctUntilChangedBy { it?.id },
@@ -1245,21 +1267,29 @@ class MusicService :
     }
 
     private fun updateNotification() {
+        val song = currentSong.value?.song
+        val metadata = currentMediaMetadata.value ?: player.currentMetadata
+        val isEpisode = (song?.isEpisode == true) || (metadata?.isEpisode == true)
+        val isFavorite =
+            if (isEpisode) {
+                if (song != null) song.inLibrary != null else metadata?.inLibrary != null
+            } else {
+                if (song != null) song.liked else metadata?.liked == true
+            }
+
         mediaSession.setCustomLayout(
             listOf(
                 CommandButton
                     .Builder()
                     .setDisplayName(
                         getString(
-                            if (currentSong.value?.song?.liked ==
-                                true
-                            ) {
+                            if (isFavorite) {
                                 R.string.action_remove_like
                             } else {
                                 R.string.action_like
                             },
                         ),
-                    ).setIconResId(if (currentSong.value?.song?.liked == true) R.drawable.ic_heart else R.drawable.ic_heart_outline)
+                    ).setIconResId(if (isFavorite) R.drawable.ic_heart else R.drawable.ic_heart_outline)
                     .setSessionCommand(CommandToggleLike)
                     .setEnabled(currentSong.value != null)
                     .build(),
@@ -1391,68 +1421,94 @@ class MusicService :
             player.playWhenReady = playWhenReady
         }
         scope.launch(SilentHandler) {
-            val initialStatus =
-                withContext(Dispatchers.IO) {
-                    queue
-                        .getInitialStatus()
-                        .filterExplicit(dataStore.get(HideExplicitKey, false))
-                        .filterVideoSongs(dataStore.get(HideVideoSongsKey, false))
+            try {
+                val initialStatus =
+                    withContext(Dispatchers.IO) {
+                        queue
+                            .getInitialStatus()
+                            .filterExplicit(dataStore.get(HideExplicitKey, false))
+                            .filterVideoSongs(dataStore.get(HideVideoSongsKey, false))
+                    }
+                if (queue.preloadItem != null && player.playbackState == STATE_IDLE) return@launch
+                if (initialStatus.title != null) {
+                    queueTitle = initialStatus.title
                 }
-            if (queue.preloadItem != null && player.playbackState == STATE_IDLE) return@launch
-            if (initialStatus.title != null) {
-                queueTitle = initialStatus.title
-            }
-            if (initialStatus.items.isEmpty()) return@launch
-            // Track original queue size for shuffle playlist first feature
-            originalQueueSize = initialStatus.items.size
-            if (queue.preloadItem != null) {
-                player.addMediaItems(
-                    0,
-                    initialStatus.items.subList(0, initialStatus.mediaItemIndex),
-                )
-                player.addMediaItems(
-                    initialStatus.items.subList(
-                        initialStatus.mediaItemIndex + 1,
-                        initialStatus.items.size,
-                    ),
-                )
-            } else {
-                player.setMediaItems(
-                    initialStatus.items,
-                    if (initialStatus.mediaItemIndex >
-                        0
-                    ) {
-                        initialStatus.mediaItemIndex
-                    } else {
-                        0
-                    },
-                    initialStatus.position,
-                )
-                player.prepare()
-                player.playWhenReady = playWhenReady
-            }
+                if (initialStatus.items.isEmpty()) return@launch
+                // Track original queue size for shuffle playlist first feature
+                originalQueueSize = initialStatus.items.size
+                if (queue.preloadItem != null) {
+                    player.addMediaItems(
+                        0,
+                        initialStatus.items.subList(0, initialStatus.mediaItemIndex),
+                    )
+                    player.addMediaItems(
+                        initialStatus.items.subList(
+                            initialStatus.mediaItemIndex + 1,
+                            initialStatus.items.size,
+                        ),
+                    )
+                } else {
+                    player.setMediaItems(
+                        initialStatus.items,
+                        if (initialStatus.mediaItemIndex >
+                            0
+                        ) {
+                            initialStatus.mediaItemIndex
+                        } else {
+                            0
+                        },
+                        initialStatus.position,
+                    )
+                    player.prepare()
+                    player.playWhenReady = playWhenReady
+                }
 
-            // Rebuild shuffle order if shuffle is enabled
-            if (player.shuffleModeEnabled) {
-                val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
-                applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
+                // Rebuild shuffle order if shuffle is enabled
+                if (player.shuffleModeEnabled) {
+                    val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
+                    applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to load queue")
+                reportException(e)
             }
         }
     }
 
     fun startRadioSeamlessly() {
-        // Safety Check: Ensure Player is initilized
-        if (!playerInitialized.value) {
-            Timber.tag(TAG).w("startRadioSeamlessly called before player initialization")
-            return
-        }
-
-        val currentMediaMetadata = player.currentMetadata ?: return
-
-        val currentIndex = player.currentMediaItemIndex
-        val currentMediaId = currentMediaMetadata.id
-
         scope.launch(SilentHandler) {
+            runStartRadioSafely("Failed to start radio seamlessly")
+        }
+    }
+
+    private suspend fun runStartRadioSafely(errorMessage: String) {
+        try {
+            toggleStartRadioInternal()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: NoRadioRecommendationsException) {
+            Timber.tag(TAG).d(e, "Start radio: no recommendations available")
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, errorMessage)
+            reportException(e)
+        }
+    }
+
+    private suspend fun toggleStartRadioInternal() {
+        startRadioMutex.withLock {
+            // Safety Check: Ensure Player is initialized
+            if (!playerInitialized.value) {
+                Timber.tag(TAG).w("startRadioSeamlessly called before player initialization")
+                return
+            }
+
+            val currentMediaMetadata = player.currentMetadata ?: return
+
+            val currentIndex = player.currentMediaItemIndex
+            val currentMediaId = currentMediaMetadata.id
+
             // Use simple videoId to let YouTube personalize recommendations
             val radioQueue =
                 YouTubeQueue(
@@ -1461,6 +1517,7 @@ class MusicService :
                             videoId = currentMediaId,
                         ),
                 )
+            var hasAppliedRadioItems = false
 
             try {
                 val initialStatus =
@@ -1489,6 +1546,7 @@ class MusicService :
                     }
 
                     player.addMediaItems(currentIndex + 1, radioItems)
+                    hasAppliedRadioItems = true
                     if (player.shuffleModeEnabled) {
                         val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
                         applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
@@ -1497,6 +1555,7 @@ class MusicService :
 
                 currentQueue = radioQueue
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // Fallback: try with related endpoint
                 try {
                     val nextResult =
@@ -1522,6 +1581,7 @@ class MusicService :
                                     player.removeMediaItems(currentIndex + 1, itemCount)
                                 }
                                 player.addMediaItems(currentIndex + 1, radioItems)
+                                hasAppliedRadioItems = true
                                 if (player.shuffleModeEnabled) {
                                     val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
                                     applyShuffleOrder(
@@ -1533,9 +1593,14 @@ class MusicService :
                             }
                         }
                     }
-                } catch (_: Exception) {
-                    // Silent fail
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    // No-op, will surface as command failure below.
                 }
+            }
+
+            if (!hasAppliedRadioItems) {
+                throw NoRadioRecommendationsException()
             }
         }
     }
@@ -1546,6 +1611,12 @@ class MusicService :
                 .album(albumId)
                 .onSuccess {
                     getAutomix(it.album.playlistId)
+                }.onFailure {
+                    if (it is CancellationException) {
+                        throw it
+                    }
+                    Timber.tag(TAG).e(it, "Failed to load album for automix: $albumId")
+                    reportException(it)
                 }
         }
     }
@@ -1556,66 +1627,107 @@ class MusicService :
         ) {
             scope.launch(SilentHandler) {
                 try {
-                    // Try primary method
-                    YouTube
-                        .next(WatchEndpoint(playlistId = playlistId))
-                        .onSuccess { firstResult ->
+                    var lastFailure: Throwable? = null
+
+                    fun recordFailure(error: Throwable) {
+                        if (error is CancellationException) {
+                            throw error
+                        }
+                        lastFailure = error
+                    }
+
+                    // Try primary method.
+                    val firstResult =
+                        YouTube
+                            .next(WatchEndpoint(playlistId = playlistId))
+                            .onFailure(::recordFailure)
+                            .getOrNull()
+
+                    if (firstResult != null) {
+                        val secondResult =
                             YouTube
                                 .next(WatchEndpoint(playlistId = firstResult.endpoint.playlistId))
-                                .onSuccess { secondResult ->
-                                    automixItems.value =
-                                        secondResult.items.map { song ->
-                                            song.toMediaItem()
-                                        }
-                                }.onFailure {
-                                    // Fallback: use first result items
-                                    if (firstResult.items.isNotEmpty()) {
-                                        automixItems.value =
-                                            firstResult.items.map { song ->
-                                                song.toMediaItem()
-                                            }
-                                    }
-                                }
-                        }.onFailure {
-                            // Fallback: try with radio format
-                            val currentSong = player.currentMetadata
-                            if (currentSong != null) {
-                                // Use simple videoId for better personalized recommendations
+                                .onFailure(::recordFailure)
+                                .getOrNull()
+
+                        val secondItems =
+                            secondResult
+                                ?.items
+                                ?.map { song ->
+                                    song.toMediaItem()
+                                }.orEmpty()
+                        if (secondItems.isNotEmpty()) {
+                            automixItems.value = secondItems
+                            return@launch
+                        }
+
+                        // Fallback: use first result items.
+                        val firstItems =
+                            firstResult.items.map { song ->
+                                song.toMediaItem()
+                            }
+                        if (firstItems.isNotEmpty()) {
+                            automixItems.value = firstItems
+                            return@launch
+                        }
+                    }
+
+                    // Fallback: try with radio format.
+                    val currentSong = player.currentMetadata
+                    if (currentSong != null) {
+                        val radioResult =
+                            YouTube
+                                .next(
+                                    WatchEndpoint(
+                                        videoId = currentSong.id,
+                                    ),
+                                ).onFailure(::recordFailure)
+                                .getOrNull()
+
+                        val radioItems =
+                            radioResult
+                                ?.items
+                                ?.filter { it.id != currentSong.id }
+                                ?.map { it.toMediaItem() }
+                                .orEmpty()
+                        if (radioItems.isNotEmpty()) {
+                            automixItems.value = radioItems
+                            return@launch
+                        }
+
+                        // Final fallback: try related endpoint.
+                        val relatedEndpoint =
+                            YouTube
+                                .next(WatchEndpoint(videoId = currentSong.id))
+                                .onFailure(::recordFailure)
+                                .getOrNull()
+                                ?.relatedEndpoint
+                        if (relatedEndpoint != null) {
+                            val relatedItems =
                                 YouTube
-                                    .next(
-                                        WatchEndpoint(
-                                            videoId = currentSong.id,
-                                        ),
-                                    ).onSuccess { radioResult ->
-                                        val filteredItems =
-                                            radioResult.items
-                                                .filter { it.id != currentSong.id }
-                                                .map { it.toMediaItem() }
-                                        if (filteredItems.isNotEmpty()) {
-                                            automixItems.value = filteredItems
-                                        }
-                                    }.onFailure {
-                                        // Final fallback: try related endpoint
-                                        YouTube
-                                            .next(WatchEndpoint(videoId = currentSong.id))
-                                            .getOrNull()
-                                            ?.relatedEndpoint
-                                            ?.let { relatedEndpoint ->
-                                                YouTube.related(relatedEndpoint).onSuccess { relatedPage ->
-                                                    val relatedItems =
-                                                        relatedPage.songs
-                                                            .filter { it.id != currentSong.id }
-                                                            .map { it.toMediaItem() }
-                                                    if (relatedItems.isNotEmpty()) {
-                                                        automixItems.value = relatedItems
-                                                    }
-                                                }
-                                            }
-                                    }
+                                    .related(relatedEndpoint)
+                                    .onFailure(::recordFailure)
+                                    .getOrNull()
+                                    ?.songs
+                                    ?.filter { it.id != currentSong.id }
+                                    ?.map { it.toMediaItem() }
+                                    .orEmpty()
+                            if (relatedItems.isNotEmpty()) {
+                                automixItems.value = relatedItems
+                                return@launch
                             }
                         }
-                } catch (_: Exception) {
-                    // Silent fail
+                    }
+
+                    // Report only real failures. Empty recommendation sets remain a benign no-op.
+                    if (lastFailure != null) {
+                        throw lastFailure
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "Failed to load automix for playlist: $playlistId")
+                    reportException(e)
                 }
             }
         }
@@ -1771,68 +1883,206 @@ class MusicService :
 
     fun toggleLibrary() {
         scope.launch {
-            val songToToggle = currentSong.first()
-            songToToggle?.let {
-                val isInLibrary = it.song.inLibrary != null
-                val token = if (isInLibrary) it.song.libraryRemoveToken else it.song.libraryAddToken
-
-                // Call YouTube API with feedback token if available
-                token?.let { feedbackToken ->
-                    YouTube.feedback(listOf(feedbackToken))
-                }
-
-                // Update local database
-                database.query {
-                    update(it.song.toggleLibrary())
-                }
-                currentMediaMetadata.value = player.currentMetadata
+            try {
+                toggleLibraryInternal()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to toggle library")
+                reportException(e)
             }
         }
     }
 
-    fun toggleLike() {
-        scope.launch {
-            val songToToggle = currentSong.first()
-            songToToggle?.let { librarySong ->
-                val songEntity = librarySong.song
+    private suspend fun toggleLibraryInternal() {
+        libraryToggleMutex.withLock {
+            val songToToggle = currentSong.value ?: currentSong.first() ?: return@withLock
+            val previousSong =
+                withContext(Dispatchers.IO) {
+                    database.song(songToToggle.song.id).first()?.song
+                } ?: songToToggle.song
 
-                // For podcast episodes, toggle save for later instead of like
-                if (songEntity.isEpisode) {
-                    toggleEpisodeSaveForLater(songEntity)
-                    return@let
-                }
+            val isInLibrary = previousSong.inLibrary != null
+            val token = if (isInLibrary) previousSong.libraryRemoveToken else previousSong.libraryAddToken
+            val now = LocalDateTime.now()
 
-                val song = songEntity.toggleLike()
-                database.query {
-                    update(song)
-                    syncUtils.likeSong(song)
+            val updatedSong =
+                previousSong.copy(
+                    liked = if (!isInLibrary) previousSong.liked else false,
+                    inLibrary = if (!isInLibrary) now else null,
+                    likedDate = if (!isInLibrary) previousSong.likedDate else null,
+                )
 
-                    // Check if auto-download on like is enabled and the song is now liked
-                    if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
-                        // Trigger download for the liked song
-                        val downloadRequest =
-                            androidx.media3.exoplayer.offline.DownloadRequest
-                                .Builder(song.id, song.id.toUri())
-                                .setCustomCacheKey(song.id)
-                                .setData(song.title.toByteArray())
-                                .build()
-                        androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
-                            this@MusicService,
-                            ExoDownloadService::class.java,
-                            downloadRequest,
-                            false,
-                        )
+            // Optimistic local update first for immediate UI feedback.
+            withContext(Dispatchers.IO) {
+                database.update(updatedSong)
+            }
+
+            try {
+                withContext(Dispatchers.IO) {
+                    if (token != null) {
+                        YouTube.feedback(listOf(token))
+                    } else {
+                        YouTube.toggleSongLibrary(previousSong.id, !isInLibrary)
                     }
                 }
-                currentMediaMetadata.value = player.currentMetadata
+
+                val refreshedSong =
+                    withContext(Dispatchers.IO) {
+                        database.song(updatedSong.id).first()?.song
+                    } ?: updatedSong
+
+                mergeSongStateIntoCurrentMetadata(refreshedSong)
+                updateNotification()
+                updateWidgetUI(player.isPlaying)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+
+                val rolledBackSong =
+                    withContext(Dispatchers.IO) {
+                        runCatching { database.update(previousSong) }
+                            .onFailure { rollbackError ->
+                                Timber.tag(TAG)
+                                    .e(rollbackError, "Failed to rollback library toggle for ${previousSong.id}")
+                            }
+
+                        database.song(previousSong.id).first()?.song ?: previousSong
+                    }
+
+                mergeSongStateIntoCurrentMetadata(rolledBackSong)
+                updateNotification()
+                updateWidgetUI(player.isPlaying)
+                throw e
+            }        }
+    }
+
+    fun toggleLike() {
+        scope.launch {
+            try {
+                toggleLikeInternal()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to toggle like")
+                reportException(e)
             }
+        }
+    }
+
+    private suspend fun toggleLikeInternal() {
+        likeToggleMutex.withLock {
+            val songToToggle = currentSong.value ?: currentSong.first() ?: return@withLock
+            val songEntity =
+                withContext(Dispatchers.IO) {
+                    database.song(songToToggle.song.id).first()?.song
+                } ?: songToToggle.song
+
+            val isEpisode =
+                songEntity.isEpisode ||
+                    (currentMediaMetadata.value?.isEpisode == true) ||
+                    (player.currentMetadata?.isEpisode == true)
+
+            // For podcast episodes, toggle save for later instead of like.
+            if (isEpisode) {
+                toggleEpisodeSaveForLater(songEntity.copy(isEpisode = true))
+                return@withLock
+            }
+
+            val likedAt = if (!songEntity.liked) LocalDateTime.now() else null
+            val updatedSong =
+                songEntity.copy(
+                    liked = !songEntity.liked,
+                    likedDate = likedAt,
+                    inLibrary = if (likedAt != null) songEntity.inLibrary ?: likedAt else songEntity.inLibrary,
+                )
+
+            withContext(Dispatchers.IO) {
+                database.update(updatedSong)
+            }
+
+            try {
+                val refreshedSong =
+                    withContext(Dispatchers.IO) {
+                        database.song(updatedSong.id).first()?.song
+                    } ?: updatedSong
+
+                syncUtils.likeSong(refreshedSong)
+
+                // Check if auto-download on like is enabled and the song is now liked
+                if (refreshedSong.liked && withContext(Dispatchers.IO) { dataStore.get(AutoDownloadOnLikeKey, false) }) {
+                    // Trigger download for the liked song
+                    val downloadRequest =
+                        androidx.media3.exoplayer.offline.DownloadRequest
+                            .Builder(refreshedSong.id, refreshedSong.id.toUri())
+                            .setCustomCacheKey(refreshedSong.id)
+                            .setData(refreshedSong.title.toByteArray())
+                            .build()
+                    androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
+                        this@MusicService,
+                        ExoDownloadService::class.java,
+                        downloadRequest,
+                        false,
+                    )
+                }
+
+                mergeSongStateIntoCurrentMetadata(refreshedSong)
+                updateNotification()
+                updateWidgetUI(player.isPlaying)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+
+                val rolledBackSong =
+                    withContext(Dispatchers.IO) {
+                        runCatching { database.update(songEntity) }
+                            .onFailure { rollbackError ->
+                                Timber.tag(TAG)
+                                    .e(rollbackError, "Failed to rollback like toggle for ${songEntity.id}")
+                            }
+
+                        database.song(songEntity.id).first()?.song ?: songEntity
+                    }
+
+                mergeSongStateIntoCurrentMetadata(rolledBackSong)
+                updateNotification()
+                updateWidgetUI(player.isPlaying)
+                throw e
+            }
+        }
+    }
+
+    private fun mergeSongStateIntoCurrentMetadata(songEntity: com.metrolist.music.db.entities.SongEntity) {
+        val baseMetadata = player.currentMetadata ?: currentMediaMetadata.value
+        if (baseMetadata?.id == songEntity.id) {
+            currentMediaMetadata.value =
+                baseMetadata.copy(
+                    liked = songEntity.liked,
+                    likedDate = songEntity.likedDate,
+                    inLibrary = songEntity.inLibrary,
+                    isEpisode = songEntity.isEpisode,
+                )
         }
     }
 
     fun addToTargetPlaylist() {
         scope.launch {
-            val currentSong = currentSong.first() ?: return@launch
-            val targetPlaylistId = dataStore.get(AndroidAutoTargetPlaylistKey, MediaSessionConstants.TARGET_PLAYLIST_AUTO)
+            try {
+                addToTargetPlaylistInternal()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to add current song to target playlist")
+                reportException(e)
+            }
+        }
+    }
+
+    private suspend fun addToTargetPlaylistInternal() {
+        addToTargetPlaylistMutex.withLock {
+            val currentSongItem = currentSong.value ?: currentSong.first() ?: return
+            val targetPlaylistId =
+                withContext(Dispatchers.IO) {
+                    dataStore.get(AndroidAutoTargetPlaylistKey, MediaSessionConstants.TARGET_PLAYLIST_AUTO)
+                }
 
             if (targetPlaylistId == MediaSessionConstants.TARGET_PLAYLIST_AUTO) {
                 Handler(Looper.getMainLooper()).post {
@@ -1843,39 +2093,83 @@ class MusicService :
                             Toast.LENGTH_SHORT,
                         ).show()
                 }
-                return@launch
+                return
             }
 
-            val targetPlaylist = database.playlist(targetPlaylistId).first()
-            if (targetPlaylist != null) {
-                database.addSongsToPlaylist(targetPlaylist, listOf(currentSong.id to null), prepend = true)
+            withContext(Dispatchers.IO) {
+                val targetPlaylist = database.playlist(targetPlaylistId).first() ?: return@withContext
+                val exists = database.checkInPlaylist(targetPlaylist.id, currentSongItem.id) > 0
+                if (!exists) {
+                    database.addSongsToPlaylist(targetPlaylist, listOf(currentSongItem.id to null), prepend = true)
+                }
             }
         }
     }
 
     private suspend fun toggleEpisodeSaveForLater(songEntity: com.metrolist.music.db.entities.SongEntity) {
-        val isCurrentlySaved = songEntity.inLibrary != null
+        val previousSong =
+            withContext(Dispatchers.IO) {
+                database.song(songEntity.id).first()?.song
+            } ?: songEntity
+
+        val isCurrentlySaved = previousSong.inLibrary != null
         val shouldBeSaved = !isCurrentlySaved
+        val updatedInLibrary = if (isCurrentlySaved) null else java.time.LocalDateTime.now()
+        val updatedSong =
+            previousSong.copy(
+                inLibrary = updatedInLibrary,
+                isEpisode = true,
+            )
 
         // Update database first (optimistic update)
         // Also ensure isEpisode = true so it appears in saved episodes list
-        database.query {
-            update(
-                songEntity.copy(
-                    inLibrary = if (isCurrentlySaved) null else java.time.LocalDateTime.now(),
-                    isEpisode = true,
-                ),
-            )
+        withContext(Dispatchers.IO) {
+            database.update(updatedSong)
         }
-        currentMediaMetadata.value = player.currentMetadata
 
-        // Sync with YouTube (handles login check internally)
-        val setVideoId = if (isCurrentlySaved) database.getSetVideoId(songEntity.id)?.setVideoId else null
-        syncUtils.saveEpisode(songEntity.id, shouldBeSaved, setVideoId)
+        // Update in-memory metadata immediately so notification state updates without delay,
+        // but only if we're still on the same track the user toggled.
+        mergeSongStateIntoCurrentMetadata(updatedSong)
+
+        updateNotification()
+        updateWidgetUI(player.isPlaying)
+
+        try {
+            // Sync with YouTube (handles login check internally)
+            val setVideoId =
+                if (isCurrentlySaved) {
+                    withContext(Dispatchers.IO) {
+                        database.getSetVideoId(previousSong.id)?.setVideoId
+                    }
+                } else {
+                    null
+                }
+            syncUtils.saveEpisode(previousSong.id, shouldBeSaved, setVideoId)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+
+            val rolledBackSong =
+                withContext(Dispatchers.IO) {
+                    runCatching { database.update(previousSong) }
+                        .onFailure { rollbackError ->
+                            Timber.tag(TAG)
+                                .e(rollbackError, "Failed to rollback episode save toggle for ${previousSong.id}")
+                        }
+
+                    database.song(previousSong.id).first()?.song ?: previousSong
+                }
+
+            mergeSongStateIntoCurrentMetadata(rolledBackSong)
+            updateNotification()
+            updateWidgetUI(player.isPlaying)
+            throw e
+        }
     }
 
     fun toggleStartRadio() {
-        startRadioSeamlessly()
+        scope.launch(SilentHandler) {
+            runStartRadioSafely("Failed to start radio")
+        }
     }
 
     private fun setupLoudnessEnhancer() {
@@ -2113,19 +2407,26 @@ class MusicService :
             !(dataStore.get(DisableLoadMoreWhenRepeatAllKey, false) && player.repeatMode == REPEAT_MODE_ALL)
         ) {
             scope.launch(SilentHandler) {
-                val mediaItems =
-                    withContext(Dispatchers.IO) {
-                        currentQueue
-                            .nextPage()
-                            .filterExplicit(dataStore.get(HideExplicitKey, false))
-                            .filterVideoSongs(dataStore.get(HideVideoSongsKey, false))
+                try {
+                    val mediaItems =
+                        withContext(Dispatchers.IO) {
+                            currentQueue
+                                .nextPage()
+                                .filterExplicit(dataStore.get(HideExplicitKey, false))
+                                .filterVideoSongs(dataStore.get(HideVideoSongsKey, false))
+                        }
+                    if (player.playbackState != STATE_IDLE && mediaItems.isNotEmpty()) {
+                        player.addMediaItems(mediaItems)
+                        if (player.shuffleModeEnabled) {
+                            val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
+                            applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
+                        }
                     }
-                if (player.playbackState != STATE_IDLE && mediaItems.isNotEmpty()) {
-                    player.addMediaItems(mediaItems)
-                    if (player.shuffleModeEnabled) {
-                        val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
-                        applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
-                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "Failed to auto load more songs")
+                    reportException(e)
                 }
             }
         }
