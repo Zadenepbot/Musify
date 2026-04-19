@@ -7,7 +7,7 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
-val baseApplicationId = "com.metrolist.music"
+val baseApplicationId = "com.musify.app"
 val applicationIdOverride = System.getenv("METROLIST_APPLICATION_ID")?.takeIf { it.isNotBlank() }
 val appNameOverride = System.getenv("METROLIST_APP_NAME")?.takeIf { it.isNotBlank() }
 val debugKeystorePathOverride = System.getenv("METROLIST_DEBUG_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
@@ -35,7 +35,7 @@ android {
         targetSdk = 36
         versionCode = 145
         versionName = "13.4.1"
-        resValue("string", "app_name", appNameOverride ?: "Metrolist")
+        resValue("string", "app_name", appNameOverride ?: "Musify")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -56,14 +56,14 @@ android {
             dimension = "variant"
             isDefault = true
             buildConfigField("Boolean", "CAST_AVAILABLE", "false")
-            buildConfigField("Boolean", "UPDATER_AVAILABLE", "true")
+            buildConfigField("Boolean", "UPDATER_AVAILABLE", "false")
         }
 
         // GMS variant - with Google Cast support (requires Google Play Services)
         create("gms") {
             dimension = "variant"
             buildConfigField("Boolean", "CAST_AVAILABLE", "true")
-            buildConfigField("Boolean", "UPDATER_AVAILABLE", "true")
+            buildConfigField("Boolean", "UPDATER_AVAILABLE", "false")
         }
 
         // IzzyOnDroid variant - no Google Cast, no built-in updater (store handles updates)
@@ -118,7 +118,7 @@ android {
             }
             isDebuggable = true
             if (appNameOverride == null) {
-                resValue("string", "app_name", "Metrolist Debug")
+                resValue("string", "app_name", "Musify Debug")
             }
             signingConfig =
                 if (workflowDebugKeystoreFile != null) {
