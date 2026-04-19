@@ -5,17 +5,31 @@
 
 package com.metrolist.music.utils
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import androidx.core.graphics.createBitmap
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.BitmapLoader
+import coil3.imageLoader
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.guava.future
 import timber.log.Timber
 
-class CoilBitmapLoader : BitmapLoader {
+class CoilBitmapLoader(
+    private val context: Context,
+    private val scope: CoroutineScope,
+) : BitmapLoader {
     override fun supportsMimeType(mimeType: String): Boolean = mimeType.startsWith("image/")
 
     private fun createFallbackBitmap(): Bitmap = createBitmap(64, 64)
@@ -32,20 +46,63 @@ class CoilBitmapLoader : BitmapLoader {
         }
 
     override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> =
-        Futures.immediateFuture(
+        scope.future(Dispatchers.IO) {
             try {
                 val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
                 bitmap?.copyIfNeeded() ?: createFallbackBitmap()
             } catch (e: Exception) {
                 Timber.tag("CoilBitmapLoader").w(e, "Failed to decode bitmap data")
                 createFallbackBitmap()
-            },
-        )
+            }
+        }
 
-    override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> = Futures.immediateFuture(createFallbackBitmap())
+    private fun shouldSkipNetworkArtwork(uri: Uri): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        return when (uri.scheme?.lowercase()) {
+            "http", "https" -> true
+            else -> false
+        }
+    }
+
+    override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
+        if (shouldSkipNetworkArtwork(uri)) {
+            return Futures.immediateFuture(createFallbackBitmap())
+        }
+
+        return scope.future(Dispatchers.IO) {
+            try {
+                val request =
+                    ImageRequest
+                        .Builder(context)
+                        .data(uri)
+                        .allowHardware(false)
+                        .build()
+
+                when (val result = context.imageLoader.execute(request)) {
+                    is ErrorResult -> {
+                        createFallbackBitmap()
+                    }
+
+                    is SuccessResult -> {
+                        try {
+                            val bitmap = result.image.toBitmap()
+                            bitmap.copyIfNeeded()
+                        } catch (e: Exception) {
+                            Timber.tag("CoilBitmapLoader").w(e, "Failed to convert image to bitmap")
+                            createFallbackBitmap()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.tag("CoilBitmapLoader").w(e, "Failed to load bitmap from uri")
+                createFallbackBitmap()
+            }
+        }
+    }
 
     override fun loadBitmapFromMetadata(metadata: MediaMetadata): ListenableFuture<Bitmap>? {
-        val artworkData = metadata.artworkData ?: return null
-        return decodeBitmap(artworkData)
+        metadata.artworkData?.let { return decodeBitmap(it) }
+        val artworkUri = metadata.artworkUri ?: return null
+        return loadBitmap(artworkUri)
     }
 }
